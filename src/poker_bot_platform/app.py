@@ -14,6 +14,8 @@ from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.config import Settings
 from poker_bot_platform.integration import (
     AdminCoordinatorService,
+    HeadlessGameplayRuntime,
+    RuntimeAdminCoordinatorService,
     SyncedEntrantService,
     TournamentRegistry,
 )
@@ -32,17 +34,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         blocked_ips=settings.blocked_ips,
     )
     auth = AuthService(auth_repository)
+    token_store = EncryptedTokenStore.from_deployment_secret(settings.secret_key.get_secret_value())
     entrant_accounts = EntrantService(
         auth_repository,
-        token_store=EncryptedTokenStore.from_deployment_secret(
-            settings.secret_key.get_secret_value()
-        ),
+        token_store=token_store,
         participant_subnet=settings.participant_subnet,
         blocked_ips=settings.blocked_ips,
         verifier=bot_gateway,
     )
     entrants = SyncedEntrantService(entrant_accounts, registry)
-    admin = AdminCoordinatorService(registry)
+    gameplay = HeadlessGameplayRuntime(
+        registry,
+        table_repository,
+        auth_repository,
+        token_store,
+        bot_gateway,
+    )
+    admin = RuntimeAdminCoordinatorService(
+        AdminCoordinatorService(registry),
+        gameplay,
+        registry,
+    )
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -65,12 +77,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             auth=auth,
             entrants=entrants,
             admin=admin,
+            gameplay=gameplay,
             allowed_origin=settings.allowed_origin,
             cookie_secure=settings.cookie_secure,
         )
     )
     application.state.database_engine = database_engine
     application.state.tournament_registry = registry
+    application.state.gameplay_runtime = gameplay
     return application
 
 

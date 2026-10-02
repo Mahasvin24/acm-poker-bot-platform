@@ -106,3 +106,5 @@ def test_application_factory_mounts_headless_api_without_connecting_to_database(
     paths = set(application.openapi()["paths"])
     assert "/api/v1/auth/login" in paths
     assert "/api/v1/admin/tournaments" in paths
+    assert "/api/v1/tournaments/{tournament_id}/table" in paths
+    assert "/api/v1/tournaments/{tournament_id}/table/action" in paths

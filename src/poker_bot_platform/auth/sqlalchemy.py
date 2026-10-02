@@ -131,6 +131,18 @@ class SqlAlchemyAuthRepository:
         except SQLAlchemyError as exc:
             raise AuthRepositoryError("account database operation failed") from exc
 
+    async def get_entrant_by_id(self, entrant_id: str) -> Entrant | None:
+        try:
+            identifier = uuid.UUID(entrant_id)
+        except ValueError:
+            return None
+        try:
+            async with self._sessions() as session:
+                row = await session.get(EntrantRow, identifier)
+                return self._entrant(row) if row else None
+        except SQLAlchemyError as exc:
+            raise AuthRepositoryError("account database operation failed") from exc
+
     async def delete_entrant(self, entrant_id: str) -> None:
         async with self._transaction() as session:
             row = await self._locked_entrant(session, entrant_id)

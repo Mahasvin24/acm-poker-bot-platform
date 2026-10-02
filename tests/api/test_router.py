@@ -6,8 +6,12 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from poker_bot_platform.api.models import AdminCommandResponse
-from poker_bot_platform.api.router import create_api_router
+from poker_bot_platform.api.models import (
+    AdminCommandResponse,
+    PlayerActionRequest,
+    PlayerTableStateResponse,
+)
+from poker_bot_platform.api.router import GameplayControlService, create_api_router
 from poker_bot_platform.auth import (
     AuthService,
     EntrantService,
@@ -16,7 +20,7 @@ from poker_bot_platform.auth import (
 )
 from poker_bot_platform.bots import VerificationOutcome
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
-from poker_bot_platform.domain import TournamentConfig
+from poker_bot_platform.domain import ActionType, Street, TournamentConfig, TournamentStatus
 
 ORIGIN = "http://testserver"
 HEADERS = {"Origin": ORIGIN}
@@ -80,7 +84,9 @@ class FakeAdmin:
         return AdminCommandResponse(tournament_id=tournament_id, status=result_status)
 
 
-def make_services() -> tuple[FastAPI, InMemoryAuthRepository, AuthService, FakeAdmin]:
+def make_services(
+    gameplay: GameplayControlService | None = None,
+) -> tuple[FastAPI, InMemoryAuthRepository, AuthService, FakeAdmin]:
     repository = InMemoryAuthRepository()
     auth = AuthService(repository)
     entrants = EntrantService(
@@ -96,10 +102,54 @@ def make_services() -> tuple[FastAPI, InMemoryAuthRepository, AuthService, FakeA
             auth=auth,
             entrants=entrants,
             admin=admin,
+            gameplay=gameplay,
             allowed_origin=ORIGIN,
         )
     )
     return app, repository, auth, admin
+
+
+class FakeGameplay:
+    def __init__(self) -> None:
+        self.actions: list[PlayerActionRequest] = []
+
+    async def player_state(
+        self,
+        account_id: str,
+        tournament_id: str,
+    ) -> PlayerTableStateResponse:
+        return self._state(tournament_id)
+
+    async def submit_human_action(
+        self,
+        account_id: str,
+        tournament_id: str,
+        request: PlayerActionRequest,
+    ) -> PlayerTableStateResponse:
+        self.actions.append(request)
+        return self._state(tournament_id)
+
+    @staticmethod
+    def _state(tournament_id: str) -> PlayerTableStateResponse:
+        return PlayerTableStateResponse(
+            tournament_id=tournament_id,
+            tournament_status=TournamentStatus.RUNNING,
+            table_id="table-1",
+            hand_id="hand-1",
+            hand_number=1,
+            table_version=0,
+            street=Street.PREFLOP,
+            button_seat=1,
+            small_blind=100,
+            big_blind=200,
+            big_blind_ante=200,
+            community_cards=(),
+            seats=(),
+            pot=0,
+            side_pots=(),
+            action_history=(),
+            completed=False,
+        )
 
 
 @pytest.mark.asyncio
@@ -268,3 +318,41 @@ async def test_admin_routes_require_explicit_admin_role() -> None:
         assert started.status_code == 200
         assert started.json()["status"] == "running"
         assert [call[0] for call in admin.calls] == ["create", "start"]
+
+
+@pytest.mark.asyncio
+async def test_gameplay_read_requires_auth_and_action_requires_same_origin() -> None:
+    gameplay = FakeGameplay()
+    app, _, auth, _ = make_services(gameplay)
+    await auth.register("player@example.com", "long-enough-password")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url=ORIGIN,
+    ) as client:
+        unauthenticated = await client.get("/api/v1/tournaments/event/table")
+        assert unauthenticated.status_code == 401
+        await client.post(
+            "/api/v1/auth/login",
+            json={"email": "player@example.com", "password": "long-enough-password"},
+            headers=HEADERS,
+        )
+        state = await client.get("/api/v1/tournaments/event/table")
+        assert state.status_code == 200
+
+        body = {
+            "decision_id": "decision-1",
+            "table_version": 0,
+            "action": ActionType.CHECK.value,
+        }
+        rejected = await client.post(
+            "/api/v1/tournaments/event/table/action",
+            json=body,
+        )
+        assert rejected.status_code == 403
+        accepted = await client.post(
+            "/api/v1/tournaments/event/table/action",
+            json=body,
+            headers=HEADERS,
+        )
+        assert accepted.status_code == 200
+        assert gameplay.actions[0].decision_id == "decision-1"

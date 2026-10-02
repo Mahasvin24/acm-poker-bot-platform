@@ -13,6 +13,8 @@ from poker_bot_platform.api.models import (
     EntrantRequest,
     EntrantResponse,
     LoginRequest,
+    PlayerActionRequest,
+    PlayerTableStateResponse,
     RegisterRequest,
 )
 from poker_bot_platform.api.security import SameOriginGuard
@@ -65,11 +67,27 @@ class AdminControlService(Protocol):
     async def advance_level(self, tournament_id: str, actor_id: str) -> AdminCommandResponse: ...
 
 
+class GameplayControlService(Protocol):
+    async def player_state(
+        self,
+        account_id: str,
+        tournament_id: str,
+    ) -> PlayerTableStateResponse: ...
+
+    async def submit_human_action(
+        self,
+        account_id: str,
+        tournament_id: str,
+        request: PlayerActionRequest,
+    ) -> PlayerTableStateResponse: ...
+
+
 def create_api_router(
     *,
     auth: AuthService,
     entrants: EntrantControlService,
     admin: AdminControlService,
+    gameplay: GameplayControlService | None = None,
     allowed_origin: str,
     cookie_name: str = "poker_session",
     cookie_secure: bool = False,
@@ -266,5 +284,72 @@ def create_api_router(
     admin_command("/admin/tournaments/{tournament_id}/pause", "pause")
     admin_command("/admin/tournaments/{tournament_id}/resume", "resume")
     admin_command("/admin/tournaments/{tournament_id}/advance", "advance_level")
+
+    if gameplay is not None:
+        # Kept local to avoid coupling the API protocol definitions back to the
+        # concrete runtime implementation.
+        from poker_bot_platform.integration.runtime import (
+            GameplayAccessError,
+            GameplayConflictError,
+            GameplayNotFoundError,
+        )
+
+        @router.get(
+            "/tournaments/{tournament_id}/table",
+            response_model=PlayerTableStateResponse,
+        )
+        async def player_table(
+            tournament_id: str,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> PlayerTableStateResponse:
+            try:
+                return await gameplay.player_state(account.id, tournament_id)
+            except GameplayAccessError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=str(exc),
+                ) from exc
+            except GameplayNotFoundError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=str(exc),
+                ) from exc
+            except GameplayConflictError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=str(exc),
+                ) from exc
+
+        @router.post(
+            "/tournaments/{tournament_id}/table/action",
+            response_model=PlayerTableStateResponse,
+            dependencies=mutation_guard,
+        )
+        async def submit_player_action(
+            tournament_id: str,
+            body: PlayerActionRequest,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> PlayerTableStateResponse:
+            try:
+                return await gameplay.submit_human_action(
+                    account.id,
+                    tournament_id,
+                    body,
+                )
+            except GameplayAccessError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=str(exc),
+                ) from exc
+            except GameplayNotFoundError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=str(exc),
+                ) from exc
+            except GameplayConflictError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=str(exc),
+                ) from exc
 
     return router
