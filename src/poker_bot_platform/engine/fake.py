@@ -38,7 +38,10 @@ class FakePokerEngine:
             deck_order=request.deck_order,
             seats=request.seats,
             acting_seat=acting,
-            legal_actions=(LegalAction(action=ActionType.FOLD), LegalAction(action=ActionType.CHECK)),
+            legal_actions=(
+                LegalAction(action=ActionType.FOLD),
+                LegalAction(action=ActionType.CHECK),
+            ),
         )
         return EngineTransition(
             snapshot=snapshot,
@@ -72,11 +75,15 @@ class FakePokerEngine:
         )
         return EngineTransition(
             snapshot=updated,
-            events=(DomainEvent(event_type="action_applied", payload={"seat": action.seat, "action": action.action.value}),),
+            events=(
+                DomainEvent(
+                    event_type="action_applied",
+                    payload={"seat": action.seat, "action": action.action.value},
+                ),
+            ),
         )
 
     def restore(self, snapshot: HandSnapshot) -> HandSnapshot:
         if snapshot.adapter_version != self.adapter_version:
             raise ValueError("snapshot adapter version is incompatible")
         return snapshot
-

@@ -43,7 +43,10 @@ _DEFAULT_BLINDS = (
 
 
 def default_blind_levels() -> tuple[BlindLevel, ...]:
-    return tuple(BlindLevel(small_blind=sb, big_blind=bb, big_blind_ante=bb) for sb, bb in _DEFAULT_BLINDS)
+    return tuple(
+        BlindLevel(small_blind=sb, big_blind=bb, big_blind_ante=bb)
+        for sb, bb in _DEFAULT_BLINDS
+    )
 
 
 class TournamentConfig(ContractModel):
@@ -79,4 +82,3 @@ class TournamentConfig(ContractModel):
             big_blind_ante=previous.big_blind_ante * factor,
             duration_seconds=previous.duration_seconds,
         )
-

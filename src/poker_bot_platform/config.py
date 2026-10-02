@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     def parse_blocked_ips(cls, value: object) -> tuple[str, ...]:
         if isinstance(value, str):
             return tuple(part.strip() for part in value.split(",") if part.strip())
-        return tuple(value) if value else ()
+        if isinstance(value, (list, tuple, set)):
+            return tuple(str(part) for part in value)
+        if value is None:
+            return ()
+        raise ValueError("blocked_ips must be a comma-separated string or sequence")
 
     @field_validator("worker_count")
     @classmethod
@@ -38,4 +42,3 @@ class Settings(BaseSettings):
         if value != 1:
             raise ValueError("v1 requires exactly one application worker")
         return value
-

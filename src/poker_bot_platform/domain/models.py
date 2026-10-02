@@ -85,14 +85,20 @@ class LegalAction(ContractModel):
     @model_validator(mode="after")
     def validate_amount_shape(self) -> LegalAction:
         if self.action is ActionType.CALL:
-            if self.amount is None or self.min_amount_to is not None or self.max_amount_to is not None:
+            if (
+                self.amount is None
+                or self.min_amount_to is not None
+                or self.max_amount_to is not None
+            ):
                 raise ValueError("call requires amount and forbids raise bounds")
         elif self.action is ActionType.RAISE:
             if self.min_amount_to is None or self.max_amount_to is None or self.amount is not None:
                 raise ValueError("raise requires min_amount_to and max_amount_to")
             if self.min_amount_to > self.max_amount_to:
                 raise ValueError("raise minimum cannot exceed maximum")
-        elif any(value is not None for value in (self.amount, self.min_amount_to, self.max_amount_to)):
+        elif any(
+            value is not None for value in (self.amount, self.min_amount_to, self.max_amount_to)
+        ):
             raise ValueError("fold and check do not accept amounts")
         return self
 
@@ -200,4 +206,3 @@ class StartHandRequest(ContractModel):
 class EngineTransition(ContractModel):
     snapshot: HandSnapshot
     events: tuple[DomainEvent, ...] = ()
-
