@@ -15,6 +15,8 @@ class BlindLevel(ContractModel):
     def validate_blinds(self) -> BlindLevel:
         if self.small_blind >= self.big_blind:
             raise ValueError("small blind must be less than big blind")
+        if self.big_blind_ante != self.big_blind:
+            raise ValueError("v1 requires the big-blind ante to equal the big blind")
         return self
 
 
