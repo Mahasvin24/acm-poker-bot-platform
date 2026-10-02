@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: poker
+      POSTGRES_USER: poker
+      POSTGRES_PASSWORD: poker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poker -d poker"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    ports:
+      - "5432:5432"
+    volumes:
+      - poker-postgres:/var/lib/postgresql/data
+
+volumes:
+  poker-postgres:
+
