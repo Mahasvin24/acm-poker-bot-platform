@@ -107,9 +107,11 @@ function SeatView({
   const showBacks = !seat.folded && !seat.eliminated && seat.hole_cards.length === 0;
   return (
     <article
+      aria-label={`${seat.kind === "bot" ? "Bot" : "Human"} player ${seat.display_name}, seat ${seat.seat}`}
       className={[
         styles.seat,
         positionClass,
+        seat.kind === "bot" ? styles.botSeat : styles.humanSeat,
         seat.seat === viewerSeat ? styles.viewerSeat : "",
         seat.seat === actingSeat ? styles.actingSeat : "",
         seat.folded ? styles.foldedSeat : "",
@@ -129,7 +131,14 @@ function SeatView({
       </div>
       <div className={styles.seatPanel}>
         <div className={styles.seatNameRow}>
-          <span className={styles.playerKind}>{seat.kind === "bot" ? "BOT" : "HUM"}</span>
+          <span
+            className={`${styles.playerKind} ${
+              seat.kind === "bot" ? styles.botBadge : styles.humanBadge
+            }`}
+          >
+            <i aria-hidden="true">{seat.kind === "bot" ? "<>" : "●"}</i>
+            {seat.kind === "bot" ? "Bot" : "Human"}
+          </span>
           <strong>{seat.display_name}</strong>
           {seat.seat === buttonSeat && <span className={styles.dealerChip}>D</span>}
         </div>
