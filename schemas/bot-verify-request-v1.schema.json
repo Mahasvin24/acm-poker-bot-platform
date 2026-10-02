@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acm.example/schemas/bot-verify-request-v1.schema.json",
+  "title": "Poker Bot Verification Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "challenge"],
+  "properties": {
+    "protocol": { "const": "poker-bot.v1" },
+    "challenge": { "type": "string", "minLength": 32, "maxLength": 256 }
+  }
+}

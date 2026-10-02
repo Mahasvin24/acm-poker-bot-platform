@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acm.example/schemas/bot-action-response-v1.schema.json",
+  "title": "Poker Bot Action Response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "tournament_id", "table_id", "hand_id", "decision_id", "table_version", "action"],
+  "properties": {
+    "protocol": { "const": "poker-bot.v1" },
+    "tournament_id": { "$ref": "#/$defs/identifier" },
+    "table_id": { "$ref": "#/$defs/identifier" },
+    "hand_id": { "$ref": "#/$defs/identifier" },
+    "decision_id": { "$ref": "#/$defs/identifier" },
+    "table_version": { "type": "integer", "minimum": 0 },
+    "action": { "enum": ["fold", "check", "call", "raise"] },
+    "amount_to": { "type": ["integer", "null"], "minimum": 0 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "const": "raise" } }, "required": ["action"] },
+      "then": { "required": ["amount_to"], "properties": { "amount_to": { "type": "integer", "minimum": 0 } } },
+      "else": { "properties": { "amount_to": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 128 }
+  }
+}
