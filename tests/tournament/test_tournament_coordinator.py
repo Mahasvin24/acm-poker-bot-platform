@@ -41,6 +41,7 @@ async def created(
     *,
     tournament_id: str = "tournament-1",
     config: TournamentConfig | None = None,
+    seed_hex: str = SEED,
 ) -> tuple[TournamentCoordinator, InMemoryTournamentStore]:
     store = InMemoryTournamentStore()
     coordinator = await TournamentCoordinator.create(
@@ -48,7 +49,7 @@ async def created(
         config or TournamentConfig(),
         store,
         InMemoryTableRepository(),
-        seed_hex=SEED,
+        seed_hex=seed_hex,
     )
     await coordinator.open_registration(actor_id="admin")
     for number in range(1, count + 1):
@@ -270,8 +271,8 @@ async def test_first_and_next_hand_dispatch_through_table_coordinator() -> None:
     assert next_snapshot.table_version == completed.table_version + 1
 
 
-async def simulate_36(tournament_id: str) -> TournamentCoordinator:
-    coordinator, _ = await created(36, tournament_id=tournament_id)
+async def simulate_36(tournament_id: str, *, seed_hex: str = SEED) -> TournamentCoordinator:
+    coordinator, _ = await created(36, tournament_id=tournament_id, seed_hex=seed_hex)
     await coordinator.seat_entrants(actor_id="admin")
     await coordinator.start(actor_id="admin")
     safety = 0
@@ -305,3 +306,17 @@ async def test_seeded_36_player_headless_lifecycle_reaches_same_winner() -> None
     second_winner = next(item.entrant_id for item in second.state.standings if item.position == 1)
     assert first_winner == second_winner
     assert sum(player.stack for table in first.state.tables for player in table.players) == 720_000
+
+
+@pytest.mark.asyncio
+async def test_one_hundred_seeded_36_player_tournaments_finish_without_chip_drift() -> None:
+    for number in range(100):
+        coordinator = await simulate_36(
+            f"soak-{number:03d}",
+            seed_hex=f"{number:064x}",
+        )
+        assert coordinator.state.status is TournamentStatus.COMPLETED
+        assert len(coordinator.state.standings) == 36
+        assert sum(
+            player.stack for table in coordinator.state.tables for player in table.players
+        ) == 720_000
