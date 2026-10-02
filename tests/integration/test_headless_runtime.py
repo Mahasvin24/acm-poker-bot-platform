@@ -139,7 +139,6 @@ async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_stat
             "event",
             TournamentConfig(
                 human_action_timeout_ms=7_000,
-                bot_action_timeout_ms=800,
             ),
             "admin",
         )

@@ -53,8 +53,9 @@ class TournamentConfig(ContractModel):
     table_size: int = Field(default=6, ge=2, le=6)
     starting_stack: int = Field(default=20_000, gt=0)
     human_action_timeout_ms: int = Field(default=30_000, ge=1_000)
-    bot_action_timeout_ms: int = Field(default=3_000, ge=100, le=30_000)
-    bot_connect_timeout_ms: int = Field(default=500, ge=50, le=5_000)
+    # Bot timing is part of the public v1 wire contract, not a tournament knob.
+    bot_action_timeout_ms: int = Field(default=3_000, ge=3_000, le=3_000)
+    bot_connect_timeout_ms: int = Field(default=500, ge=500, le=500)
     break_every_levels: int = Field(default=3, gt=0)
     break_duration_seconds: int = Field(default=600, ge=0)
     levels: tuple[BlindLevel, ...] = Field(default_factory=default_blind_levels)
