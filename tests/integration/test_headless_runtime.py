@@ -18,6 +18,7 @@ from poker_bot_platform.domain import ActionType, EntryKind, TournamentConfig
 from poker_bot_platform.integration import (
     AdminCoordinatorService,
     GameplayConflictError,
+    GameplayScheduler,
     HeadlessGameplayRuntime,
     RuntimeAdminCoordinatorService,
     SyncedEntrantService,
@@ -47,6 +48,7 @@ class RuntimeStack:
     accounts: InMemoryAuthRepository
     tables: InMemoryTableRepository
     tournament_store: InMemoryTournamentStore
+    registry: TournamentRegistry
 
 
 def make_stack(
@@ -95,6 +97,7 @@ def make_stack(
             accounts,
             tables,
             tournament_store,
+            registry,
         ),
         gateway,
     )
@@ -129,9 +132,17 @@ async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_stat
             bot_actions += 1
         return bot_handler(request)
 
-    stack, gateway = make_stack(httpx.MockTransport(counting_handler))
+    clock = MutableClock(datetime(2026, 10, 1, 18, 0, tzinfo=UTC))
+    stack, gateway = make_stack(httpx.MockTransport(counting_handler), clock=clock)
     async with gateway:
-        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.create_tournament(
+            "event",
+            TournamentConfig(
+                human_action_timeout_ms=7_000,
+                bot_action_timeout_ms=800,
+            ),
+            "admin",
+        )
         await stack.admin.open_registration("event", "admin")
         human = await stack.auth.register("human@example.com", "long-enough-password")
         bot = await stack.auth.register("bot@example.com", "long-enough-password")
@@ -149,6 +160,7 @@ async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_stat
 
         state = await stack.runtime.player_state(human.id, "event")
         assert state.decision is not None
+        assert state.decision.deadline_at == clock.value + timedelta(seconds=7)
         own = next(seat for seat in state.seats if seat.entrant_id == human_entrant.id)
         opponents = [seat for seat in state.seats if seat.entrant_id != human_entrant.id]
         assert len(own.hole_cards) == 2
@@ -236,3 +248,79 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
         assert after_timeout.decision is None or (
             after_timeout.decision.decision_id != timeout_state.decision.decision_id
         )
+
+
+@pytest.mark.asyncio
+async def test_scheduler_advances_levels_and_expires_disconnected_human() -> None:
+    clock = MutableClock(datetime(2026, 10, 1, 18, 0, tzinfo=UTC))
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler), clock=clock)
+    scheduler = GameplayScheduler(stack.registry, stack.runtime)
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        first = await stack.auth.register("one@example.com", "long-enough-password")
+        second = await stack.auth.register("two@example.com", "long-enough-password")
+        await stack.entrants.register(first.id, "event", EntryKind.HUMAN, "One")
+        await stack.entrants.register(second.id, "event", EntryKind.HUMAN, "Two")
+        await stack.admin.seat("event", "admin")
+        await stack.admin.start("event", "admin")
+
+        first_state = await stack.runtime.player_state(first.id, "event")
+        second_state = await stack.runtime.player_state(second.id, "event")
+        original = first_state if first_state.decision is not None else second_state
+        assert original.decision is not None
+
+        await scheduler.run_once(now=100.0)
+        clock.advance(31)
+        await scheduler.run_once(now=131.0)
+
+        tournament = await stack.registry.get("event")
+        assert tournament.state.phase_remaining_seconds == 900 - 31
+        updated_first = await stack.runtime.player_state(first.id, "event")
+        updated_second = await stack.runtime.player_state(second.id, "event")
+        assert updated_first.hand_id != original.hand_id
+        assert updated_second.hand_id != original.hand_id
+
+
+@pytest.mark.asyncio
+async def test_scheduler_isolates_one_tournament_failure() -> None:
+    class Coordinator:
+        def __init__(self, should_fail: bool) -> None:
+            self.should_fail = should_fail
+            self.ticks: list[int] = []
+
+        async def tick(self, seconds: int) -> None:
+            self.ticks.append(seconds)
+            if self.should_fail:
+                raise RuntimeError("injected clock failure")
+
+    class Registry:
+        def __init__(self) -> None:
+            self.coordinators = {
+                "bad": Coordinator(True),
+                "good": Coordinator(False),
+            }
+
+        async def known_tournament_ids(self) -> tuple[str, ...]:
+            return tuple(self.coordinators)
+
+        async def get(self, tournament_id: str) -> Coordinator:
+            return self.coordinators[tournament_id]
+
+    class Gameplay:
+        def __init__(self) -> None:
+            self.synchronized: list[str] = []
+
+        async def synchronize(self, tournament_id: str) -> None:
+            self.synchronized.append(tournament_id)
+
+    registry = Registry()
+    gameplay = Gameplay()
+    scheduler = GameplayScheduler(registry, gameplay)  # type: ignore[arg-type]
+    await scheduler.run_once(now=10.0)
+    await scheduler.run_once(now=15.0)
+
+    assert registry.coordinators["bad"].ticks == [5]
+    assert registry.coordinators["good"].ticks == [5]
+    assert gameplay.synchronized.count("bad") == 2
+    assert gameplay.synchronized.count("good") == 2

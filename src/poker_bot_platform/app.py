@@ -14,6 +14,7 @@ from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.config import Settings
 from poker_bot_platform.integration import (
     AdminCoordinatorService,
+    GameplayScheduler,
     HeadlessGameplayRuntime,
     RuntimeAdminCoordinatorService,
     SyncedEntrantService,
@@ -55,12 +56,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         gameplay,
         registry,
     )
+    scheduler = GameplayScheduler(registry, gameplay)
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
-        yield
-        await bot_gateway.aclose()
-        await database_engine.dispose()
+        await scheduler.start()
+        try:
+            yield
+        finally:
+            await scheduler.stop()
+            await bot_gateway.aclose()
+            await database_engine.dispose()
 
     application = FastAPI(
         title="ACM Poker Bot Platform",
@@ -85,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.database_engine = database_engine
     application.state.tournament_registry = registry
     application.state.gameplay_runtime = gameplay
+    application.state.gameplay_scheduler = scheduler
     return application
 
 

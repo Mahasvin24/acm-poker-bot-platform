@@ -101,7 +101,9 @@ def test_application_factory_mounts_headless_api_without_connecting_to_database(
         )
     )
     with TestClient(application) as client:
+        assert application.state.gameplay_scheduler.running
         response = client.get("/health")
+    assert not application.state.gameplay_scheduler.running
     assert response.status_code == 200
     paths = set(application.openapi()["paths"])
     assert "/api/v1/auth/login" in paths

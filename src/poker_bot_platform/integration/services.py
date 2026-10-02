@@ -66,6 +66,12 @@ class TournamentRegistry:
                 self._coordinators[tournament_id] = coordinator
             return coordinator
 
+    async def known_tournament_ids(self) -> tuple[str, ...]:
+        """Return tournaments restored or created in this application process."""
+
+        async with self._lock:
+            return tuple(self._coordinators)
+
 
 @dataclass(slots=True)
 class SyncedEntrantService:

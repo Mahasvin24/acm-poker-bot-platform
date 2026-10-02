@@ -6,6 +6,7 @@ from poker_bot_platform.integration.runtime import (
     HeadlessGameplayRuntime,
     RuntimeAdminCoordinatorService,
 )
+from poker_bot_platform.integration.scheduler import GameplayScheduler
 from poker_bot_platform.integration.services import (
     AdminCoordinatorService,
     SyncedEntrantService,
@@ -18,6 +19,7 @@ __all__ = [
     "GameplayAccessError",
     "GameplayConflictError",
     "GameplayNotFoundError",
+    "GameplayScheduler",
     "HeadlessGameplayRuntime",
     "RuntimeAdminCoordinatorService",
     "SyncedEntrantService",

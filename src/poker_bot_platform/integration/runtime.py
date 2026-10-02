@@ -45,9 +45,6 @@ from poker_bot_platform.tournament import (
     TournamentStoreError,
 )
 
-HUMAN_DECISION_SECONDS = 30
-BOT_DECISION_SECONDS = 3
-
 Clock = Callable[[], datetime]
 TableActor = Callable[[PendingDecision, HandSnapshot], Awaitable[PlayerAction]]
 
@@ -85,19 +82,13 @@ class HeadlessGameplayRuntime:
         gateway: BotGateway,
         *,
         clock: Clock | None = None,
-        human_decision_seconds: int = HUMAN_DECISION_SECONDS,
-        bot_decision_seconds: int = BOT_DECISION_SECONDS,
     ) -> None:
-        if human_decision_seconds <= 0 or bot_decision_seconds <= 0:
-            raise ValueError("decision durations must be positive")
         self._tournaments = tournaments
         self._tables = tables
         self._accounts = accounts
         self._token_store = token_store
         self._gateway = gateway
         self._clock = clock or (lambda: datetime.now(UTC))
-        self._human_timeout = timedelta(seconds=human_decision_seconds)
-        self._bot_timeout = timedelta(seconds=bot_decision_seconds)
         self._coordinators: dict[str, TableCoordinator] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._locks_guard = asyncio.Lock()
@@ -217,12 +208,16 @@ class HeadlessGameplayRuntime:
                 raise GameplayConflictError("acting seat is missing from the table")
             if acting.kind is EntryKind.BOT:
                 actor = await self._bot_actor(acting.entrant_id)
-                await coordinator.request_actor_action(actor, self._now() + self._bot_timeout)
+                bot_timeout = timedelta(milliseconds=tournament.state.config.bot_action_timeout_ms)
+                await coordinator.request_actor_action(actor, self._now() + bot_timeout)
                 continue
 
             pending = coordinator.state.pending
             if pending is None:
-                pending = await coordinator.open_decision(self._now() + self._human_timeout)
+                human_timeout = timedelta(
+                    milliseconds=tournament.state.config.human_action_timeout_ms
+                )
+                pending = await coordinator.open_decision(self._now() + human_timeout)
             if pending.seat != acting.seat:
                 raise GameplayConflictError("pending decision does not match the acting seat")
             if self._now() >= pending.deadline_at:
