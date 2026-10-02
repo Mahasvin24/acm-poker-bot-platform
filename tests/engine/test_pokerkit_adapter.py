@@ -284,9 +284,7 @@ def test_all_in_from_forced_bets_preserves_private_cards_for_recovery() -> None:
     assert transition.snapshot.completed
     assert transition.snapshot.seats[0].hole_cards == ("As", "Ah")
     assert transition.snapshot.seats[1].hole_cards == ("Ks", "Kh")
-    assert all(
-        seat.public_hole_cards == seat.hole_cards for seat in transition.snapshot.seats
-    )
+    assert all(seat.public_hole_cards == seat.hole_cards for seat in transition.snapshot.seats)
     assert engine.restore(transition.snapshot) == transition.snapshot
 
 
