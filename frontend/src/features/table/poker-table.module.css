@@ -633,6 +633,17 @@
   opacity: 0.45;
 }
 
+.actionButton:focus-visible,
+.foldButton:focus-visible,
+.raiseButton:focus-visible,
+.presets button:focus-visible,
+.gateActions button:focus-visible,
+.raiseTopline input:focus-visible,
+.raiseSlider:focus-visible {
+  outline: 3px solid var(--table-red);
+  outline-offset: 3px;
+}
+
 .handRail {
   min-width: 0;
   padding: 28px;
@@ -857,18 +868,18 @@
   .tableStatus { justify-content: flex-start; gap: 14px; overflow-x: auto; padding-inline: 16px; white-space: nowrap; }
   .tableColumn { grid-template-rows: auto minmax(470px, 1fr) auto; }
   .tableStage { min-height: 470px; }
-  .felt { inset: 20% -8%; }
+  .felt { inset: 20% -2%; }
   .seat { min-width: 112px; }
   .seatPanel { min-width: 112px; padding: 8px 8px 8px 12px; }
   .seatNameRow { gap: 4px; }
   .seatNameRow strong { max-width: 52px; font-size: 10px; }
   .playerKind { padding: 3px 4px; font-size: 6px; }
   .seatPosition0 { bottom: 2%; }
-  .seatPosition1 { bottom: 19%; left: -18px; }
-  .seatPosition2 { top: 13%; left: -18px; }
+  .seatPosition1 { bottom: 19%; left: 2px; }
+  .seatPosition2 { top: 13%; left: 2px; }
   .seatPosition3 { top: 2%; }
-  .seatPosition4 { top: 13%; right: -18px; }
-  .seatPosition5 { right: -18px; bottom: 19%; }
+  .seatPosition4 { top: 13%; right: 2px; }
+  .seatPosition5 { right: 2px; bottom: 19%; }
   .seatCards .card { width: 32px; }
   .communityCards { gap: 4px; }
   .card,
@@ -880,6 +891,7 @@
   .foldButton { width: 100%; }
   .raiseBottom { align-items: stretch; flex-direction: column; }
   .presets { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .presets button { min-height: 40px; }
   .raiseButton { width: 100%; }
   .handRail { grid-template-columns: 1fr; padding: 24px 16px; }
   .history { grid-column: auto; grid-template-columns: 1fr; }

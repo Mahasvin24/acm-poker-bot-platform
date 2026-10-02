@@ -9,16 +9,21 @@ import styles from "./play.module.css";
 export function JoinTable() {
   const router = useRouter();
   const [tournamentId, setTournamentId] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const join = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = tournamentId.trim();
-    if (!normalized) return;
+    if (!normalized) {
+      setError("Enter the tournament ID supplied by the organizer.");
+      return;
+    }
+    setError(null);
     router.push(`/play/${encodeURIComponent(normalized)}`);
   };
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link href="/">ACM / POKER</Link>
         <span>Human player interface</span>
@@ -38,13 +43,25 @@ export function JoinTable() {
             <div>
               <input
                 autoComplete="off"
+                aria-describedby={error ? "tournament-id-error" : undefined}
+                aria-invalid={Boolean(error)}
                 id="tournament-id"
-                onChange={(event) => setTournamentId(event.target.value)}
-                placeholder="club-event"
+                name="tournamentId"
+                onChange={(event) => {
+                  setTournamentId(event.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="e.g. club-event…"
+                spellCheck={false}
                 value={tournamentId}
               />
-              <button disabled={!tournamentId.trim()} type="submit">Join table →</button>
+              <button type="submit">Join Table →</button>
             </div>
+            {error && (
+              <p className={styles.fieldError} id="tournament-id-error" role="alert">
+                {error}
+              </p>
+            )}
           </form>
           <span className={styles.or}>or</span>
           <Link className={styles.demoLink} href="/play/demo">

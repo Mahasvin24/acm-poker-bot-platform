@@ -32,6 +32,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 10px;
+  left: 10px;
+  padding: 11px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 700 10px/1 monospace;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transform: translateY(-160%);
+  transition: transform 0.18s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 ::selection {
   background: var(--red);
   color: var(--paper);
@@ -39,6 +59,23 @@ body {
 
 a {
   color: inherit;
+}
+
+a,
+button,
+input,
+select,
+summary {
+  touch-action: manipulation;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--red);
+  outline-offset: 4px;
 }
 
 img {
@@ -239,6 +276,7 @@ h1 {
   margin: 0;
   font: 400 clamp(82px, 14vw, 205px) / 0.72 var(--serif);
   letter-spacing: -0.085em;
+  text-wrap: balance;
 }
 
 .title-line {
@@ -520,6 +558,7 @@ h1 {
   margin: 0;
   font: 400 clamp(54px, 7vw, 100px) / 0.92 var(--serif);
   letter-spacing: -0.06em;
+  text-wrap: balance;
 }
 
 .duel {
@@ -909,7 +948,7 @@ h1 {
 }
 
 @media (max-width: 560px) {
-  .nav-pill { padding: 10px; font-size: 0; }
+  .nav-pill { padding: 10px 12px; font-size: 8px; }
   .nav-pill i { display: block; }
   h1 { font-size: clamp(65px, 22vw, 100px); }
   .title-line--accent { margin-left: 0; }

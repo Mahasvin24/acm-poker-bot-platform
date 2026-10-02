@@ -33,6 +33,12 @@ const suits: Record<string, string> = {
   h: "♥",
   s: "♠",
 };
+const suitNames: Record<string, string> = {
+  c: "clubs",
+  d: "diamonds",
+  h: "hearts",
+  s: "spades",
+};
 
 function formatChips(value: number): string {
   return chips.format(value);
@@ -83,7 +89,7 @@ function PlayingCard({ card, hidden = false }: { card?: string; hidden?: boolean
   return (
     <span
       className={`${styles.card} ${red ? styles.redCard : ""}`}
-      aria-label={`${rank} of ${suitCode}`}
+      aria-label={`${rank} of ${suitNames[suitCode] ?? suitCode}`}
     >
       <span>{rank}</span>
       <b>{suits[suitCode] ?? suitCode}</b>
@@ -300,7 +306,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
 
   if (!table) {
     return (
-      <main className={styles.gate}>
+      <main className={styles.gate} id="main-content">
         <div className={styles.gateCard}>
           <Link className={styles.wordmark} href="/">ACM / POKER</Link>
           {issue ? (
@@ -319,7 +325,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
             <>
               <span className={styles.loader} aria-hidden="true" />
               <h1>Finding your table</h1>
-              <p>Syncing the latest committed hand and seat assignment.</p>
+              <p aria-live="polite">Syncing the latest committed hand and seat assignment…</p>
             </>
           )}
         </div>
@@ -341,13 +347,13 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
         </div>
         <div className={styles.headerActions}>
           <span className={`${styles.connection} ${styles[connection]}`}>
-            <i /> {connection === "demo" ? "Demo table" : connection}
+            <i aria-hidden="true" /> {connection === "demo" ? "Demo table" : connection}
           </span>
           <Link href="/play">Leave table</Link>
         </div>
       </header>
 
-      <main className={styles.gameLayout}>
+      <main className={styles.gameLayout} id="main-content">
         <section className={styles.tableColumn} aria-label="Poker table">
           <div className={styles.tableStatus}>
             <span>{table.street}</span>
@@ -412,7 +418,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
                   <strong>{actingName ?? "Table resolving"}</strong>
                 </>
               )}
-              {notice && <p className={styles.notice}>{notice}</p>}
+              {notice && <p aria-live="polite" className={styles.notice}>{notice}</p>}
             </div>
 
             {decision && (

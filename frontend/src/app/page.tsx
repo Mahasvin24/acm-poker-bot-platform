@@ -100,7 +100,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         <section className="page-section hero" id="welcome">
           <div className="deal-scene" aria-hidden="true">
             <div className="table-plane">
