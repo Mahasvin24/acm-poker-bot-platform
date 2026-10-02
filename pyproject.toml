@@ -14,7 +14,7 @@ dependencies = [
   "cryptography>=44,<47",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
-  "pokerkit>=0.7.6,<0.8",
+  "pokerkit==0.7.6",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.7,<3",
   "pwdlib[argon2]>=0.2,<1",
@@ -54,4 +54,3 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 python_version = "3.12"
 strict = true
 packages = ["poker_bot_platform"]
-
