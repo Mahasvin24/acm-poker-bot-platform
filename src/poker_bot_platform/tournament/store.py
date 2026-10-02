@@ -72,4 +72,3 @@ class InMemoryTournamentStore:
 
     def audit_entries(self, tournament_id: str) -> tuple[AuditEntry, ...]:
         return tuple(self._audit.get(tournament_id, ()))
-

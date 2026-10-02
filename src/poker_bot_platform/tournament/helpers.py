@@ -65,4 +65,3 @@ def worst_legal_vacancy(table: TournamentTable) -> int:
 def table_sort_key(table: TournamentTable) -> tuple[int, str]:
     suffix = table.table_id.rsplit("-", 1)[-1]
     return (int(suffix) if suffix.isdigit() else 0, table.table_id)
-

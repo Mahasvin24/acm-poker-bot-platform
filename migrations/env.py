@@ -8,6 +8,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from poker_bot_platform.auth import db_models as _auth_db_models  # noqa: F401
 from poker_bot_platform.persistence.models import Base
 
 config = context.config

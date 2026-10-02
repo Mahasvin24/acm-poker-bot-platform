@@ -1,4 +1,4 @@
-from poker_bot_platform.persistence.database import create_database
+from poker_bot_platform.persistence.database import create_database, create_database_components
 from poker_bot_platform.persistence.memory import InMemoryTableRepository
 from poker_bot_platform.persistence.repository import (
     CommitResult,
@@ -26,4 +26,5 @@ __all__ = [
     "StatusConflictError",
     "VersionConflictError",
     "create_database",
+    "create_database_components",
 ]

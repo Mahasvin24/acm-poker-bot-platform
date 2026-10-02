@@ -14,7 +14,7 @@ from poker_bot_platform.domain import (
     TournamentConfig,
     TournamentStatus,
 )
-from poker_bot_platform.persistence import TableRepository
+from poker_bot_platform.persistence import DecisionConflictError, TableRepository
 from poker_bot_platform.tournament.helpers import (
     clockwise_occupied,
     deterministic_rng,
@@ -77,11 +77,16 @@ class TournamentCoordinator:
             seed_hex=seed_hex,
             phase_remaining_seconds=config.level(1).duration_seconds,
         )
-        await table_repository.create_tournament(
-            tournament_id,
-            config.model_dump(mode="json"),
-            status=TournamentStatus.DRAFT,
-        )
+        try:
+            await table_repository.create_tournament(
+                tournament_id,
+                config.model_dump(mode="json"),
+                status=TournamentStatus.DRAFT,
+            )
+        except DecisionConflictError:
+            existing = await table_repository.load_tournament(tournament_id)
+            if existing.status is not TournamentStatus.DRAFT or existing.version != 0:
+                raise
         await store.create(state, AuditEntry(actor_id=actor_id, command="create_tournament"))
         return cls(state, store, table_repository)
 
@@ -436,9 +441,7 @@ class TournamentCoordinator:
 
     def _begin_round_or_break(self, state: TournamentState) -> TournamentState:
         tables, balance_counter = self._consolidate_and_balance(state)
-        state = state.model_copy(
-            update={"tables": tables, "balance_counter": balance_counter}
-        )
+        state = state.model_copy(update={"tables": tables, "balance_counter": balance_counter})
         if state.break_pending:
             return state.model_copy(
                 update={
@@ -493,9 +496,7 @@ class TournamentCoordinator:
             candidate = candidate.model_copy(
                 update={
                     "level_number": next_level,
-                    "phase_remaining_seconds": candidate.config.level(
-                        next_level
-                    ).duration_seconds,
+                    "phase_remaining_seconds": candidate.config.level(next_level).duration_seconds,
                 }
             )
             if candidate.phase_remaining_seconds == 0:
@@ -503,8 +504,7 @@ class TournamentCoordinator:
         if candidate.phase_remaining_seconds > 0:
             candidate = candidate.model_copy(
                 update={
-                    "phase_remaining_seconds": candidate.phase_remaining_seconds
-                    - remaining_elapsed
+                    "phase_remaining_seconds": candidate.phase_remaining_seconds - remaining_elapsed
                 }
             )
         return candidate
@@ -577,9 +577,12 @@ class TournamentCoordinator:
                 replacement = target.model_copy(update={"players": (*target.players, moved)})
                 tables[tables.index(target)] = replacement
 
-        while tables and max(map(lambda item: len(item.players), tables)) - min(
-            map(lambda item: len(item.players), tables)
-        ) > 1:
+        while (
+            tables
+            and max(map(lambda item: len(item.players), tables))
+            - min(map(lambda item: len(item.players), tables))
+            > 1
+        ):
             donor = max(tables, key=lambda item: (len(item.players), table_sort_key(item)))
             receiver = min(tables, key=lambda item: (len(item.players), table_sort_key(item)))
             mover = next_big_blind_player(donor)
@@ -593,9 +596,7 @@ class TournamentCoordinator:
                 update={"players": remaining, "button_seat": donor_button}
             )
             moved = mover.model_copy(update={"seat": worst_legal_vacancy(receiver)})
-            receiver_update = receiver.model_copy(
-                update={"players": (*receiver.players, moved)}
-            )
+            receiver_update = receiver.model_copy(update={"players": (*receiver.players, moved)})
             tables[tables.index(donor)] = donor_update
             tables[tables.index(receiver)] = receiver_update
             counter += 1

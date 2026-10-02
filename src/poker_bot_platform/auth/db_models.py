@@ -31,9 +31,7 @@ class AccountRow(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        CheckConstraint("role IN ('user', 'admin')", name="ck_accounts_role"),
-    )
+    __table_args__ = (CheckConstraint("role IN ('user', 'admin')", name="ck_accounts_role"),)
 
 
 class SessionRow(Base):

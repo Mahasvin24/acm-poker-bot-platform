@@ -37,6 +37,7 @@ class AuthRepository(Protocol):
         display_name: str,
     ) -> Entrant: ...
     async def get_entrant(self, account_id: str, tournament_id: str) -> Entrant | None: ...
+    async def delete_entrant(self, entrant_id: str) -> None: ...
     async def configure_bot(
         self,
         entrant_id: str,
@@ -131,6 +132,11 @@ class InMemoryAuthRepository:
             ),
             None,
         )
+
+    async def delete_entrant(self, entrant_id: str) -> None:
+        if entrant_id not in self.entrants:
+            raise AuthNotFoundError("entrant not found")
+        del self.entrants[entrant_id]
 
     async def configure_bot(
         self,

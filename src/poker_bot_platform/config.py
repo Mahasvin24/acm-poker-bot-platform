@@ -12,9 +12,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POKER_", env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://poker:poker@localhost:5432/poker"
-    secret_key: SecretStr = Field(min_length=32)
+    secret_key: SecretStr = Field(
+        default=SecretStr("development-only-change-before-event"),
+        min_length=32,
+    )
     participant_subnet: IPv4Network | IPv6Network = ip_network("192.168.0.0/16")
     blocked_ips: tuple[str, ...] = ()
+    allowed_origin: str = "http://localhost:3000"
+    cookie_secure: bool = False
     log_level: str = "INFO"
     worker_count: int = 1
 

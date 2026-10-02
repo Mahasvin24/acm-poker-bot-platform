@@ -74,9 +74,7 @@ async def test_registration_and_seeded_seating_are_deterministic_and_balanced() 
     await second.seat_entrants(actor_id="admin")
 
     assert [len(table.players) for table in first.state.tables] == [6, 6, 5]
-    assert [
-        [player.entrant_id for player in table.players] for table in first.state.tables
-    ] == [
+    assert [[player.entrant_id for player in table.players] for table in first.state.tables] == [
         [player.entrant_id for player in table.players] for table in second.state.tables
     ]
     assert len(store.audit_entries("first")) == 20
@@ -208,9 +206,7 @@ async def test_elimination_tiebreak_and_capacity_table_break() -> None:
             {player.entrant_id: player.stack for player in other.players},
         )
 
-    positions = {
-        standing.entrant_id: standing.position for standing in coordinator.state.standings
-    }
+    positions = {standing.entrant_id: standing.position for standing in coordinator.state.standings}
     assert positions[high.entrant_id] < positions[low.entrant_id]
     assert len(coordinator.state.tables) == 1
     assert len(coordinator.state.tables[0].players) == 6

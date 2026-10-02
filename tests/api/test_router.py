@@ -51,9 +51,7 @@ class FakeAdmin:
         self.calls.append(("update", tournament_id, actor_id))
         return AdminCommandResponse(tournament_id=tournament_id, status="draft")
 
-    async def open_registration(
-        self, tournament_id: str, actor_id: str
-    ) -> AdminCommandResponse:
+    async def open_registration(self, tournament_id: str, actor_id: str) -> AdminCommandResponse:
         return self._record("open", tournament_id, actor_id, "registration_open")
 
     async def seat(self, tournament_id: str, actor_id: str) -> AdminCommandResponse:
@@ -68,9 +66,7 @@ class FakeAdmin:
     async def resume(self, tournament_id: str, actor_id: str) -> AdminCommandResponse:
         return self._record("resume", tournament_id, actor_id, "running")
 
-    async def advance_level(
-        self, tournament_id: str, actor_id: str
-    ) -> AdminCommandResponse:
+    async def advance_level(self, tournament_id: str, actor_id: str) -> AdminCommandResponse:
         return self._record("advance", tournament_id, actor_id, "running")
 
     def _record(

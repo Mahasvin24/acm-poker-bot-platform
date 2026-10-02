@@ -16,16 +16,36 @@ from poker_bot_platform.api.models import (
     RegisterRequest,
 )
 from poker_bot_platform.api.security import SameOriginGuard
-from poker_bot_platform.auth.models import Account
+from poker_bot_platform.auth.models import Account, Entrant
 from poker_bot_platform.auth.repository import AuthConflictError, AuthNotFoundError
 from poker_bot_platform.auth.service import (
     AuthService,
+    BotRegistrationResult,
     BotVerificationError,
-    EntrantService,
     InvalidCredentialsError,
     InvalidSessionError,
 )
-from poker_bot_platform.domain import Role, TournamentConfig
+from poker_bot_platform.domain import EntryKind, Role, TournamentConfig
+
+
+class EntrantControlService(Protocol):
+    async def register(
+        self,
+        account_id: str,
+        tournament_id: str,
+        kind: EntryKind,
+        display_name: str,
+    ) -> Entrant: ...
+
+    async def configure_bot(
+        self,
+        account_id: str,
+        tournament_id: str,
+        ip: str,
+        port: int,
+    ) -> BotRegistrationResult: ...
+
+    async def verify_bot(self, account_id: str, tournament_id: str) -> Entrant: ...
 
 
 class AdminControlService(Protocol):
@@ -42,15 +62,13 @@ class AdminControlService(Protocol):
     async def start(self, tournament_id: str, actor_id: str) -> AdminCommandResponse: ...
     async def pause(self, tournament_id: str, actor_id: str) -> AdminCommandResponse: ...
     async def resume(self, tournament_id: str, actor_id: str) -> AdminCommandResponse: ...
-    async def advance_level(
-        self, tournament_id: str, actor_id: str
-    ) -> AdminCommandResponse: ...
+    async def advance_level(self, tournament_id: str, actor_id: str) -> AdminCommandResponse: ...
 
 
 def create_api_router(
     *,
     auth: AuthService,
-    entrants: EntrantService,
+    entrants: EntrantControlService,
     admin: AdminControlService,
     allowed_origin: str,
     cookie_name: str = "poker_session",

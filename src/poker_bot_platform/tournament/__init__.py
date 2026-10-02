@@ -7,6 +7,7 @@ from poker_bot_platform.tournament.models import (
     TournamentTable,
 )
 from poker_bot_platform.tournament.service import TournamentCoordinator, TournamentError
+from poker_bot_platform.tournament.sqlalchemy import SqlAlchemyTournamentStore
 from poker_bot_platform.tournament.store import (
     InMemoryTournamentStore,
     TournamentStore,
@@ -18,6 +19,7 @@ __all__ = [
     "AuditEntry",
     "Entrant",
     "InMemoryTournamentStore",
+    "SqlAlchemyTournamentStore",
     "Standing",
     "TournamentCoordinator",
     "TournamentError",

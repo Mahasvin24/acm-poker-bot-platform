@@ -90,9 +90,7 @@ class SqlAlchemyAuthRepository:
     async def revoke_session(self, token_hash: str, revoked_at: datetime) -> None:
         async with self._transaction() as session:
             row = await session.scalar(
-                select(SessionRow)
-                .where(SessionRow.token_hash == token_hash)
-                .with_for_update()
+                select(SessionRow).where(SessionRow.token_hash == token_hash).with_for_update()
             )
             if row is not None and row.revoked_at is None:
                 row.revoked_at = revoked_at
@@ -132,6 +130,11 @@ class SqlAlchemyAuthRepository:
                 return self._entrant(row) if row else None
         except SQLAlchemyError as exc:
             raise AuthRepositoryError("account database operation failed") from exc
+
+    async def delete_entrant(self, entrant_id: str) -> None:
+        async with self._transaction() as session:
+            row = await self._locked_entrant(session, entrant_id)
+            await session.delete(row)
 
     async def configure_bot(
         self,
