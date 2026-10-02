@@ -110,6 +110,12 @@ def test_snapshot_converter_strips_deck_and_other_private_cards() -> None:
     assert "Qh" not in serialized and "Qs" not in serialized
     assert "deck_order" not in serialized
 
+    inconsistent = pending.model_copy(
+        update={"legal_actions": (LegalAction(action=ActionType.FOLD),)}
+    )
+    with pytest.raises(ValueError, match="legal actions"):
+        action_request_from_snapshot(snapshot, inconsistent)
+
 
 def test_strict_parser_rejects_duplicate_keys() -> None:
     payload = (

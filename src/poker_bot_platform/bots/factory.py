@@ -25,6 +25,8 @@ def action_request_from_snapshot(
         raise ValueError("pending decision version does not match the snapshot")
     if snapshot.acting_seat != pending.seat:
         raise ValueError("pending decision seat is not the snapshot's acting seat")
+    if pending.legal_actions != snapshot.legal_actions:
+        raise ValueError("pending legal actions do not match the engine snapshot")
     acting = next((seat for seat in snapshot.seats if seat.seat == pending.seat), None)
     if acting is None:
         raise ValueError("acting seat is missing from the snapshot")
