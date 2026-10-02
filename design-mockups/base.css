@@ -1,0 +1,156 @@
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+summary {
+  font: inherit;
+}
+
+.page-section {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+}
+
+.container {
+  width: min(1180px, calc(100% - 64px));
+  margin: 0 auto;
+}
+
+.logo {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.site-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 10;
+}
+
+.site-header__inner {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.brand-copy strong,
+.brand-copy span {
+  display: block;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 3vw, 42px);
+}
+
+.site-nav a {
+  text-decoration: none;
+}
+
+.eyebrow {
+  margin: 0 0 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.section-title {
+  margin: 0;
+}
+
+.lead {
+  margin: 0;
+  max-width: 650px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+details summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .container {
+    width: min(100% - 36px, 1180px);
+  }
+
+  .site-header__inner {
+    min-height: 78px;
+  }
+
+  .logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+  }
+
+  .site-nav a:not(:last-child) {
+    display: none;
+  }
+}

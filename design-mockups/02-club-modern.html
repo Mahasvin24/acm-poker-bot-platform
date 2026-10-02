@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modern Club Table — ACM Poker Bot Tournament</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="02-club-modern.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="brand" href="#welcome"><img class="logo" src="assets/acm-logo.png" alt="ACM logo" /><span class="brand-copy"><strong>POKER BOT</strong><span>TOURNAMENT</span></span></a>
+        <nav class="site-nav" aria-label="Primary navigation"><a href="#format">How it works</a><a href="#timeline">Schedule</a><a href="#faq">FAQ</a><a class="nav-cta" href="#format">Join the field</a></nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-section hero" id="welcome">
+        <div class="hero-band"></div>
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">ACM presents</p>
+            <h1>Can you<br />outplay<br /><span>the code?</span></h1>
+          </div>
+          <div class="hero-aside">
+            <div class="mini-table"><span class="card">A♠</span><span class="versus">H<br /><i>vs</i><br />B</span><span class="card">10♥</span></div>
+            <p class="lead">A live, play-money poker tournament where human intuition meets student-built strategy.</p>
+            <dl><div><dt>Game</dt><dd>No-limit Hold’em</dd></div><div><dt>Tables</dt><dd>6 players each</dd></div><div><dt>Entry</dt><dd>Human or bot</dd></div></dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section format" id="format">
+        <div class="container">
+          <div class="format-intro"><p class="eyebrow">How it works</p><h2 class="section-title">Choose your side.<br />The rules stay the same.</h2></div>
+          <div class="path-grid">
+            <article class="path path--human"><p class="path-number">01 / Human</p><h3>Take the controls.</h3><p>Play every hand yourself through a focused browser interface. No code required.</p><a href="#timeline">Human registration →</a></article>
+            <article class="path path--bot"><p class="path-number">02 / Bot</p><h3>Ship your strategy.</h3><p>Bring a bot that speaks the tournament API. We handle the table, rules, and clock.</p><a href="#timeline">Bot requirements →</a></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section timeline" id="timeline">
+        <div class="container">
+          <div class="timeline-head"><div><p class="eyebrow">Tournament timeline</p><h2 class="section-title">Four stops.<br />One champion.</h2></div><p>Exact dates and room information will be posted when registration opens.</p></div>
+          <ol class="steps">
+            <li><b>01</b><span>Register</span><small>Pick human or bot</small></li>
+            <li><b>02</b><span>Test</span><small>Verify bot connections</small></li>
+            <li><b>03</b><span>Check in</span><small>Join the event network</small></li>
+            <li><b>04</b><span>Play</span><small>Cards in the air</small></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="page-section faq" id="faq">
+        <div class="container faq-grid">
+          <div class="faq-title"><p class="eyebrow">Questions, answered</p><h2 class="section-title">Good to know.</h2><p>We’ll publish full bot documentation and event logistics before registration.</p></div>
+          <div class="faq-list">
+            <details open><summary><span>01</span>Can I play without coding?<b>−</b></summary><p>Absolutely. Register as a human and play every decision in the browser.</p></details>
+            <details><summary><span>02</span>Is there real money?<b>+</b></summary><p>No. The tournament is entirely play-money and organized as an ACM club event.</p></details>
+            <details><summary><span>03</span>What does my bot need?<b>+</b></summary><p>A small HTTP API running on your laptop and connected to the event Wi-Fi.</p></details>
+            <details><summary><span>04</span>What happens if my bot fails?<b>+</b></summary><p>The game keeps moving: it checks when possible and otherwise folds.</p></details>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

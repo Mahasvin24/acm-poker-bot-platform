@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Human / Machine — ACM Poker Bot Tournament</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="03-human-machine.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="brand" href="#welcome"><img class="logo" src="assets/acm-logo.png" alt="ACM logo" /><span class="brand-copy"><strong>ACM // POKER</strong><span>HUMAN–MACHINE TOURNAMENT</span></span></a>
+        <nav class="site-nav" aria-label="Primary navigation"><a href="#format">Format</a><a href="#timeline">Timeline</a><a href="#faq">FAQ</a><span class="status"><i></i> Registration soon</span></nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-section hero" id="welcome">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Human / Machine · Tournament 001</p>
+            <h1>The table doesn’t care <em>who wrote your move.</em></h1>
+            <p class="lead">A live no-limit Hold’em experiment for human players, bot builders, and anyone curious enough to sit down.</p>
+            <div class="button-row"><a class="button button--signal" href="#format">Enter the tournament</a><a class="quiet-link" href="#timeline">Read the field notes ↓</a></div>
+          </div>
+          <div class="table-module">
+            <div class="module-head"><span>TABLE / 01</span><span>6 MAX</span></div>
+            <div class="machine-table"><span class="node n1">H</span><span class="node n2">B</span><span class="node n3">H</span><b>ACM<br />TABLE</b><span class="node n4">B</span><span class="node n5">B</span><span class="node n6">H</span></div>
+            <div class="module-foot"><span>PLAY-MONEY</span><span>NO-LIMIT HOLD’EM</span><span>FREEZEOUT</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section format" id="format">
+        <div class="container format-layout">
+          <div class="section-copy"><p class="eyebrow">01 / Format</p><h2 class="section-title">One field.<br />Two kinds<br />of player.</h2></div>
+          <div class="specs">
+            <article><span>HUMAN</span><h3>Read the table.</h3><p>Join from your browser, see your cards, and choose from the legal actions presented each turn.</p></article>
+            <article><span>BOT</span><h3>Read the protocol.</h3><p>Host your strategy on the event network. The platform sends game state; your API sends one move.</p></article>
+            <dl><div><dt>Variant</dt><dd>No-limit Texas Hold’em</dd></div><div><dt>Table</dt><dd>Six players maximum</dd></div><div><dt>Stakes</dt><dd>Play-money only</dd></div><div><dt>Finish</dt><dd>One player remains</dd></div></dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section timeline" id="timeline">
+        <div class="container">
+          <p class="eyebrow">02 / Timeline</p>
+          <div class="clock-head"><h2 class="section-title">Tournament clock</h2><span>Dates // TBA</span></div>
+          <div class="clock-list">
+            <article><time>PRE–01</time><div><h3>Registration</h3><p>Choose your entrant type and claim a place in the field.</p></div><span>OPEN SOON</span></article>
+            <article><time>PRE–02</time><div><h3>Connection test</h3><p>Bot entrants verify their endpoint and run the conformance check.</p></div><span>REMOTE</span></article>
+            <article><time>00:00</time><div><h3>Check-in</h3><p>Connect to the event network and receive your table assignment.</p></div><span>EVENT DAY</span></article>
+            <article><time>00:30</time><div><h3>Shuffle up</h3><p>The tournament starts and plays down to one winner.</p></div><span>LIVE</span></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section faq" id="faq">
+        <div class="container faq-layout">
+          <div><p class="eyebrow">03 / FAQ</p><h2 class="section-title">Plain answers.</h2></div>
+          <div class="questions">
+            <details open><summary>Do I need to know how to code?<span>[−]</span></summary><p>No. Human entrants play through a normal poker interface. Coding is only required if you choose to enter a bot.</p></details>
+            <details><summary>What does the bot receive?<span>[+]</span></summary><p>Public table state, its own cards, the decision deadline, and the exact actions it may legally return.</p></details>
+            <details><summary>Is this for real money?<span>[+]</span></summary><p>No. It is a cooperative, play-money ACM event.</p></details>
+            <details><summary>Can a failed bot stop the table?<span>[+]</span></summary><p>No. A failed response becomes a check when legal, otherwise a fold, and play continues.</p></details>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Editorial Cardroom — ACM Poker Bot Tournament</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="01-editorial.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="brand" href="#welcome" aria-label="ACM Poker Bot Tournament home">
+          <img class="logo" src="assets/acm-logo.png" alt="ACM logo" />
+          <span class="brand-copy"><strong>ACM</strong><span>Poker Bot Tournament</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="#format">Format</a><a href="#timeline">Timeline</a><a href="#faq">FAQ</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-section hero" id="welcome">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">A play-money club tournament</p>
+            <h1>Humans.<br />Bots.<br /><em>One table.</em></h1>
+            <p class="lead">Bring your poker face or bring your code. ACM is hosting a friendly no-limit Hold’em tournament where human players and student-built bots compete side by side.</p>
+            <div class="button-row"><a class="button button--solid" href="#format">See how it works</a><a class="text-link" href="#timeline">View the timeline →</a></div>
+          </div>
+          <div class="table-figure" aria-label="Six-seat poker table diagram">
+            <span class="seat seat--1">01</span><span class="seat seat--2">02</span><span class="seat seat--3">03</span>
+            <div class="felt"><span>HUMAN</span><b>vs.</b><span>BOT</span></div>
+            <span class="seat seat--4">04</span><span class="seat seat--5">05</span><span class="seat seat--6">06</span>
+            <p>Six seats · one winner</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section format" id="format">
+        <div class="container">
+          <div class="section-heading"><p class="eyebrow">The format</p><h2 class="section-title">Two ways to take a seat.</h2></div>
+          <div class="format-list">
+            <article><span>01</span><div><h3>Play as a human</h3><p>Register, take your assigned seat, and make every decision through the tournament interface.</p></div></article>
+            <article><span>02</span><div><h3>Bring your bot</h3><p>Host a small API on the event Wi-Fi. Your bot receives game state and returns one legal action.</p></div></article>
+            <article><span>03</span><div><h3>Same rules, same clock</h3><p>Everyone plays the same no-limit Hold’em freezeout. One field narrows to one champion.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section timeline" id="timeline">
+        <div class="container timeline-layout">
+          <div><p class="eyebrow">Event timeline</p><h2 class="section-title">From signup<br />to showdown.</h2></div>
+          <ol>
+            <li><span>01</span><div><strong>Registration opens</strong><p>Choose human or bot and reserve your seat.</p></div><small>Date TBA</small></li>
+            <li><span>02</span><div><strong>Bot test window</strong><p>Verify your endpoint against the tournament protocol.</p></div><small>Before event</small></li>
+            <li><span>03</span><div><strong>Check-in</strong><p>Join the event Wi-Fi and confirm your table.</p></div><small>Event day</small></li>
+            <li><span>04</span><div><strong>Cards in the air</strong><p>Six-handed tables play down to a final winner.</p></div><small>Event day</small></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="page-section faq" id="faq">
+        <div class="container faq-layout">
+          <div><p class="eyebrow">FAQ</p><h2 class="section-title">Before you<br />take a seat.</h2></div>
+          <div class="questions">
+            <details open><summary>Do I need to build a bot?<span>−</span></summary><p>No. You can register as a human player and play through the tournament interface.</p></details>
+            <details><summary>Is real money involved?<span>+</span></summary><p>No. This is a friendly, play-money ACM club event.</p></details>
+            <details><summary>How does a bot connect?<span>+</span></summary><p>Your bot hosts a small HTTP API on the event Wi-Fi. We provide the request and response schemas.</p></details>
+            <details><summary>What poker format are we playing?<span>+</span></summary><p>No-limit Texas Hold’em, six players per table, freezeout format.</p></details>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
