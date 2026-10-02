@@ -311,6 +311,40 @@ class TournamentCoordinator:
                     candidate = self._begin_round_or_break(candidate)
             return await self._save(candidate, actor_id, "record_hand_completed")
 
+    async def mark_table_quarantined(
+        self,
+        table_id: str,
+        *,
+        actor_id: str = "table-coordinator",
+    ) -> TournamentState:
+        """Reconcile a durable table quarantine into tournament scheduling state."""
+
+        async with self._lock:
+            tables = list(self._state.tables)
+            try:
+                table_index = next(
+                    i for i, table in enumerate(tables) if table.table_id == table_id
+                )
+            except StopIteration as exc:
+                raise TournamentError("table does not exist") from exc
+            table = tables[table_index]
+            if table.quarantined:
+                return self._state
+            tables[table_index] = table.model_copy(
+                update={
+                    "quarantined": True,
+                    "hand_in_progress": False,
+                    "start_of_hand_stacks": {},
+                }
+            )
+            candidate = self._state.model_copy(update={"tables": tuple(tables)})
+            if not any(item.hand_in_progress for item in candidate.tables):
+                if candidate.status is TournamentStatus.PAUSE_REQUESTED:
+                    candidate = candidate.model_copy(update={"status": TournamentStatus.PAUSED})
+                elif candidate.status is TournamentStatus.RUNNING:
+                    candidate = self._begin_round_or_break(candidate)
+            return await self._save(candidate, actor_id, "mark_table_quarantined")
+
     def hand_request(self, table_id: str, *, table_version: int = 0) -> StartHandRequest:
         table = self._find_table(table_id)
         if not table.hand_in_progress:
@@ -420,7 +454,7 @@ class TournamentCoordinator:
     def _start_ready_hands(self, state: TournamentState) -> tuple[TournamentTable, ...]:
         started = []
         for table in state.tables:
-            if table.hand_in_progress or len(table.players) < 2:
+            if table.quarantined or table.hand_in_progress or len(table.players) < 2:
                 started.append(table)
                 continue
             button = table.button_seat if table.hand_number == 0 else next_button(table)
@@ -543,8 +577,11 @@ class TournamentCoordinator:
         self,
         state: TournamentState,
     ) -> tuple[tuple[TournamentTable, ...], int]:
-        tables = list(state.tables)
+        quarantined = [table for table in state.tables if table.quarantined]
+        tables = [table for table in state.tables if not table.quarantined]
         active_count = sum(len(table.players) for table in tables)
+        if active_count == 0:
+            return tuple(sorted(quarantined, key=table_sort_key)), state.balance_counter
         required = math.ceil(active_count / state.config.table_size)
         counter = state.balance_counter
 
@@ -601,7 +638,7 @@ class TournamentCoordinator:
             tables[tables.index(receiver)] = receiver_update
             counter += 1
 
-        return tuple(sorted(tables, key=table_sort_key)), counter
+        return tuple(sorted((*tables, *quarantined), key=table_sort_key)), counter
 
     def _find_table(self, table_id: str) -> TournamentTable:
         try:

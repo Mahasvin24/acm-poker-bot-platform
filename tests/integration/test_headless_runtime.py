@@ -450,18 +450,95 @@ async def test_quarantined_table_does_not_stop_other_table_in_same_tournament() 
             )
         await stack.admin.seat("multi-event", "admin")
         await stack.admin.start("multi-event", "admin")
+        before = await stack.registry.get("multi-event")
+        quarantined_players = before.state.tables[0].players
 
         await scheduler.run_once(now=100.0)
         clock.advance(31)
         await scheduler.run_once(now=131.0)
 
+        clock.advance(31)
+        await scheduler.run_once(now=162.0)
+
         tournament = await stack.registry.get("multi-event")
         first, second = tournament.state.tables
         first_state = await stack.tables.load_table(first.table_id)
         second_state = await stack.tables.load_table(second.table_id)
+        assert first.quarantined
+        assert not first.hand_in_progress
+        assert first.players == quarantined_players
         assert first_state.status is TableStatus.QUARANTINED
         assert first_state.pending is not None
         assert second_state.status is TableStatus.RUNNING
         assert second_state.pending is not None
-        assert second_state.snapshot.table_version == 1
-        assert len(second_state.snapshot.action_history) == 1
+        assert second.hand_in_progress
+        assert second.hand_number == 2
+        assert second_state.snapshot.hand_number == 2
+
+
+@pytest.mark.asyncio
+async def test_restart_reconciles_table_quarantine_crash_gap_once() -> None:
+    clock = MutableClock(datetime(2026, 10, 1, 18, 0, tzinfo=UTC))
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler), clock=clock)
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        for number in range(2):
+            account = await stack.auth.register(
+                f"restart-{number}@example.com",
+                "long-enough-password",
+            )
+            await stack.entrants.register(
+                account.id,
+                "event",
+                EntryKind.HUMAN,
+                f"Player {number}",
+            )
+        await stack.admin.seat("event", "admin")
+        await stack.admin.start("event", "admin")
+        tournament = await stack.registry.get("event")
+        table = tournament.state.tables[0]
+        persisted = await stack.tables.load_table(table.table_id)
+        assert persisted.pending is not None
+
+        # Simulate a crash after the table status commits but before tournament
+        # scheduling state is reconciled.
+        await stack.tables.quarantine_table(
+            table.table_id,
+            expected_version=persisted.snapshot.table_version,
+            expected_status=TableStatus.RUNNING,
+            tournament_id="event",
+            detail="simulated crash gap",
+        )
+        assert tournament.state.tables[0].hand_in_progress
+
+        restored_registry = TournamentRegistry(stack.tournament_store, stack.tables)
+        restored_runtime = HeadlessGameplayRuntime(
+            restored_registry,
+            stack.tables,
+            stack.accounts,
+            EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3),
+            gateway,
+            clock=clock,
+        )
+        restored_scheduler = GameplayScheduler(restored_registry, restored_runtime)
+        await restored_scheduler.run_once(now=1_000.0)
+
+        restored = await restored_registry.get("event")
+        restored_table = restored.state.tables[0]
+        assert restored_table.quarantined
+        assert not restored_table.hand_in_progress
+        quarantine_audits = [
+            entry
+            for entry in stack.tournament_store.audit_entries("event")
+            if entry.command == "mark_table_quarantined"
+        ]
+        assert len(quarantine_audits) == 1
+
+        await restored_scheduler.run_once(now=1_001.0)
+        quarantine_audits = [
+            entry
+            for entry in stack.tournament_store.audit_entries("event")
+            if entry.command == "mark_table_quarantined"
+        ]
+        assert len(quarantine_audits) == 1

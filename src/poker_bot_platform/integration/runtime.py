@@ -118,8 +118,8 @@ class HeadlessGameplayRuntime:
                 account_id,
                 tournament_id,
             )
-            coordinator = self._coordinators.get(table_id)
-            if coordinator is None or coordinator.state.snapshot is None:
+            coordinator = await self._ensure_coordinator(table_id)
+            if coordinator.state.snapshot is None:
                 raise GameplayNotFoundError("table state is not available")
             return self._project(tournament, coordinator, player)
 
@@ -140,8 +140,8 @@ class HeadlessGameplayRuntime:
             )
             if player.kind is not EntryKind.HUMAN:
                 raise GameplayAccessError("bot entrants cannot submit human actions")
-            coordinator = self._coordinators.get(table_id)
-            if coordinator is None or coordinator.state.snapshot is None:
+            coordinator = await self._ensure_coordinator(table_id)
+            if coordinator.state.snapshot is None:
                 raise GameplayNotFoundError("table state is not available")
             pending = coordinator.state.pending
             if coordinator.state.status is TableStatus.QUARANTINED:
@@ -163,6 +163,7 @@ class HeadlessGameplayRuntime:
             except InvalidActionError as exc:
                 raise GameplayConflictError(str(exc)) from exc
             except EngineInvariantError as exc:
+                await tournament.mark_table_quarantined(table_id)
                 raise GameplayConflictError(
                     "table was quarantined after a poker engine invariant failure"
                 ) from exc
@@ -173,8 +174,8 @@ class HeadlessGameplayRuntime:
                 account_id,
                 tournament_id,
             )
-            coordinator = self._coordinators.get(table_id)
-            if coordinator is None or coordinator.state.snapshot is None:
+            coordinator = await self._ensure_coordinator(table_id)
+            if coordinator.state.snapshot is None:
                 raise GameplayNotFoundError("table state is not available")
             return self._project(tournament, coordinator, player)
 
@@ -211,6 +212,7 @@ class HeadlessGameplayRuntime:
         coordinator = await self._ensure_scheduled_hand(tournament, table_id)
         while True:
             if coordinator.state.status is TableStatus.QUARANTINED:
+                await tournament.mark_table_quarantined(table_id)
                 return
             snapshot = coordinator.state.snapshot
             if snapshot is None:
@@ -230,7 +232,11 @@ class HeadlessGameplayRuntime:
             if acting.kind is EntryKind.BOT:
                 actor = await self._bot_actor(acting.entrant_id)
                 bot_timeout = timedelta(milliseconds=tournament.state.config.bot_action_timeout_ms)
-                await coordinator.request_actor_action(actor, self._now() + bot_timeout)
+                try:
+                    await coordinator.request_actor_action(actor, self._now() + bot_timeout)
+                except EngineInvariantError:
+                    await tournament.mark_table_quarantined(table_id)
+                    raise
                 continue
 
             pending = coordinator.state.pending
@@ -242,7 +248,11 @@ class HeadlessGameplayRuntime:
             if pending.seat != acting.seat:
                 raise GameplayConflictError("pending decision does not match the acting seat")
             if self._now() >= pending.deadline_at:
-                await coordinator.expire_decision()
+                try:
+                    await coordinator.expire_decision()
+                except EngineInvariantError:
+                    await tournament.mark_table_quarantined(table_id)
+                    raise
                 continue
             return
 

@@ -36,6 +36,7 @@ class TournamentTable(ContractModel):
     hand_level_number: int = Field(default=0, ge=0)
     button_seat: int = Field(ge=1, le=6)
     hand_in_progress: bool = False
+    quarantined: bool = False
     start_of_hand_stacks: dict[str, int] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -50,6 +51,8 @@ class TournamentTable(ContractModel):
             raise ValueError("a tournament table requires one to six players")
         if self.button_seat not in seats:
             raise ValueError("button must be occupied")
+        if self.quarantined and self.hand_in_progress:
+            raise ValueError("a quarantined table cannot have a hand in progress")
         if self.hand_in_progress:
             if self.hand_level_number < 1:
                 raise ValueError("active hand must capture its blind level")
