@@ -1,11 +1,12 @@
 # Local Setup
 
-The current milestone is a headless FastAPI service. It does not include the Next.js frontend
-yet, so use the generated API documentation or direct HTTP requests to operate it locally.
+The project includes a FastAPI backend and a Next.js frontend. The frontend currently serves
+the public tournament landing page; tournament operation remains available through the API.
 
 ## Requirements
 
 - Python 3.12 or newer
+- Node.js 20.9 or newer with npm
 - Docker with Docker Compose, or an existing PostgreSQL 17 instance
 - Git
 
@@ -31,9 +32,8 @@ openssl rand -hex 32
 ```
 
 Open `.env` and replace `POKER_SECRET_KEY` with the generated value. The default database URL
-matches the PostgreSQL service in `compose.yaml`. While operating the headless API through
-Swagger, set `POKER_ALLOWED_ORIGIN=http://localhost:8000`. Change it back to the frontend origin
-when the Next.js client is added.
+matches the PostgreSQL service in `compose.yaml`, and the default allowed origin matches the
+local Next.js frontend at `http://localhost:3000`.
 
 For local development, the remaining defaults can normally stay unchanged. Before testing with
 bot laptops, update `POKER_PARTICIPANT_SUBNET` and `POKER_BLOCKED_IPS` for the actual LAN.
@@ -77,13 +77,30 @@ Version 1 must run with exactly one worker. While it is running, open:
 - API documentation: <http://localhost:8000/docs>
 - Health check: <http://localhost:8000/health>
 
-## 6. Run the local checks
+## 6. Start the frontend
+
+In a second terminal from the repository root:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000>. The committed `package-lock.json` pins the frontend dependency
+tree, so use `npm ci` instead of `npm install` in CI or clean deployment environments.
+
+## 7. Run the local checks
 
 ```bash
 pytest
 ruff check .
 ruff format --check .
 python -m mypy
+cd frontend
+npm run lint
+npm run build
+cd ..
 ```
 
 The live PostgreSQL tests require a dedicated test database URL:
@@ -96,7 +113,7 @@ POKER_TEST_DATABASE_URL='postgresql+asyncpg://poker:poker@localhost:5432/poker_t
 The `createdb` command is needed only once. The test database name must end in `_test`; never
 point these migration and isolation tests at the local application, event, or production database.
 
-## 7. Run an example bot
+## 8. Run an example bot
 
 After registering a bot entrant, copy the one-time token and run either starter bot in another
 terminal. For the Python example:
