@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3ecdf" />
+    <title>Quiet Spectacle — ACM Poker Bot Tournament</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="04-quiet-spectacle.css" />
+    <script src="04-quiet-spectacle.js" defer></script>
+  </head>
+  <body>
+    <div class="progress" aria-hidden="true"><span></span></div>
+
+    <header class="site-header">
+      <div class="container site-header__inner">
+        <a class="brand" href="#welcome" aria-label="ACM Poker Bot Tournament home">
+          <img class="logo" src="assets/acm-logo.png" alt="ACM logo" />
+          <span class="brand-copy"><strong>ACM POKER</strong><span>HUMAN × MACHINE</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="#format">Format</a><a href="#timeline">Timeline</a><a href="#faq">FAQ</a>
+          <a class="nav-pill" href="#format"><i></i> Registration soon</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-section hero" id="welcome">
+        <div class="ambient-table" aria-hidden="true">
+          <span class="orbit orbit--one"></span><span class="orbit orbit--two"></span>
+          <span class="seat seat--1">H</span><span class="seat seat--2">B</span><span class="seat seat--3">H</span>
+          <span class="seat seat--4">B</span><span class="seat seat--5">H</span><span class="seat seat--6">B</span>
+        </div>
+        <div class="floating-card card--ace" aria-hidden="true"><span>A</span><b>♠</b></div>
+        <div class="floating-card card--king" aria-hidden="true"><span>K</span><b>♥</b></div>
+
+        <div class="container hero-inner">
+          <p class="eyebrow reveal">ACM presents · No-limit Hold’em · Play money</p>
+          <h1 aria-label="One table. Any mind.">
+            <span class="title-line reveal"><span>One table.</span></span>
+            <span class="title-line title-line--accent reveal"><span>Any mind.</span></span>
+          </h1>
+          <div class="hero-bottom reveal">
+            <p>A live poker tournament where people play their instincts and student-built bots play their code.</p>
+            <a class="round-link" href="#format"><span>See the format</span><b>↓</b></a>
+          </div>
+        </div>
+        <p class="side-note side-note--left">36 entrants · 6 per table</p>
+        <p class="side-note side-note--right">Scroll to deal</p>
+      </section>
+
+      <section class="page-section thesis" aria-label="Tournament introduction">
+        <div class="suit-field" aria-hidden="true"><span>♣</span><span>♦</span><span>♠</span><span>♥</span></div>
+        <div class="container thesis-inner">
+          <p class="chapter reveal">01 · The idea</p>
+          <p class="statement reveal">Poker has always been a game of incomplete information.</p>
+          <p class="statement statement--shift reveal">Now the player across from you might be <em>an API.</em></p>
+          <div class="thesis-foot reveal"><span>Bring your poker face.</span><span>Or bring your code.</span></div>
+        </div>
+      </section>
+
+      <section class="page-section format" id="format">
+        <div class="container format-inner">
+          <div class="format-head reveal">
+            <p class="chapter">02 · Choose your seat</p>
+            <h2>Same table.<br />Different interface.</h2>
+          </div>
+
+          <div class="duel reveal">
+            <article class="player player--human">
+              <div class="player-meta"><span>01</span><span>Human</span></div>
+              <div><p class="player-mark">H</p><h3>Read the room.</h3><p>Play each hand through a focused browser interface. Your cards, legal moves, and clock—nothing more.</p></div>
+              <span class="player-tag">No code required</span>
+            </article>
+            <div class="duel-center" aria-hidden="true"><span>VS</span></div>
+            <article class="player player--bot">
+              <div class="player-meta"><span>02</span><span>Bot</span></div>
+              <div><p class="player-mark">B</p><h3>Read the state.</h3><p>Connect your own strategy over the event network. We send the hand; your API returns the move.</p></div>
+              <span class="player-tag">Bring an HTTP API</span>
+            </article>
+          </div>
+
+          <div class="ticker" aria-label="Tournament format">
+            <div><span>NO-LIMIT HOLD’EM</span><i>◆</i><span>SIX-PLAYER TABLES</span><i>◆</i><span>PLAY-MONEY</span><i>◆</i><span>ONE CHAMPION</span><i>◆</i><span>NO-LIMIT HOLD’EM</span><i>◆</i><span>SIX-PLAYER TABLES</span><i>◆</i><span>PLAY-MONEY</span><i>◆</i><span>ONE CHAMPION</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-section timeline" id="timeline">
+        <div class="container timeline-inner">
+          <div class="timeline-title reveal">
+            <p class="chapter">03 · From signup to showdown</p>
+            <h2>Four moments.<br /><em>One night.</em></h2>
+          </div>
+          <ol class="timeline-list">
+            <li class="reveal"><span class="step">01</span><div><h3>Pick your side</h3><p>Register as a human player or a bot builder.</p></div><span class="when">Registration</span></li>
+            <li class="reveal"><span class="step">02</span><div><h3>Run the check</h3><p>Bots verify their connection and response format.</p></div><span class="when">Before event</span></li>
+            <li class="reveal"><span class="step">03</span><div><h3>Take your seat</h3><p>Join the event Wi-Fi and receive a table assignment.</p></div><span class="when">Event day</span></li>
+            <li class="reveal"><span class="step">04</span><div><h3>Play it down</h3><p>The field competes until one stack remains.</p></div><span class="when when--live"><i></i> Live</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="page-section faq" id="faq">
+        <div class="faq-watermark" aria-hidden="true">?</div>
+        <div class="container faq-inner">
+          <div class="faq-intro reveal">
+            <p class="chapter">04 · Before you ask</p>
+            <h2>The fine print,<br /><em>kept simple.</em></h2>
+            <p>Full rules, bot documentation, and event logistics will arrive when registration opens.</p>
+          </div>
+          <div class="questions reveal">
+            <details open><summary><span>01</span>Do I need to know how to code?<b></b></summary><p>No. Human entrants play through a normal poker interface. Coding is only needed to enter a bot.</p></details>
+            <details><summary><span>02</span>What does my bot need?<b></b></summary><p>A small HTTP API running on your laptop and connected to the same event Wi-Fi.</p></details>
+            <details><summary><span>03</span>Is there real money involved?<b></b></summary><p>No. This is a friendly, play-money ACM club tournament.</p></details>
+            <details><summary><span>04</span>What if my bot misses a turn?<b></b></summary><p>The table keeps moving. It checks when possible and otherwise folds.</p></details>
+          </div>
+        </div>
+        <footer class="container footer reveal"><span>ACM · Poker Bot Tournament</span><span>Dates and location coming soon</span><a href="#welcome">Back to top ↑</a></footer>
+      </section>
+    </main>
+  </body>
+</html>
