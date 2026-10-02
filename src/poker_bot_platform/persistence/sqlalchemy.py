@@ -27,8 +27,11 @@ from poker_bot_platform.persistence.models import (
 from poker_bot_platform.persistence.repository import (
     CommitResult,
     DecisionConflictError,
+    HandStartCommitResult,
     PersistedTableState,
+    PersistedTournamentState,
     PersistenceError,
+    StatusConflictError,
     TableNotFoundError,
     VersionConflictError,
     utc_now,
@@ -57,16 +60,69 @@ class SqlAlchemyTableRepository:
         config: dict[str, object],
         *,
         status: TournamentStatus = TournamentStatus.DRAFT,
-    ) -> None:
+    ) -> PersistedTournamentState:
         try:
             async with self._transaction() as session:
                 session.add(
-                    TournamentRow(id=tournament_id, status=status.value, config=dict(config))
+                    TournamentRow(
+                        id=tournament_id,
+                        status=status.value,
+                        config=dict(config),
+                        version=0,
+                    )
                 )
         except PersistenceError as exc:
             if isinstance(exc.__cause__, IntegrityError):
                 raise DecisionConflictError(f"tournament {tournament_id!r} already exists") from exc
             raise
+        return PersistedTournamentState(
+            tournament_id=tournament_id,
+            status=status,
+            config=dict(config),
+            version=0,
+        )
+
+    async def load_tournament(self, tournament_id: str) -> PersistedTournamentState:
+        async with self._transaction() as session:
+            row = await session.scalar(
+                select(TournamentRow).where(TournamentRow.id == tournament_id).with_for_update()
+            )
+            if row is None:
+                raise TableNotFoundError(f"tournament {tournament_id!r}")
+            return self._tournament_from_row(row)
+
+    async def update_tournament(
+        self,
+        tournament_id: str,
+        *,
+        expected_version: int,
+        expected_status: TournamentStatus,
+        status: TournamentStatus | None = None,
+        config: dict[str, object] | None = None,
+    ) -> PersistedTournamentState:
+        if status is None and config is None:
+            raise ValueError("tournament update requires a status or config change")
+        async with self._transaction() as session:
+            row = await session.scalar(
+                select(TournamentRow).where(TournamentRow.id == tournament_id).with_for_update()
+            )
+            if row is None:
+                raise TableNotFoundError(f"tournament {tournament_id!r}")
+            if row.version != expected_version:
+                raise VersionConflictError(
+                    f"expected version {expected_version}, found {row.version}"
+                )
+            if row.status != expected_status.value:
+                raise StatusConflictError(
+                    f"expected status {expected_status.value}, found {row.status}"
+                )
+            if status is not None:
+                row.status = status.value
+            if config is not None:
+                row.config = dict(config)
+            row.version += 1
+            await session.flush()
+            return self._tournament_from_row(row)
 
     async def create_table(
         self,
@@ -123,6 +179,80 @@ class SqlAlchemyTableRepository:
                 status=TableStatus(row.status),
                 pending=self._pending_from_row(pending_row) if pending_row else None,
             )
+
+    async def update_table_status(
+        self,
+        table_id: str,
+        *,
+        expected_version: int,
+        expected_status: TableStatus,
+        status: TableStatus,
+    ) -> TableStatus:
+        async with self._transaction() as session:
+            table = await session.scalar(
+                select(TableRow).where(TableRow.id == table_id).with_for_update()
+            )
+            if table is None:
+                raise TableNotFoundError(table_id)
+            if table.version != expected_version:
+                raise VersionConflictError(
+                    f"expected version {expected_version}, found {table.version}"
+                )
+            if table.status == status.value:
+                return status
+            if table.status != expected_status.value:
+                raise StatusConflictError(
+                    f"expected status {expected_status.value}, found {table.status}"
+                )
+            table.status = status.value
+            return status
+
+    async def commit_next_hand(
+        self,
+        *,
+        expected_version: int,
+        snapshot: HandSnapshot,
+        events: tuple[DomainEvent, ...],
+    ) -> HandStartCommitResult:
+        async with self._transaction() as session:
+            table = await session.scalar(
+                select(TableRow).where(TableRow.id == snapshot.table_id).with_for_update()
+            )
+            if table is None:
+                raise TableNotFoundError(snapshot.table_id)
+            stored = await session.get(TableSnapshotRow, snapshot.table_id)
+            if stored is None:
+                raise PersistenceError("table is missing its recovery snapshot")
+            previous = HandSnapshot.model_validate(stored.snapshot)
+            if table.version != stored.version:
+                raise PersistenceError("table and recovery snapshot versions differ")
+            if (
+                table.version == snapshot.table_version
+                and table.current_hand_id == snapshot.hand_id
+            ):
+                if previous != snapshot:
+                    raise DecisionConflictError("next hand identity already has different state")
+                return HandStartCommitResult(snapshot=previous, idempotent=True)
+
+            pending = await session.scalar(
+                select(PendingDecisionRow).where(
+                    PendingDecisionRow.table_id == snapshot.table_id,
+                    PendingDecisionRow.status == "pending",
+                )
+            )
+            self._validate_next_hand(
+                table,
+                previous,
+                pending,
+                expected_version,
+                snapshot,
+            )
+            stored.version = snapshot.table_version
+            stored.snapshot = snapshot.model_dump(mode="json")
+            table.version = snapshot.table_version
+            table.current_hand_id = snapshot.hand_id
+            self._add_events(session, snapshot, events)
+            return HandStartCommitResult(snapshot=snapshot)
 
     async def create_pending(self, decision: PendingDecision) -> PendingDecision:
         try:
@@ -292,6 +422,42 @@ class SqlAlchemyTableRepository:
                 "legal_actions": row.legal_actions,
             }
         )
+
+    @staticmethod
+    def _tournament_from_row(row: TournamentRow) -> PersistedTournamentState:
+        return PersistedTournamentState(
+            tournament_id=row.id,
+            status=TournamentStatus(row.status),
+            config=dict(row.config),
+            version=row.version,
+        )
+
+    @staticmethod
+    def _validate_next_hand(
+        table: TableRow,
+        previous: HandSnapshot,
+        pending: PendingDecisionRow | None,
+        expected_version: int,
+        snapshot: HandSnapshot,
+    ) -> None:
+        if table.status != TableStatus.RUNNING.value:
+            raise StatusConflictError("only a running table can start its next hand")
+        if pending is not None:
+            raise DecisionConflictError("cannot start a hand with an unresolved decision")
+        if not previous.completed:
+            raise DecisionConflictError("current hand is not complete")
+        if table.version != expected_version:
+            raise VersionConflictError(
+                f"expected version {expected_version}, found {table.version}"
+            )
+        if snapshot.table_version != expected_version + 1:
+            raise VersionConflictError("next hand must advance exactly one version")
+        if snapshot.tournament_id != previous.tournament_id:
+            raise DecisionConflictError("next hand changed tournament identity")
+        if snapshot.hand_id == previous.hand_id or snapshot.hand_number != previous.hand_number + 1:
+            raise DecisionConflictError("next hand identity or number is invalid")
+        if snapshot.action_history:
+            raise DecisionConflictError("a new hand cannot contain action history")
 
     @staticmethod
     def _action_from_row(row: ActionRow) -> ActionRecord:

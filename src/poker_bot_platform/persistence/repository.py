@@ -30,6 +30,18 @@ class DecisionConflictError(PersistenceError):
     pass
 
 
+class StatusConflictError(PersistenceError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class PersistedTournamentState:
+    tournament_id: str
+    status: TournamentStatus
+    config: dict[str, object]
+    version: int
+
+
 @dataclass(frozen=True, slots=True)
 class PersistedTableState:
     snapshot: HandSnapshot
@@ -44,6 +56,12 @@ class CommitResult:
     idempotent: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class HandStartCommitResult:
+    snapshot: HandSnapshot
+    idempotent: bool = False
+
+
 class TableRepository(Protocol):
     async def create_tournament(
         self,
@@ -51,7 +69,19 @@ class TableRepository(Protocol):
         config: dict[str, object],
         *,
         status: TournamentStatus = TournamentStatus.DRAFT,
-    ) -> None: ...
+    ) -> PersistedTournamentState: ...
+
+    async def load_tournament(self, tournament_id: str) -> PersistedTournamentState: ...
+
+    async def update_tournament(
+        self,
+        tournament_id: str,
+        *,
+        expected_version: int,
+        expected_status: TournamentStatus,
+        status: TournamentStatus | None = None,
+        config: dict[str, object] | None = None,
+    ) -> PersistedTournamentState: ...
 
     async def create_table(
         self,
@@ -62,6 +92,23 @@ class TableRepository(Protocol):
     ) -> PersistedTableState: ...
 
     async def load_table(self, table_id: str) -> PersistedTableState: ...
+
+    async def update_table_status(
+        self,
+        table_id: str,
+        *,
+        expected_version: int,
+        expected_status: TableStatus,
+        status: TableStatus,
+    ) -> TableStatus: ...
+
+    async def commit_next_hand(
+        self,
+        *,
+        expected_version: int,
+        snapshot: HandSnapshot,
+        events: tuple[DomainEvent, ...],
+    ) -> HandStartCommitResult: ...
 
     async def create_pending(self, decision: PendingDecision) -> PendingDecision: ...
 

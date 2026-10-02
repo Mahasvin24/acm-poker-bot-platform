@@ -9,7 +9,13 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.engine import make_url
 
-from poker_bot_platform.domain import ActionType, PendingDecision, PlayerAction
+from poker_bot_platform.domain import (
+    ActionType,
+    PendingDecision,
+    PlayerAction,
+    TableStatus,
+    TournamentStatus,
+)
 from poker_bot_platform.engine import FakePokerEngine
 from poker_bot_platform.persistence import DecisionConflictError, create_database
 
@@ -53,7 +59,17 @@ async def test_postgres_json_round_trip_partial_index_and_atomic_commit(
     engine = FakePokerEngine()
     database, repository = create_database(migrated_database)
     try:
-        await repository.create_tournament(tournament_id, {"starting_stack": 20_000})
+        created_tournament = await repository.create_tournament(
+            tournament_id, {"starting_stack": 20_000}
+        )
+        assert created_tournament.version == 0
+        updated_tournament = await repository.update_tournament(
+            tournament_id,
+            expected_version=0,
+            expected_status=TournamentStatus.DRAFT,
+            status=TournamentStatus.REGISTRATION_OPEN,
+        )
+        assert updated_tournament.version == 1
         request = start_request().model_copy(
             update={
                 "tournament_id": tournament_id,
@@ -101,5 +117,37 @@ async def test_postgres_json_round_trip_partial_index_and_atomic_commit(
         assert loaded.snapshot.model_dump(mode="json") == transition.snapshot.model_dump(
             mode="json"
         )
+
+        assert (
+            await repository.update_table_status(
+                table_id,
+                expected_version=loaded.snapshot.table_version,
+                expected_status=TableStatus.RUNNING,
+                status=TableStatus.PAUSE_REQUESTED,
+            )
+            is TableStatus.PAUSE_REQUESTED
+        )
+        await repository.update_table_status(
+            table_id,
+            expected_version=loaded.snapshot.table_version,
+            expected_status=TableStatus.PAUSE_REQUESTED,
+            status=TableStatus.RUNNING,
+        )
+        next_request = request.model_copy(
+            update={
+                "hand_id": f"next-{hand_id}",
+                "hand_number": 2,
+                "table_version": loaded.snapshot.table_version + 1,
+                "button_seat": 2,
+            }
+        )
+        next_transition = engine.start_hand(next_request)
+        next_commit = await repository.commit_next_hand(
+            expected_version=loaded.snapshot.table_version,
+            snapshot=next_transition.snapshot,
+            events=next_transition.events,
+        )
+        assert next_commit.snapshot.hand_id == next_request.hand_id
+        assert (await repository.load_table(table_id)).snapshot == next_commit.snapshot
     finally:
         await database.dispose()

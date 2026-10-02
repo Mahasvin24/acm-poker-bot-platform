@@ -15,6 +15,7 @@ from poker_bot_platform.domain import (
     PendingDecision,
     PlayerAction,
     StartHandRequest,
+    TableStatus,
 )
 from poker_bot_platform.engine import PokerEngine
 from poker_bot_platform.persistence import PersistenceError, TableRepository
@@ -45,6 +46,7 @@ class ActorDecisionFailure(CoordinatorError):
 class CoordinatorState:
     snapshot: HandSnapshot | None
     pending: PendingDecision | None
+    status: TableStatus | None
     database_paused: bool
 
 
@@ -65,6 +67,7 @@ class TableCoordinator:
         self._clock = clock or (lambda: datetime.now(UTC))
         self._snapshot: HandSnapshot | None = None
         self._pending: PendingDecision | None = None
+        self._status: TableStatus | None = None
         self._database_paused = False
         self._command_lock = asyncio.Lock()
 
@@ -73,6 +76,7 @@ class TableCoordinator:
         return CoordinatorState(
             snapshot=self._snapshot,
             pending=self._pending,
+            status=self._status,
             database_paused=self._database_paused,
         )
 
@@ -85,12 +89,13 @@ class TableCoordinator:
             transition = self._engine.start_hand(request)
             self._validate_started_transition(request, transition)
             try:
-                await self._repository.create_table(transition.snapshot, transition.events)
+                stored = await self._repository.create_table(transition.snapshot, transition.events)
             except PersistenceError:
                 self._database_paused = True
                 raise
-            self._snapshot = transition.snapshot
+            self._snapshot = stored.snapshot
             self._pending = None
+            self._status = stored.status
             self._database_paused = False
             return transition.snapshot
 
@@ -107,6 +112,7 @@ class TableCoordinator:
             snapshot = self._engine.restore(stored.snapshot)
             self._snapshot = snapshot
             self._pending = stored.pending
+            self._status = stored.status
             self._database_paused = False
             if stored.pending is not None:
                 try:
@@ -120,6 +126,60 @@ class TableCoordinator:
                     raise
             assert self._snapshot is not None
             return self._snapshot
+
+    async def start_next_hand(self, request: StartHandRequest) -> HandSnapshot:
+        async with self._command_lock:
+            self._require_available()
+            previous = self._require_snapshot()
+            if self._status is not TableStatus.RUNNING:
+                raise CoordinatorNotReadyError("only a running table can start its next hand")
+            if self._pending is not None:
+                raise CoordinatorNotReadyError("table still has a pending decision")
+            if not previous.completed:
+                raise CoordinatorNotReadyError("current hand is not complete")
+            if request.table_id != self.table_id or request.tournament_id != previous.tournament_id:
+                raise CoordinatorError("next hand targets a different table or tournament")
+            if request.hand_id == previous.hand_id:
+                raise CoordinatorError("next hand requires a new hand identifier")
+            if request.hand_number != previous.hand_number + 1:
+                raise CoordinatorError("next hand number must advance exactly one")
+            if request.table_version != previous.table_version + 1:
+                raise CoordinatorError("next hand must start at the next table version")
+
+            transition = self._engine.start_hand(request)
+            self._validate_started_transition(request, transition)
+            try:
+                committed = await self._repository.commit_next_hand(
+                    expected_version=previous.table_version,
+                    snapshot=transition.snapshot,
+                    events=transition.events,
+                )
+            except PersistenceError:
+                self._database_paused = True
+                raise
+            self._snapshot = committed.snapshot
+            self._pending = None
+            self._database_paused = False
+            return committed.snapshot
+
+    async def set_status(self, status: TableStatus) -> TableStatus:
+        async with self._command_lock:
+            self._require_available()
+            snapshot = self._require_snapshot()
+            if self._status is None:
+                raise CoordinatorNotReadyError("table lifecycle status is unavailable")
+            try:
+                stored = await self._repository.update_table_status(
+                    self.table_id,
+                    expected_version=snapshot.table_version,
+                    expected_status=self._status,
+                    status=status,
+                )
+            except PersistenceError:
+                self._database_paused = True
+                raise
+            self._status = stored
+            return stored
 
     async def open_decision(self, deadline_at: datetime) -> PendingDecision:
         async with self._command_lock:
