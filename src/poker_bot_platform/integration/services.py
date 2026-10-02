@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -20,6 +21,8 @@ from poker_bot_platform.tournament import (
     TournamentStore,
     TournamentStoreError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class TournamentRegistry:
@@ -70,7 +73,23 @@ class TournamentRegistry:
         """Return tournaments restored or created in this application process."""
 
         async with self._lock:
-            return tuple(self._coordinators)
+            return tuple(sorted(self._coordinators))
+
+    async def discover_active_tournaments(self) -> tuple[str, ...]:
+        """Restore every persisted active tournament not yet known in this process."""
+
+        persisted_ids = await self._store.list_active_tournament_ids()
+        for tournament_id in persisted_ids:
+            try:
+                await self.get(tournament_id)
+            except (TournamentStoreError, ValueError):
+                # A corrupt tournament must not prevent unrelated tournaments
+                # from recovering and resuming after a process restart.
+                logger.exception(
+                    "active tournament restore failed",
+                    extra={"id": tournament_id},
+                )
+        return await self.known_tournament_ids()
 
 
 @dataclass(slots=True)

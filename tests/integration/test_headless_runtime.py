@@ -235,6 +235,13 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
             gateway,
             clock=clock,
         )
+        restored_scheduler = GameplayScheduler(restored_registry, restored_runtime)
+        assert await restored_registry.known_tournament_ids() == ()
+        await restored_scheduler.run_once(now=1_000.0)
+        assert await restored_registry.known_tournament_ids() == ("event",)
+        assert len(stack.tables.actions) == 1
+        await restored_scheduler.run_once(now=1_000.0)
+        assert len(stack.tables.actions) == 1
         after_restart = await restored_runtime.player_state(actor.id, "event")
         assert after_restart.hand_id != original.hand_id
 
@@ -303,6 +310,9 @@ async def test_scheduler_isolates_one_tournament_failure() -> None:
 
         async def known_tournament_ids(self) -> tuple[str, ...]:
             return tuple(self.coordinators)
+
+        async def discover_active_tournaments(self) -> tuple[str, ...]:
+            return await self.known_tournament_ids()
 
         async def get(self, tournament_id: str) -> Coordinator:
             return self.coordinators[tournament_id]

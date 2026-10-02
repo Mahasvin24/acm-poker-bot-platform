@@ -3,7 +3,17 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
+from poker_bot_platform.domain import TournamentStatus
 from poker_bot_platform.tournament.models import AuditEntry, TournamentState
+
+ACTIVE_TOURNAMENT_STATUSES = frozenset(
+    {
+        TournamentStatus.RUNNING,
+        TournamentStatus.PAUSE_REQUESTED,
+        TournamentStatus.PAUSED,
+        TournamentStatus.BREAK,
+    }
+)
 
 
 class TournamentStoreError(RuntimeError):
@@ -26,6 +36,8 @@ class TournamentStore(Protocol):
     ) -> None: ...
 
     async def load(self, tournament_id: str) -> TournamentState: ...
+
+    async def list_active_tournament_ids(self) -> tuple[str, ...]: ...
 
 
 class InMemoryTournamentStore:
@@ -69,6 +81,16 @@ class InMemoryTournamentStore:
                 return self._states[tournament_id]
             except KeyError as exc:
                 raise TournamentStoreError("tournament does not exist") from exc
+
+    async def list_active_tournament_ids(self) -> tuple[str, ...]:
+        async with self._lock:
+            return tuple(
+                sorted(
+                    tournament_id
+                    for tournament_id, state in self._states.items()
+                    if state.status in ACTIVE_TOURNAMENT_STATUSES
+                )
+            )
 
     def audit_entries(self, tournament_id: str) -> tuple[AuditEntry, ...]:
         return tuple(self._audit.get(tournament_id, ()))

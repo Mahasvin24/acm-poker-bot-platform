@@ -17,10 +17,12 @@ from poker_bot_platform.domain import (
 from poker_bot_platform.engine import FakePokerEngine
 from poker_bot_platform.persistence import InMemoryTableRepository
 from poker_bot_platform.tournament import (
+    AuditEntry,
     Entrant,
     InMemoryTournamentStore,
     TournamentCoordinator,
     TournamentError,
+    TournamentState,
 )
 
 SEED = "12" * 32
@@ -64,6 +66,32 @@ async def finish_unchanged(coordinator: TournamentCoordinator, table_ids: Sequen
             table_id,
             {player.entrant_id: player.stack for player in table.players},
         )
+
+
+@pytest.mark.asyncio
+async def test_store_lists_only_persisted_active_tournaments() -> None:
+    store = InMemoryTournamentStore()
+    active = {
+        TournamentStatus.RUNNING,
+        TournamentStatus.PAUSE_REQUESTED,
+        TournamentStatus.PAUSED,
+        TournamentStatus.BREAK,
+    }
+    for status in TournamentStatus:
+        await store.create(
+            TournamentState(
+                tournament_id=f"event-{status.value}",
+                config=TournamentConfig(),
+                seed_hex=SEED,
+                status=status,
+                phase_remaining_seconds=900,
+            ),
+            AuditEntry(actor_id="test", command="create"),
+        )
+
+    assert await store.list_active_tournament_ids() == tuple(
+        sorted(f"event-{status.value}" for status in active)
+    )
 
 
 @pytest.mark.asyncio
@@ -317,6 +345,7 @@ async def test_one_hundred_seeded_36_player_tournaments_finish_without_chip_drif
         )
         assert coordinator.state.status is TournamentStatus.COMPLETED
         assert len(coordinator.state.standings) == 36
-        assert sum(
-            player.stack for table in coordinator.state.tables for player in table.players
-        ) == 720_000
+        assert (
+            sum(player.stack for table in coordinator.state.tables for player in table.players)
+            == 720_000
+        )

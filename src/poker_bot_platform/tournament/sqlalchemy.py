@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from poker_bot_platform.persistence.models import AuditLogRow, TournamentRow
 from poker_bot_platform.tournament.models import AuditEntry, TournamentState
 from poker_bot_platform.tournament.store import (
+    ACTIVE_TOURNAMENT_STATUSES,
     TournamentStoreError,
     TournamentVersionConflict,
 )
@@ -84,6 +85,19 @@ class SqlAlchemyTournamentStore:
                 return state
         except TournamentStoreError:
             raise
+        except SQLAlchemyError as exc:
+            raise TournamentStoreError("tournament database operation failed") from exc
+
+    async def list_active_tournament_ids(self) -> tuple[str, ...]:
+        try:
+            active_statuses = tuple(status.value for status in ACTIVE_TOURNAMENT_STATUSES)
+            async with self._sessions() as session:
+                rows = await session.scalars(
+                    select(TournamentRow.id)
+                    .where(TournamentRow.status.in_(active_statuses))
+                    .order_by(TournamentRow.id)
+                )
+                return tuple(rows)
         except SQLAlchemyError as exc:
             raise TournamentStoreError("tournament database operation failed") from exc
 

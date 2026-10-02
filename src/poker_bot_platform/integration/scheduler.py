@@ -17,9 +17,8 @@ MonotonicClock = Callable[[], float]
 class GameplayScheduler:
     """Lifespan-owned clock and deadline driver for known tournaments.
 
-    The registry deliberately owns only tournaments touched in this process. A
-    deployment restart therefore needs an API/admin access to restore a persisted
-    tournament before this scheduler can discover and drive it.
+    Each poll first restores persisted active tournaments into the process registry,
+    then advances their level clocks and gameplay deadlines.
     """
 
     def __init__(
@@ -62,6 +61,14 @@ class GameplayScheduler:
         """Advance one deterministic polling cycle; public for focused tests."""
 
         current = self._monotonic() if now is None else now
+        try:
+            await self._tournaments.discover_active_tournaments()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Keep servicing already known tournaments when discovery itself is
+            # temporarily unavailable (for example during a database outage).
+            logger.exception("active tournament discovery failed")
         tournament_ids = await self._tournaments.known_tournament_ids()
         active_ids = set(tournament_ids)
         for tournament_id in tuple(self._last_level_tick):
