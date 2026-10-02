@@ -10,10 +10,10 @@
 ## Discoveries and gotchas
 
 - **Greenfield repository** — The repository had no tracked files or commits when architecture planning began. Evidence: `git status --short --branch` on 2026-10-01.
-- **Redis boundary** — The current proposal does not treat Redis as the sole source of truth or expose it to browsers. PostgreSQL owns durable tournament state; Redis is proposed for cache/live fan-out. Rationale and sources: `docs/architecture-plan.md`.
+- **Single-process authority** — PostgreSQL is the durable authority and the v1 app must use exactly one FastAPI worker. Redis is excluded unless a later multi-process design is approved. Evidence: `docs/architecture-plan.md`, `src/poker_bot_platform/config.py`. Last verified: 2026-10-01.
+- **Local test environment** — Docker was not available during implementation, so optional live-PostgreSQL tests could not run locally; migration SQL rendering and repository semantics were tested without it. The live database tests and rehearsal remain mandatory before event acceptance. Evidence: `tests/auth/test_postgres_auth.py`, `tests/coordinator/test_postgres_repository.py`, `docs/event-runbook.md`. Last verified: 2026-10-01.
 
 ## Open threads
 
-- **Architecture proposal is not yet accepted** — Review and decide the open product/rules/network questions in `docs/architecture-plan.md` before implementation.
-- **Poker engine selection** — PokerKit is the leading candidate but must pass the adapter spike listed in `docs/architecture-plan.md` before adoption.
-- **LAN bot transport** — Direct HTTP to registered IP/port must be rehearsed on the actual access point. An outbound persistent bot connection is the fallback if peer connectivity is unreliable.
+- **External acceptance gates** — Run the optional live-PostgreSQL tests, eight-hour soak, and full actual-router rehearsal before declaring event readiness. These require Docker/event hardware unavailable in the implementation environment. Evidence: `docs/event-runbook.md`. Last verified: 2026-10-01.
+- **Later frontend** — Build the minimal Next.js client only after independent approval of the headless backend. 3D remains outside scope. Evidence: `docs/architecture-plan.md`. Last verified: 2026-10-01.
