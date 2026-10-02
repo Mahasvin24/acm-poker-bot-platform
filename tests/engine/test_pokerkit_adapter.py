@@ -261,6 +261,7 @@ def test_multiple_all_ins_create_correct_main_and_side_pot_payouts() -> None:
     assert snapshot.completed
     assert {seat.seat: seat.stack for seat in snapshot.seats} == {1: 15, 2: 10, 3: 10}
     assert sum(seat.stack for seat in snapshot.seats) == 35
+    assert all(seat.public_hole_cards == seat.hole_cards for seat in snapshot.seats)
     completion = next(event for event in transition.events if event.event_type == "hand_completed")
     assert completion.payload["payouts"] == [
         {"seat": 1, "amount": 15, "stack": 15, "net": 10},
@@ -283,7 +284,19 @@ def test_all_in_from_forced_bets_preserves_private_cards_for_recovery() -> None:
     assert transition.snapshot.completed
     assert transition.snapshot.seats[0].hole_cards == ("As", "Ah")
     assert transition.snapshot.seats[1].hole_cards == ("Ks", "Kh")
+    assert all(
+        seat.public_hole_cards == seat.hole_cards for seat in transition.snapshot.seats
+    )
     assert engine.restore(transition.snapshot) == transition.snapshot
+
+
+def test_folded_hand_does_not_publish_opponent_cards() -> None:
+    engine = PokerKitEngine()
+    snapshot = engine.start_hand(_request(_seat(1), _seat(2), button=2)).snapshot
+    snapshot = _act(engine, snapshot, ActionType.FOLD).snapshot
+
+    assert snapshot.completed
+    assert all(not seat.public_hole_cards for seat in snapshot.seats)
 
 
 def test_snapshot_is_json_serializable_and_restore_is_exact() -> None:

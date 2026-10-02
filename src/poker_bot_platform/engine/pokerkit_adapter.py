@@ -15,6 +15,7 @@ from pokerkit import (
     CheckingOrCalling,
     CompletionBettingOrRaisingTo,
     Deck,
+    HoleCardsShowingOrMucking,
     NoLimitTexasHoldem,
     State,
 )
@@ -312,6 +313,7 @@ class PokerKitEngine:
         folded_seats = {
             record.seat for record in action_history if record.action is ActionType.FOLD
         }
+        public_hole_cards = self._public_hole_cards(state, restored.player_seats)
         completed = not state.status
 
         updated_seats = []
@@ -332,6 +334,7 @@ class PokerKitEngine:
                         "all_in": stack == 0 and not folded and not completed,
                         "eliminated": original.eliminated or (completed and stack == 0),
                         "hole_cards": restored.hole_cards_by_seat[original.seat],
+                        "public_hole_cards": public_hole_cards.get(original.seat, ()),
                     }
                 )
             )
@@ -370,6 +373,26 @@ class PokerKitEngine:
             completed=completed,
             engine_state=engine_state,
         )
+
+    @staticmethod
+    def _public_hole_cards(
+        state: State,
+        player_seats: tuple[int, ...],
+    ) -> dict[int, tuple[str, ...]]:
+        """Return only cards PokerKit actually exposed during showdown.
+
+        PokerKit's default showdown automation shows every live all-in hand and,
+        otherwise, only hands that can still win a pot. Mucked cards produce an
+        empty operation and remain private.
+        """
+
+        shown: dict[int, tuple[str, ...]] = {}
+        for operation in state.operations:
+            if isinstance(operation, HoleCardsShowingOrMucking) and operation.hole_cards:
+                shown[player_seats[operation.player_index]] = tuple(
+                    repr(card) for card in operation.hole_cards
+                )
+        return shown
 
     def _legal_actions(self, state: State) -> tuple[LegalAction, ...]:
         if state.actor_index is None:

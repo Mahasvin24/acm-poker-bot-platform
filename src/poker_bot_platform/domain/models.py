@@ -142,6 +142,13 @@ class SeatState(ContractModel):
     all_in: bool = False
     eliminated: bool = False
     hole_cards: tuple[Card, ...] = ()
+    public_hole_cards: tuple[Card, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_public_hole_cards(self) -> SeatState:
+        if any(card not in self.hole_cards for card in self.public_hole_cards):
+            raise ValueError("public hole cards must belong to the seat")
+        return self
 
 
 class SidePot(ContractModel):
