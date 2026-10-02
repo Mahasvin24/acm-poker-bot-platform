@@ -168,6 +168,8 @@ class PlayerTableStateResponse(ApiModel):
     hand_id: str
     hand_number: int
     table_version: int
+    viewer_seat: int = Field(ge=1, le=6)
+    acting_seat: int | None = Field(default=None, ge=1, le=6)
     street: Street
     button_seat: int
     small_blind: int

@@ -360,6 +360,8 @@ class HeadlessGameplayRuntime:
             hand_id=snapshot.hand_id,
             hand_number=snapshot.hand_number,
             table_version=snapshot.table_version,
+            viewer_seat=player.seat,
+            acting_seat=snapshot.acting_seat,
             street=snapshot.street,
             button_seat=snapshot.button_seat,
             small_blind=snapshot.small_blind,

@@ -4,8 +4,9 @@ A server-authoritative tournament platform for a play-money human-versus-bot no-
 Texas Hold'em club event.
 
 The repository contains a FastAPI/PostgreSQL tournament backend and a Next.js frontend. The
-current frontend includes the public tournament landing page; authenticated participant and
-admin interfaces remain future work. 3D rendering is still intentionally deferred.
+current frontend includes the public tournament landing page and a human gameplay table;
+registration, bot setup, and admin interfaces remain future work. 3D rendering is still
+intentionally deferred.
 
 ## Development
 
@@ -31,6 +32,7 @@ npm run dev
 ```
 
 The frontend runs at <http://localhost:3000> and the API at <http://localhost:8000>.
+The standalone table demo is available at <http://localhost:3000/play/demo>.
 
 The service must run with exactly one application worker in v1. See
 [`docs/setup.md`](docs/setup.md) for complete local setup instructions,

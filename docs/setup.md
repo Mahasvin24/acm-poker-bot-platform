@@ -1,7 +1,8 @@
 # Local Setup
 
-The project includes a FastAPI backend and a Next.js frontend. The frontend currently serves
-the public tournament landing page; tournament operation remains available through the API.
+The project includes a FastAPI backend and a Next.js frontend. The frontend serves the public
+tournament landing page and a human tournament table; tournament administration remains
+available through the API.
 
 ## Requirements
 
@@ -87,8 +88,16 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. The committed `package-lock.json` pins the frontend dependency
-tree, so use `npm ci` instead of `npm install` in CI or clean deployment environments.
+Open <http://localhost:3000>. Use <http://localhost:3000/play/demo> to exercise the table without
+an account or running backend. For a live tournament, authenticate against the API and open
+`http://localhost:3000/play/<tournament-id>`.
+
+The frontend proxies `/api/v1/*` to `http://127.0.0.1:8000` by default. If the API runs at a
+different origin, create `frontend/.env.local` from `frontend/.env.example` and change
+`POKER_API_ORIGIN`, then restart the frontend development server.
+
+The committed `package-lock.json` pins the frontend dependency tree, so use `npm ci` instead of
+`npm install` in CI or clean deployment environments.
 
 ## 7. Run the local checks
 

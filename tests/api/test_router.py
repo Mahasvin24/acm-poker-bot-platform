@@ -145,6 +145,8 @@ class FakeGameplay:
             hand_id="hand-1",
             hand_number=1,
             table_version=0,
+            viewer_seat=1,
+            acting_seat=1,
             street=Street.PREFLOP,
             button_seat=1,
             small_blind=100,

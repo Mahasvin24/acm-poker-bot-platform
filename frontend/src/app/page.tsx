@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { MotionController } from "./motion-controller";
 
@@ -91,6 +92,7 @@ export default function Home() {
             <a href="#format">Format</a>
             <a href="#timeline">Timeline</a>
             <a href="#faq">FAQ</a>
+            <Link href="/play">Play</Link>
             <a className="nav-pill" href="#format">
               <i /> Registration soon
             </a>
