@@ -374,19 +374,19 @@ def test_generated_foldouts_preserve_core_engine_invariants(
     previous_version = snapshot.table_version
     while not snapshot.completed:
         legal = {candidate.action for candidate in snapshot.legal_actions}
-        action = ActionType.FOLD if ActionType.FOLD in legal else (
-            ActionType.CHECK if ActionType.CHECK in legal else ActionType.CALL
+        action = (
+            ActionType.FOLD
+            if ActionType.FOLD in legal
+            else (ActionType.CHECK if ActionType.CHECK in legal else ActionType.CALL)
         )
         snapshot = _act(engine, snapshot, action).snapshot
         assert snapshot.table_version == previous_version + 1
         previous_version = snapshot.table_version
         assert engine.restore(snapshot) == snapshot
 
-    cards = [
-        card
-        for seat in snapshot.seats
-        for card in seat.hole_cards
-    ] + list(snapshot.community_cards)
+    cards = [card for seat in snapshot.seats for card in seat.hole_cards] + list(
+        snapshot.community_cards
+    )
     assert len(cards) == len(set(cards))
     assert all(seat.stack >= 0 for seat in snapshot.seats)
     assert sum(seat.stack for seat in snapshot.seats) == initial_total

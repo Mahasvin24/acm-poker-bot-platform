@@ -8,4 +8,3 @@ app = FastAPI(title="ACM Poker Bot Platform", version=__version__)
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": __version__}
-

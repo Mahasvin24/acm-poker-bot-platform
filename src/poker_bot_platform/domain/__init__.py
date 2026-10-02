@@ -41,4 +41,3 @@ __all__ = [
     "TournamentStatus",
     "default_blind_levels",
 ]
-

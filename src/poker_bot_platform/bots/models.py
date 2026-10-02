@@ -126,8 +126,7 @@ class BotLegalAction(WireModel):
             if self.min_amount_to > self.max_amount_to:
                 raise ValueError("raise minimum cannot exceed maximum")
         elif any(
-            value is not None
-            for value in (self.amount, self.min_amount_to, self.max_amount_to)
+            value is not None for value in (self.amount, self.min_amount_to, self.max_amount_to)
         ):
             raise ValueError("fold and check do not accept amounts")
         return self

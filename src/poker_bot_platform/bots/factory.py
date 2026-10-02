@@ -85,7 +85,6 @@ def action_request_from_snapshot(
             hole_cards=acting.hole_cards,
         ),
         legal_actions=tuple(
-            BotLegalAction.model_validate(action.model_dump())
-            for action in pending.legal_actions
+            BotLegalAction.model_validate(action.model_dump()) for action in pending.legal_actions
         ),
     )

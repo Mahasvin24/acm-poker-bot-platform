@@ -12,4 +12,3 @@ def test_default_tournament_contract() -> None:
 def test_legal_raise_contract() -> None:
     action = LegalAction(action=ActionType.RAISE, min_amount_to=400, max_amount_to=20_000)
     assert action.min_amount_to == 400
-

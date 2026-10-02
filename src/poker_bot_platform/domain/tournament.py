@@ -44,8 +44,7 @@ _DEFAULT_BLINDS = (
 
 def default_blind_levels() -> tuple[BlindLevel, ...]:
     return tuple(
-        BlindLevel(small_blind=sb, big_blind=bb, big_blind_ante=bb)
-        for sb, bb in _DEFAULT_BLINDS
+        BlindLevel(small_blind=sb, big_blind=bb, big_blind_ante=bb) for sb, bb in _DEFAULT_BLINDS
     )
 
 

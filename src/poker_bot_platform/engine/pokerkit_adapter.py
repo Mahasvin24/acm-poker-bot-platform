@@ -307,9 +307,7 @@ class PokerKitEngine:
     ) -> HandSnapshot:
         request = restored.request
         state = restored.state
-        player_index_by_seat = {
-            seat: index for index, seat in enumerate(restored.player_seats)
-        }
+        player_index_by_seat = {seat: index for index, seat in enumerate(restored.player_seats)}
         street_commitments, hand_commitments = self._commitments(state)
         folded_seats = {
             record.seat for record in action_history if record.action is ActionType.FOLD
