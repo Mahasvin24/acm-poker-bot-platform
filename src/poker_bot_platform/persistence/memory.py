@@ -168,6 +168,46 @@ class InMemoryTableRepository:
             table.status = status
             return status
 
+    async def quarantine_table(
+        self,
+        table_id: str,
+        *,
+        expected_version: int,
+        expected_status: TableStatus,
+        tournament_id: str,
+        detail: str,
+    ) -> TableStatus:
+        async with self._lock:
+            self._maybe_fail("quarantine_table")
+            table = self._tables.get(table_id)
+            if table is None:
+                raise TableNotFoundError(table_id)
+            if table.snapshot.table_version != expected_version:
+                raise VersionConflictError(
+                    f"expected version {expected_version}, found {table.snapshot.table_version}"
+                )
+            if table.status is TableStatus.QUARANTINED:
+                return TableStatus.QUARANTINED
+            if table.status is not expected_status:
+                raise StatusConflictError(
+                    f"expected status {expected_status.value}, found {table.status.value}"
+                )
+            table.status = TableStatus.QUARANTINED
+            self._audit.append(
+                {
+                    "actor_id": "system",
+                    "command": "quarantine_table",
+                    "outcome": "failure",
+                    "tournament_id": tournament_id,
+                    "payload": {
+                        "table_id": table_id,
+                        "failure_reason": "engine_invariant",
+                    },
+                    "detail": detail,
+                }
+            )
+            return table.status
+
     async def commit_next_hand(
         self,
         *,
@@ -287,6 +327,10 @@ class InMemoryTableRepository:
     @property
     def events(self) -> tuple[tuple[str, int, DomainEvent], ...]:
         return tuple(self._events)
+
+    @property
+    def audit_entries(self) -> tuple[dict[str, object], ...]:
+        return tuple(self._audit)
 
     @staticmethod
     def _tournament_state(

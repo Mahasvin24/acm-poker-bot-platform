@@ -7,14 +7,36 @@ import pytest
 from poker_bot_platform.coordinator import (
     ActorDecisionFailure,
     CoordinatorNotReadyError,
+    EngineInvariantError,
     InvalidActionError,
     TableCoordinator,
 )
-from poker_bot_platform.domain import ActionType, FailureReason, PlayerAction
+from poker_bot_platform.domain import (
+    ActionType,
+    EngineTransition,
+    FailureReason,
+    HandSnapshot,
+    PlayerAction,
+    TableStatus,
+)
 from poker_bot_platform.engine import FakePokerEngine
 from poker_bot_platform.persistence import InMemoryTableRepository, PersistenceError
 
 from .conftest import NOW, start_request
+
+
+class ApplyInvariantFailureEngine(FakePokerEngine):
+    def apply_action(
+        self,
+        snapshot: HandSnapshot,
+        action: PlayerAction,
+    ) -> EngineTransition:
+        raise RuntimeError("injected apply invariant failure")
+
+
+class RestoreInvariantFailureEngine(FakePokerEngine):
+    def restore(self, snapshot: HandSnapshot) -> HandSnapshot:
+        raise ValueError("injected restore invariant failure")
 
 
 @pytest.mark.asyncio
@@ -230,3 +252,94 @@ async def test_expired_human_decision_uses_timeout_fallback(
     result = await coordinator.expire_decision()
     assert result.action_history[-1].automatic
     assert result.action_history[-1].failure_reason is FailureReason.TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_engine_apply_invariant_durably_quarantines_table(
+    repository: InMemoryTableRepository,
+) -> None:
+    coordinator = TableCoordinator(
+        "table-1",
+        ApplyInvariantFailureEngine(),
+        repository,
+        clock=lambda: NOW,
+    )
+    await coordinator.start_table(start_request())
+    pending = await coordinator.open_decision(NOW + timedelta(seconds=30))
+    action = PlayerAction(
+        decision_id=pending.decision_id,
+        table_version=pending.table_version,
+        seat=pending.seat,
+        action=ActionType.CHECK,
+    )
+
+    with pytest.raises(EngineInvariantError, match="action invariant"):
+        await coordinator.submit_action(action)
+
+    stored = await repository.load_table("table-1")
+    assert stored.status is TableStatus.QUARANTINED
+    assert stored.pending == pending
+    assert repository.actions == ()
+    assert repository.audit_entries[-1]["command"] == "quarantine_table"
+    assert repository.audit_entries[-1]["outcome"] == "failure"
+    assert "injected apply" in str(repository.audit_entries[-1]["detail"])
+    with pytest.raises(CoordinatorNotReadyError, match="quarantined"):
+        await coordinator.submit_action(action)
+
+
+@pytest.mark.asyncio
+async def test_quarantine_database_failure_is_not_masked(
+    repository: InMemoryTableRepository,
+) -> None:
+    coordinator = TableCoordinator(
+        "table-1",
+        ApplyInvariantFailureEngine(),
+        repository,
+        clock=lambda: NOW,
+    )
+    await coordinator.start_table(start_request())
+    pending = await coordinator.open_decision(NOW + timedelta(seconds=30))
+    repository.inject_failure("quarantine_table")
+
+    with pytest.raises(PersistenceError, match="injected quarantine_table"):
+        await coordinator.submit_action(
+            PlayerAction(
+                decision_id=pending.decision_id,
+                table_version=pending.table_version,
+                seat=pending.seat,
+                action=ActionType.CHECK,
+            )
+        )
+
+    assert coordinator.state.database_paused
+    assert (await repository.load_table("table-1")).status is TableStatus.RUNNING
+
+
+@pytest.mark.asyncio
+async def test_engine_restore_invariant_quarantines_without_resolving_pending(
+    repository: InMemoryTableRepository,
+) -> None:
+    original = TableCoordinator("table-1", FakePokerEngine(), repository, clock=lambda: NOW)
+    await original.start_table(start_request())
+    pending = await original.open_decision(NOW + timedelta(seconds=30))
+
+    broken = TableCoordinator(
+        "table-1",
+        RestoreInvariantFailureEngine(),
+        repository,
+        clock=lambda: NOW,
+    )
+    with pytest.raises(EngineInvariantError, match="restore invariant"):
+        await broken.restore()
+
+    stored = await repository.load_table("table-1")
+    assert stored.status is TableStatus.QUARANTINED
+    assert stored.pending == pending
+    assert repository.actions == ()
+
+    healthy = TableCoordinator("table-1", FakePokerEngine(), repository, clock=lambda: NOW)
+    restored = await healthy.restore()
+    assert restored.table_version == 0
+    assert healthy.state.status is TableStatus.QUARANTINED
+    assert healthy.state.pending == pending
+    assert repository.actions == ()

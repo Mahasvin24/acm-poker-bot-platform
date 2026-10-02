@@ -4,6 +4,7 @@ from poker_bot_platform.coordinator.table import (
     CoordinatorError,
     CoordinatorNotReadyError,
     CoordinatorState,
+    EngineInvariantError,
     InvalidActionError,
     TableCoordinator,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "CoordinatorError",
     "CoordinatorNotReadyError",
     "CoordinatorState",
+    "EngineInvariantError",
     "InvalidActionError",
     "TableCoordinator",
 ]

@@ -36,6 +36,10 @@ class InvalidActionError(CoordinatorError):
     pass
 
 
+class EngineInvariantError(CoordinatorError):
+    pass
+
+
 class ActorDecisionFailure(CoordinatorError):
     def __init__(self, reason: FailureReason, detail: str | None = None) -> None:
         super().__init__(detail or reason.value)
@@ -109,11 +113,18 @@ class TableCoordinator:
                 self._database_paused = True
                 raise
 
-            snapshot = self._engine.restore(stored.snapshot)
-            self._snapshot = snapshot
+            self._snapshot = stored.snapshot
             self._pending = stored.pending
             self._status = stored.status
             self._database_paused = False
+            if stored.status is TableStatus.QUARANTINED:
+                return stored.snapshot
+            try:
+                snapshot = self._engine.restore(stored.snapshot)
+            except Exception as exc:
+                await self._quarantine_locked("restore", exc)
+                raise EngineInvariantError("poker engine restore invariant failed") from exc
+            self._snapshot = snapshot
             if stored.pending is not None:
                 try:
                     await self._apply_locked(
@@ -146,8 +157,12 @@ class TableCoordinator:
             if request.table_version != previous.table_version + 1:
                 raise CoordinatorError("next hand must start at the next table version")
 
-            transition = self._engine.start_hand(request)
-            self._validate_started_transition(request, transition)
+            try:
+                transition = self._engine.start_hand(request)
+                self._validate_started_transition(request, transition)
+            except Exception as exc:
+                await self._quarantine_locked("start_next_hand", exc)
+                raise EngineInvariantError("poker engine hand-start invariant failed") from exc
             try:
                 committed = await self._repository.commit_next_hand(
                     expected_version=previous.table_version,
@@ -300,15 +315,16 @@ class TableCoordinator:
         self._validate_legal_action(action)
         try:
             transition = self._engine.apply_action(snapshot, action)
-        except ValueError as exc:
-            raise InvalidActionError(str(exc)) from exc
-        transition, record = self._prepare_transition(
-            snapshot,
-            action,
-            transition,
-            automatic=automatic,
-            failure_reason=failure_reason,
-        )
+            transition, record = self._prepare_transition(
+                snapshot,
+                action,
+                transition,
+                automatic=automatic,
+                failure_reason=failure_reason,
+            )
+        except Exception as exc:
+            await self._quarantine_locked("apply_action", exc)
+            raise EngineInvariantError("poker engine action invariant failed") from exc
         try:
             result = await self._repository.commit_transition(
                 expected_version=snapshot.table_version,
@@ -398,6 +414,28 @@ class TableCoordinator:
     def _require_available(self) -> None:
         if self._database_paused:
             raise CoordinatorNotReadyError("table is paused after a database failure; restore it")
+        if self._status is TableStatus.QUARANTINED:
+            raise CoordinatorNotReadyError("table is quarantined after an engine invariant failure")
+
+    async def _quarantine_locked(self, operation: str, error: Exception) -> None:
+        snapshot = self._require_snapshot()
+        if self._status is None:
+            raise CoordinatorNotReadyError("table lifecycle status is unavailable")
+        if self._status is TableStatus.QUARANTINED:
+            return
+        detail = f"{operation}: {type(error).__name__}: {error}"[:2_000]
+        try:
+            status = await self._repository.quarantine_table(
+                self.table_id,
+                expected_version=snapshot.table_version,
+                expected_status=self._status,
+                tournament_id=snapshot.tournament_id,
+                detail=detail,
+            )
+        except PersistenceError:
+            self._database_paused = True
+            raise
+        self._status = status
 
     def _require_snapshot(self) -> HandSnapshot:
         if self._snapshot is None:

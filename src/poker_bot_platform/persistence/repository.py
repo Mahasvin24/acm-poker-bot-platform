@@ -102,6 +102,16 @@ class TableRepository(Protocol):
         status: TableStatus,
     ) -> TableStatus: ...
 
+    async def quarantine_table(
+        self,
+        table_id: str,
+        *,
+        expected_version: int,
+        expected_status: TableStatus,
+        tournament_id: str,
+        detail: str,
+    ) -> TableStatus: ...
+
     async def commit_next_hand(
         self,
         *,

@@ -20,6 +20,7 @@ from poker_bot_platform.bots import BotEndpoint, BotGateway
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.coordinator import (
     ActorDecisionFailure,
+    EngineInvariantError,
     InvalidActionError,
     TableCoordinator,
 )
@@ -29,10 +30,11 @@ from poker_bot_platform.domain import (
     HandSnapshot,
     PendingDecision,
     PlayerAction,
+    TableStatus,
     TournamentConfig,
     TournamentStatus,
 )
-from poker_bot_platform.engine import PokerKitEngine
+from poker_bot_platform.engine import PokerEngine, PokerKitEngine
 from poker_bot_platform.integration.actors import BotActor
 from poker_bot_platform.integration.services import (
     AdminCoordinatorService,
@@ -47,6 +49,7 @@ from poker_bot_platform.tournament import (
 
 Clock = Callable[[], datetime]
 TableActor = Callable[[PendingDecision, HandSnapshot], Awaitable[PlayerAction]]
+EngineFactory = Callable[[], PokerEngine]
 
 
 class GameplayError(RuntimeError):
@@ -82,6 +85,7 @@ class HeadlessGameplayRuntime:
         gateway: BotGateway,
         *,
         clock: Clock | None = None,
+        engine_factory: EngineFactory = PokerKitEngine,
     ) -> None:
         self._tournaments = tournaments
         self._tables = tables
@@ -89,6 +93,7 @@ class HeadlessGameplayRuntime:
         self._token_store = token_store
         self._gateway = gateway
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._engine_factory = engine_factory
         self._coordinators: dict[str, TableCoordinator] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._locks_guard = asyncio.Lock()
@@ -139,6 +144,10 @@ class HeadlessGameplayRuntime:
             if coordinator is None or coordinator.state.snapshot is None:
                 raise GameplayNotFoundError("table state is not available")
             pending = coordinator.state.pending
+            if coordinator.state.status is TableStatus.QUARANTINED:
+                raise GameplayConflictError(
+                    "table is quarantined after a poker engine invariant failure"
+                )
             if pending is None or pending.seat != player.seat:
                 raise GameplayConflictError("player does not have the pending decision")
             try:
@@ -153,6 +162,10 @@ class HeadlessGameplayRuntime:
                 )
             except InvalidActionError as exc:
                 raise GameplayConflictError(str(exc)) from exc
+            except EngineInvariantError as exc:
+                raise GameplayConflictError(
+                    "table was quarantined after a poker engine invariant failure"
+                ) from exc
 
             await self._synchronize_locked(tournament)
             player, table_id = await self._locate_player(
@@ -173,9 +186,15 @@ class HeadlessGameplayRuntime:
             scheduled = tuple(table for table in tournament.state.tables if table.hand_in_progress)
             if not scheduled:
                 return
-            await asyncio.gather(
-                *(self._drive_table(tournament, table.table_id) for table in scheduled)
+            results = await asyncio.gather(
+                *(self._drive_table(tournament, table.table_id) for table in scheduled),
+                return_exceptions=True,
             )
+            for result in results:
+                if isinstance(result, EngineInvariantError):
+                    continue
+                if isinstance(result, BaseException):
+                    raise result
             current = tuple(table for table in tournament.state.tables if table.hand_in_progress)
             if not current:
                 return
@@ -191,6 +210,8 @@ class HeadlessGameplayRuntime:
     ) -> None:
         coordinator = await self._ensure_scheduled_hand(tournament, table_id)
         while True:
+            if coordinator.state.status is TableStatus.QUARANTINED:
+                return
             snapshot = coordinator.state.snapshot
             if snapshot is None:
                 raise GameplayConflictError("table coordinator has no snapshot")
@@ -251,7 +272,7 @@ class HeadlessGameplayRuntime:
             return existing
         coordinator = TableCoordinator(
             table_id,
-            PokerKitEngine(),
+            self._engine_factory(),
             self._tables,
             clock=self._clock,
         )
@@ -259,6 +280,11 @@ class HeadlessGameplayRuntime:
             await coordinator.restore()
         except TableNotFoundError:
             pass
+        except EngineInvariantError:
+            # The coordinator durably quarantined the table before raising.
+            # Retain it so reads can expose the safe terminal table state.
+            self._coordinators[table_id] = coordinator
+            return coordinator
         self._coordinators[table_id] = coordinator
         return coordinator
 
@@ -305,7 +331,11 @@ class HeadlessGameplayRuntime:
         assert snapshot is not None
         pending = coordinator.state.pending
         decision = None
-        if pending is not None and pending.seat == player.seat:
+        if (
+            coordinator.state.status is not TableStatus.QUARANTINED
+            and pending is not None
+            and pending.seat == player.seat
+        ):
             decision = PlayerDecisionResponse(
                 decision_id=pending.decision_id,
                 table_version=pending.table_version,
@@ -315,6 +345,7 @@ class HeadlessGameplayRuntime:
         return PlayerTableStateResponse(
             tournament_id=snapshot.tournament_id,
             tournament_status=tournament.state.status,
+            table_status=coordinator.state.status or TableStatus.QUARANTINED,
             table_id=snapshot.table_id,
             hand_id=snapshot.hand_id,
             hand_number=snapshot.hand_number,
@@ -337,7 +368,11 @@ class HeadlessGameplayRuntime:
                     folded=seat.folded,
                     all_in=seat.all_in,
                     eliminated=seat.eliminated,
-                    hole_cards=seat.hole_cards if seat.entrant_id == player.entrant_id else (),
+                    hole_cards=(
+                        seat.hole_cards
+                        if seat.entrant_id == player.entrant_id
+                        else seat.public_hole_cards
+                    ),
                 )
                 for seat in snapshot.seats
             ),

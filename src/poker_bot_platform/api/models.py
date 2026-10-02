@@ -20,6 +20,7 @@ from poker_bot_platform.domain import (
     LegalAction,
     Role,
     Street,
+    TableStatus,
     TournamentConfig,
     TournamentStatus,
 )
@@ -162,6 +163,7 @@ class PublicSidePotResponse(ApiModel):
 class PlayerTableStateResponse(ApiModel):
     tournament_id: str
     tournament_status: TournamentStatus
+    table_status: TableStatus
     table_id: str
     hand_id: str
     hand_number: int

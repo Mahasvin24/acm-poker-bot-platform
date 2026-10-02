@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_network
@@ -9,12 +10,21 @@ import httpx
 import pytest
 
 from poker_bot_platform.api.models import PlayerActionRequest
-from poker_bot_platform.auth import AuthService, EntrantService, InMemoryAuthRepository
+from poker_bot_platform.auth import Account, AuthService, EntrantService, InMemoryAuthRepository
 from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.models import BotActionRequest, VerifyRequest
 from poker_bot_platform.bots.reference import deterministic_reference_action
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
-from poker_bot_platform.domain import ActionType, EntryKind, TournamentConfig
+from poker_bot_platform.domain import (
+    ActionType,
+    EngineTransition,
+    EntryKind,
+    HandSnapshot,
+    PlayerAction,
+    TableStatus,
+    TournamentConfig,
+)
+from poker_bot_platform.engine import PokerEngine, PokerKitEngine
 from poker_bot_platform.integration import (
     AdminCoordinatorService,
     GameplayConflictError,
@@ -51,10 +61,22 @@ class RuntimeStack:
     registry: TournamentRegistry
 
 
+class SelectiveInvariantFailureEngine(PokerKitEngine):
+    def apply_action(
+        self,
+        snapshot: HandSnapshot,
+        action: PlayerAction,
+    ) -> EngineTransition:
+        if snapshot.tournament_id == "bad-event" or snapshot.table_id == "multi-event-table-1":
+            raise RuntimeError("injected runtime engine invariant failure")
+        return super().apply_action(snapshot, action)
+
+
 def make_stack(
     transport: httpx.AsyncBaseTransport,
     *,
     clock: MutableClock | None = None,
+    engine_factory: Callable[[], PokerEngine] | None = None,
 ) -> tuple[RuntimeStack, BotGateway]:
     accounts = InMemoryAuthRepository()
     tables = InMemoryTableRepository()
@@ -82,6 +104,7 @@ def make_stack(
         token_store,
         gateway,
         clock=clock,
+        engine_factory=engine_factory or PokerKitEngine,
     )
     admin = RuntimeAdminCoordinatorService(
         AdminCoordinatorService(registry),
@@ -333,3 +356,112 @@ async def test_scheduler_isolates_one_tournament_failure() -> None:
     assert registry.coordinators["good"].ticks == [5]
     assert gameplay.synchronized.count("bad") == 2
     assert gameplay.synchronized.count("good") == 2
+
+
+@pytest.mark.asyncio
+async def test_engine_quarantine_does_not_stop_other_tournament_scheduler() -> None:
+    clock = MutableClock(datetime(2026, 10, 1, 18, 0, tzinfo=UTC))
+    stack, gateway = make_stack(
+        httpx.MockTransport(bot_handler),
+        clock=clock,
+        engine_factory=SelectiveInvariantFailureEngine,
+    )
+    scheduler = GameplayScheduler(stack.registry, stack.runtime)
+
+    async def create_event(tournament_id: str) -> tuple[Account, Account]:
+        await stack.admin.create_tournament(tournament_id, TournamentConfig(), "admin")
+        await stack.admin.open_registration(tournament_id, "admin")
+        first = await stack.auth.register(
+            f"{tournament_id}-one@example.com",
+            "long-enough-password",
+        )
+        second = await stack.auth.register(
+            f"{tournament_id}-two@example.com",
+            "long-enough-password",
+        )
+        await stack.entrants.register(first.id, tournament_id, EntryKind.HUMAN, "One")
+        await stack.entrants.register(second.id, tournament_id, EntryKind.HUMAN, "Two")
+        await stack.admin.seat(tournament_id, "admin")
+        await stack.admin.start(tournament_id, "admin")
+        return first, second
+
+    async with gateway:
+        bad_players = await create_event("bad-event")
+        good_players = await create_event("good-event")
+        bad_states = [
+            await stack.runtime.player_state(player.id, "bad-event") for player in bad_players
+        ]
+        good_states = [
+            await stack.runtime.player_state(player.id, "good-event") for player in good_players
+        ]
+        bad_actor = next(state for state in bad_states if state.decision is not None)
+        good_original = next(state for state in good_states if state.decision is not None)
+        assert bad_actor.decision is not None
+
+        await scheduler.run_once(now=100.0)
+        clock.advance(31)
+        await scheduler.run_once(now=131.0)
+
+        bad_tournament = await stack.registry.get("bad-event")
+        bad_table_id = bad_tournament.state.tables[0].table_id
+        assert (await stack.tables.load_table(bad_table_id)).status is TableStatus.QUARANTINED
+        safe_state = await stack.runtime.player_state(bad_players[0].id, "bad-event")
+        assert safe_state.table_status is TableStatus.QUARANTINED
+        assert safe_state.decision is None
+        with pytest.raises(GameplayConflictError, match="quarantined"):
+            await stack.runtime.submit_human_action(
+                bad_players[0].id,
+                "bad-event",
+                PlayerActionRequest(
+                    decision_id=bad_actor.decision.decision_id,
+                    table_version=bad_actor.decision.table_version,
+                    action=ActionType.FOLD,
+                ),
+            )
+
+        progressed = [
+            await stack.runtime.player_state(player.id, "good-event") for player in good_players
+        ]
+        assert all(state.hand_id != good_original.hand_id for state in progressed)
+
+
+@pytest.mark.asyncio
+async def test_quarantined_table_does_not_stop_other_table_in_same_tournament() -> None:
+    clock = MutableClock(datetime(2026, 10, 1, 18, 0, tzinfo=UTC))
+    stack, gateway = make_stack(
+        httpx.MockTransport(bot_handler),
+        clock=clock,
+        engine_factory=SelectiveInvariantFailureEngine,
+    )
+    scheduler = GameplayScheduler(stack.registry, stack.runtime)
+    async with gateway:
+        await stack.admin.create_tournament("multi-event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("multi-event", "admin")
+        for number in range(7):
+            account = await stack.auth.register(
+                f"multi-{number}@example.com",
+                "long-enough-password",
+            )
+            await stack.entrants.register(
+                account.id,
+                "multi-event",
+                EntryKind.HUMAN,
+                f"Player {number}",
+            )
+        await stack.admin.seat("multi-event", "admin")
+        await stack.admin.start("multi-event", "admin")
+
+        await scheduler.run_once(now=100.0)
+        clock.advance(31)
+        await scheduler.run_once(now=131.0)
+
+        tournament = await stack.registry.get("multi-event")
+        first, second = tournament.state.tables
+        first_state = await stack.tables.load_table(first.table_id)
+        second_state = await stack.tables.load_table(second.table_id)
+        assert first_state.status is TableStatus.QUARANTINED
+        assert first_state.pending is not None
+        assert second_state.status is TableStatus.RUNNING
+        assert second_state.pending is not None
+        assert second_state.snapshot.table_version == 1
+        assert len(second_state.snapshot.action_history) == 1

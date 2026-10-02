@@ -207,6 +207,47 @@ class SqlAlchemyTableRepository:
             table.status = status.value
             return status
 
+    async def quarantine_table(
+        self,
+        table_id: str,
+        *,
+        expected_version: int,
+        expected_status: TableStatus,
+        tournament_id: str,
+        detail: str,
+    ) -> TableStatus:
+        async with self._transaction() as session:
+            table = await session.scalar(
+                select(TableRow).where(TableRow.id == table_id).with_for_update()
+            )
+            if table is None:
+                raise TableNotFoundError(table_id)
+            if table.version != expected_version:
+                raise VersionConflictError(
+                    f"expected version {expected_version}, found {table.version}"
+                )
+            if table.status == TableStatus.QUARANTINED.value:
+                return TableStatus.QUARANTINED
+            if table.status != expected_status.value:
+                raise StatusConflictError(
+                    f"expected status {expected_status.value}, found {table.status}"
+                )
+            table.status = TableStatus.QUARANTINED.value
+            session.add(
+                AuditLogRow(
+                    tournament_id=tournament_id,
+                    actor_id="system",
+                    command="quarantine_table",
+                    outcome="failure",
+                    detail=detail,
+                    payload={
+                        "table_id": table_id,
+                        "failure_reason": "engine_invariant",
+                    },
+                )
+            )
+            return TableStatus.QUARANTINED
+
     async def commit_next_hand(
         self,
         *,

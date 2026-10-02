@@ -20,7 +20,13 @@ from poker_bot_platform.auth import (
 )
 from poker_bot_platform.bots import VerificationOutcome
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
-from poker_bot_platform.domain import ActionType, Street, TournamentConfig, TournamentStatus
+from poker_bot_platform.domain import (
+    ActionType,
+    Street,
+    TableStatus,
+    TournamentConfig,
+    TournamentStatus,
+)
 
 ORIGIN = "http://testserver"
 HEADERS = {"Origin": ORIGIN}
@@ -134,6 +140,7 @@ class FakeGameplay:
         return PlayerTableStateResponse(
             tournament_id=tournament_id,
             tournament_status=TournamentStatus.RUNNING,
+            table_status=TableStatus.RUNNING,
             table_id="table-1",
             hand_id="hand-1",
             hand_number=1,
