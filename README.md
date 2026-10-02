@@ -23,6 +23,7 @@ uvicorn poker_bot_platform.app:app --workers 1 --reload
 ```
 
 The service must run with exactly one application worker in v1. See
+[`docs/setup.md`](docs/setup.md) for complete local setup instructions,
 [`docs/architecture-plan.md`](docs/architecture-plan.md) for the frozen design,
 [`docs/event-runbook.md`](docs/event-runbook.md) for rehearsal/deployment, and
 [`examples/bots/README.md`](examples/bots/README.md) for the public bot protocol.
