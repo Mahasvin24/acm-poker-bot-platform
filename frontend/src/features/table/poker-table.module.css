@@ -511,6 +511,13 @@
   line-height: 1.4;
 }
 
+.errorNotice {
+  margin: 10px 0 0;
+  color: var(--table-red);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .controls {
   display: grid;
   grid-template-columns: auto minmax(320px, 1fr);

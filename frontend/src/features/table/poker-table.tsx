@@ -48,6 +48,24 @@ function actionCopy(action: ActionType): string {
   return action.charAt(0).toUpperCase() + action.slice(1);
 }
 
+const failureReasonLabels: Record<string, string> = {
+  timeout: "Timed out",
+  malformed_json: "Malformed JSON",
+  schema: "Invalid response shape",
+  connection: "Connection failed",
+  http_status: "HTTP error",
+  content_type: "Wrong content type",
+  oversized: "Response too large",
+  stale: "Stale decision",
+  illegal_action: "Illegal action",
+  restart_recovery: "Server restart recovery",
+};
+
+function automaticActionCopy(failureReason: string | null): string {
+  if (!failureReason) return "automatic fallback";
+  return `fallback: ${failureReasonLabels[failureReason] ?? failureReason.replaceAll("_", " ")}`;
+}
+
 function issueFromError(error: unknown): AccessIssue {
   if (error instanceof TableApiError) {
     if (error.status === 401) {
@@ -197,6 +215,7 @@ function applyDemoAction(
         action: submission.action,
         amount_to: submission.amount_to ?? null,
         automatic: false,
+        failure_reason: null,
       },
     ],
   };
@@ -229,7 +248,9 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       try {
         const next = await getTableState(tournamentId, controller.signal);
         if (stopped) return;
-        setTable(next);
+        setTable((current) =>
+          !current || next.table_version >= current.table_version ? next : current,
+        );
         setIssue(null);
         setConnection("live");
         timer = setTimeout(poll, next.decision ? 750 : 1800);
@@ -285,7 +306,10 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       if (demoMode) {
         setTable((current) => (current ? applyDemoAction(current, submission) : current));
       } else {
-        setTable(await submitTableAction(tournamentId, submission));
+        const next = await submitTableAction(tournamentId, submission);
+        setTable((current) =>
+          !current || next.table_version >= current.table_version ? next : current,
+        );
       }
       setNotice(`${actionCopy(action)} accepted`);
     } catch (error) {
@@ -315,9 +339,13 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
               <h1>{issue.title}</h1>
               <p>{issue.message}</p>
               <div className={styles.gateActions}>
-                <button type="button" onClick={() => setRefreshToken((value) => value + 1)}>
-                  Try again
-                </button>
+                {issue.status === 401 ? (
+                  <Link href={`/account?tournament=${encodeURIComponent(tournamentId)}`}>Sign In</Link>
+                ) : (
+                  <button type="button" onClick={() => setRefreshToken((value) => value + 1)}>
+                    Try Again
+                  </button>
+                )}
                 <Link href="/play">Change tournament</Link>
               </div>
             </>
@@ -419,6 +447,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
                 </>
               )}
               {notice && <p aria-live="polite" className={styles.notice}>{notice}</p>}
+              {issue && <p className={styles.errorNotice} role="alert">{issue.message}</p>}
             </div>
 
             {decision && (
@@ -479,7 +508,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
                   <p>
                     {actionCopy(action.action)}
                     {action.amount_to !== null ? ` to ${formatChips(action.amount_to)}` : ""}
-                    {action.automatic ? " · timed out" : ""}
+                    {action.automatic ? ` · ${automaticActionCopy(action.failure_reason)}` : ""}
                   </p>
                 </div>
               </li>

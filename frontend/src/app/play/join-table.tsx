@@ -26,7 +26,7 @@ export function JoinTable() {
     <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link href="/">ACM / POKER</Link>
-        <span>Human player interface</span>
+        <Link href="/account">Account / Sign In</Link>
       </header>
       <section className={styles.content}>
         <div className={styles.intro}>

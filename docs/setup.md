@@ -1,8 +1,7 @@
 # Local Setup
 
-The project includes a FastAPI backend and a Next.js frontend. The frontend serves the public
-tournament landing page and a human tournament table; tournament administration remains
-available through the API.
+The project includes a FastAPI backend and a Next.js frontend. The frontend supports account
+creation, participant and bot registration, tournament administration, and human gameplay.
 
 ## Requirements
 
@@ -89,8 +88,19 @@ npm run dev
 ```
 
 Open <http://localhost:3000>. Use <http://localhost:3000/play/demo> to exercise the table without
-an account or running backend. For a live tournament, authenticate against the API and open
-`http://localhost:3000/play/<tournament-id>`.
+an account or running backend. For a live event:
+
+1. Sign in as the bootstrapped administrator at <http://localhost:3000/account>.
+2. Create a tournament in `/admin`, save any draft settings, and open registration.
+3. Share the participant invite shown by the admin page. Each participant creates an account,
+   follows the invite to `/dashboard`, and registers exactly one human or bot entry.
+4. Bot entrants run a starter bot, save the one-time token shown during endpoint setup, and
+   verify the endpoint before seating.
+5. The administrator seats entrants and starts the tournament. Human entrants open their table
+   from `/dashboard`; bot turns are dispatched automatically.
+
+The human table reveals hole cards only to their owner, polls committed server state, and
+submits decisions using the server-issued decision ID and table version.
 
 The frontend proxies `/api/v1/*` to `http://127.0.0.1:8000` by default. If the API runs at a
 different origin, create `frontend/.env.local` from `frontend/.env.example` and change
@@ -142,6 +152,11 @@ BOT_TOKEN='token-from-registration' PORT=8001 node server.mjs
 ```
 
 See `examples/bots/README.md` for the protocol and conformance-runner commands.
+
+Malformed JSON, duplicate keys, schema mismatches, stale identifiers, illegal actions,
+non-success HTTP responses, wrong content types, oversized responses, connection failures, and
+timeouts all resolve to one deterministic automatic check-or-fold. The exact failure reason is
+persisted with the action and shown in the human action log.
 
 ## Stopping the local services
 

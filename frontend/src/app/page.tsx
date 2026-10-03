@@ -92,10 +92,10 @@ export default function Home() {
             <a href="#format">Format</a>
             <a href="#timeline">Timeline</a>
             <a href="#faq">FAQ</a>
-            <Link href="/play">Play</Link>
-            <a className="nav-pill" href="#format">
-              <i /> Registration soon
-            </a>
+            <Link href="/dashboard">Play</Link>
+            <Link className="nav-pill" href="/account">
+              <i aria-hidden="true" /> Sign In / Register
+            </Link>
           </nav>
         </div>
       </header>

@@ -35,6 +35,7 @@ export interface PlayerAction {
   action: ActionType;
   amount_to: number | null;
   automatic: boolean;
+  failure_reason: string | null;
 }
 
 export interface SidePot {
