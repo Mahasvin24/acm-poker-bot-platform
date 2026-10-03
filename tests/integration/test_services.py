@@ -60,9 +60,13 @@ async def test_account_entrant_is_visible_to_tournament_seating() -> None:
     await entrants.register(first.id, "club-event", EntryKind.HUMAN, "One")
     await entrants.register(second.id, "club-event", EntryKind.HUMAN, "Two")
     result = await admin.seat("club-event", "admin")
+    state = await admin.get_state("club-event")
 
     coordinator = await registry.get("club-event")
     assert result.status == TournamentStatus.SEATED.value
+    assert state.entrant_count == 2
+    assert state.human_count == 2
+    assert state.table_count == 1
     assert {
         player.account_id for table in coordinator.state.tables for player in table.players
     } == {

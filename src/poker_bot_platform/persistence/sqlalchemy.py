@@ -142,6 +142,11 @@ class SqlAlchemyTableRepository:
                         current_hand_id=snapshot.hand_id,
                     )
                 )
+                # These models intentionally do not declare ORM relationships, so
+                # SQLAlchemy cannot infer that the table row must precede its
+                # snapshot and domain events. Materialize the parent first to
+                # satisfy their foreign-key constraints on PostgreSQL.
+                await session.flush()
                 session.add(
                     TableSnapshotRow(
                         table_id=snapshot.table_id,

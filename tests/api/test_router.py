@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from poker_bot_platform.api.models import (
     AdminCommandResponse,
+    AdminTournamentStateResponse,
     PlayerActionRequest,
     PlayerTableStateResponse,
 )
@@ -51,6 +52,22 @@ class FakeAdmin:
     ) -> AdminCommandResponse:
         self.calls.append(("create", tournament_id, actor_id))
         return AdminCommandResponse(tournament_id=tournament_id, status="draft")
+
+    async def get_state(self, tournament_id: str) -> AdminTournamentStateResponse:
+        self.calls.append(("get", tournament_id, "admin"))
+        return AdminTournamentStateResponse(
+            tournament_id=tournament_id,
+            status=TournamentStatus.DRAFT,
+            entrant_count=0,
+            human_count=0,
+            bot_count=0,
+            verified_bot_count=0,
+            table_count=0,
+            level_number=1,
+            phase_remaining_seconds=900,
+            revision=0,
+            config=TournamentConfig(),
+        )
 
     async def update_draft(
         self,
@@ -256,6 +273,9 @@ async def test_one_entrant_per_user_and_bot_endpoint_flow() -> None:
             headers=HEADERS,
         )
         assert entrant.status_code == 201
+        current = await client.get("/api/v1/tournaments/t-1/entrant")
+        assert current.status_code == 200
+        assert current.json()["display_name"] == "Test Bot"
         duplicate = await client.post(
             "/api/v1/tournaments/t-1/entrant",
             json={"kind": "human", "display_name": "Also Human"},
@@ -320,13 +340,16 @@ async def test_admin_routes_require_explicit_admin_role() -> None:
         )
         assert created.status_code == 201
         assert created.json() == {"tournament_id": "club-event", "status": "draft"}
+        state = await client.get("/api/v1/admin/tournaments/club-event")
+        assert state.status_code == 200
+        assert state.json()["config"]["starting_stack"] == 20_000
         started = await client.post(
             "/api/v1/admin/tournaments/club-event/start",
             headers=HEADERS,
         )
         assert started.status_code == 200
         assert started.json()["status"] == "running"
-        assert [call[0] for call in admin.calls] == ["create", "start"]
+        assert [call[0] for call in admin.calls] == ["create", "get", "start"]
 
 
 @pytest.mark.asyncio

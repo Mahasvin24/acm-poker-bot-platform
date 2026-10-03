@@ -179,6 +179,9 @@ class EntrantService:
             clean_name,
         )
 
+    async def current(self, account_id: str, tournament_id: str) -> Entrant:
+        return await self._owned_entrant(account_id, tournament_id)
+
     async def configure_bot(
         self,
         account_id: str,

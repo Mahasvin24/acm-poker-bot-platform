@@ -8,6 +8,7 @@ from ipaddress import ip_address
 
 from poker_bot_platform.api.models import (
     AdminCommandResponse,
+    AdminTournamentStateResponse,
     PlayerActionRequest,
     PlayerDecisionResponse,
     PlayerTableStateResponse,
@@ -403,6 +404,7 @@ class HeadlessGameplayRuntime:
                     action=action.action,
                     amount_to=action.amount_to,
                     automatic=action.automatic,
+                    failure_reason=action.failure_reason,
                 )
                 for action in snapshot.action_history
             ),
@@ -449,6 +451,9 @@ class RuntimeAdminCoordinatorService:
     base: AdminCoordinatorService
     gameplay: HeadlessGameplayRuntime
     tournaments: TournamentRegistry
+
+    async def get_state(self, tournament_id: str) -> AdminTournamentStateResponse:
+        return await self.base.get_state(tournament_id)
 
     async def create_tournament(
         self,

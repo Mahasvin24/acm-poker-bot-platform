@@ -17,6 +17,7 @@ from poker_bot_platform.auth.models import Account, Entrant
 from poker_bot_platform.domain import (
     ActionType,
     EntryKind,
+    FailureReason,
     LegalAction,
     Role,
     Street,
@@ -111,6 +112,20 @@ class AdminCommandResponse(ApiModel):
     status: str
 
 
+class AdminTournamentStateResponse(ApiModel):
+    tournament_id: str
+    status: TournamentStatus
+    entrant_count: int = Field(ge=0)
+    human_count: int = Field(ge=0)
+    bot_count: int = Field(ge=0)
+    verified_bot_count: int = Field(ge=0)
+    table_count: int = Field(ge=0)
+    level_number: int = Field(ge=1)
+    phase_remaining_seconds: int = Field(ge=0)
+    revision: int = Field(ge=0)
+    config: TournamentConfig
+
+
 class PlayerActionRequest(ApiModel):
     decision_id: Annotated[StrictStr, StringConstraints(min_length=1, max_length=128)]
     table_version: StrictInt = Field(ge=0)
@@ -153,6 +168,7 @@ class PublicPlayerActionResponse(ApiModel):
     action: ActionType
     amount_to: int | None = None
     automatic: bool
+    failure_reason: FailureReason | None = None
 
 
 class PublicSidePotResponse(ApiModel):

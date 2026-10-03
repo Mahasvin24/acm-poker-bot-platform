@@ -15,6 +15,7 @@ from poker_bot_platform.coordinator import TableCoordinator
 from poker_bot_platform.domain import (
     ActionType,
     EntryKind,
+    FailureReason,
     PendingDecision,
     PlayerAction,
     SeatState,
@@ -29,26 +30,10 @@ def full_deck() -> tuple[str, ...]:
     return tuple(map(repr, Deck.STANDARD))
 
 
-@pytest.mark.asyncio
-async def test_mixed_bot_hand_persists_through_production_boundaries() -> None:
-    bot_requests = 0
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        nonlocal bot_requests
-        assert request.headers["authorization"] == "Bearer event-token"
-        payload = BotActionRequest.model_validate(json.loads(request.content))
-        bot_requests += 1
-        response = deterministic_reference_action(payload)
-        return httpx.Response(
-            200,
-            headers={"content-type": "application/json"},
-            content=response.model_dump_json(),
-        )
-
-    repository = InMemoryTableRepository()
+async def start_heads_up_table(repository: InMemoryTableRepository) -> TableCoordinator:
     await repository.create_tournament("tournament-1", {"starting_stack": 20_000})
     coordinator = TableCoordinator("table-1", PokerKitEngine(), repository)
-    snapshot = await coordinator.start_table(
+    await coordinator.start_table(
         StartHandRequest(
             tournament_id="tournament-1",
             table_id="table-1",
@@ -78,6 +63,29 @@ async def test_mixed_bot_hand_persists_through_production_boundaries() -> None:
             deck_order=full_deck(),
         )
     )
+    return coordinator
+
+
+@pytest.mark.asyncio
+async def test_mixed_bot_hand_persists_through_production_boundaries() -> None:
+    bot_requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal bot_requests
+        assert request.headers["authorization"] == "Bearer event-token"
+        payload = BotActionRequest.model_validate(json.loads(request.content))
+        bot_requests += 1
+        response = deterministic_reference_action(payload)
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=response.model_dump_json(),
+        )
+
+    repository = InMemoryTableRepository()
+    coordinator = await start_heads_up_table(repository)
+    snapshot = coordinator.state.snapshot
+    assert snapshot is not None
 
     endpoint = BotEndpoint(ip="192.168.1.50", port=8_080)
     async with BotGateway(
@@ -112,3 +120,102 @@ async def test_mixed_bot_hand_persists_through_production_boundaries() -> None:
     assert persisted.snapshot == snapshot
     assert persisted.pending is None
     assert sum(seat.stack for seat in snapshot.seats) == 40_000
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure", "expected_reason"),
+    [
+        ("malformed", FailureReason.MALFORMED_JSON),
+        ("duplicate", FailureReason.MALFORMED_JSON),
+        ("schema", FailureReason.SCHEMA),
+        ("stale", FailureReason.STALE),
+        ("illegal", FailureReason.ILLEGAL_ACTION),
+        ("http", FailureReason.HTTP_STATUS),
+        ("content_type", FailureReason.CONTENT_TYPE),
+        ("oversized", FailureReason.OVERSIZED),
+        ("connection", FailureReason.CONNECTION),
+        ("timeout", FailureReason.TIMEOUT),
+    ],
+)
+async def test_bot_failures_become_one_durable_automatic_fallback(
+    failure: str,
+    expected_reason: FailureReason,
+) -> None:
+    requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        payload = BotActionRequest.model_validate(json.loads(request.content))
+        assert payload.player.seat == 1
+        assert payload.player.hole_cards
+        public_seats = payload.table.model_dump(mode="json")["seats"]
+        assert all("hole_cards" not in seat for seat in public_seats)
+
+        if failure == "malformed":
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                content=b"{not-json",
+            )
+        if failure == "duplicate":
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                content=b'{"protocol":"poker-bot.v1","protocol":"poker-bot.v1"}',
+            )
+        if failure == "schema":
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                json={"protocol": "poker-bot.v1"},
+            )
+        if failure == "http":
+            return httpx.Response(503, json={"error": "unavailable"})
+        if failure == "content_type":
+            return httpx.Response(200, text="not JSON")
+        if failure == "oversized":
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                content=b"x" * 4097,
+            )
+        if failure == "connection":
+            raise httpx.ConnectError("offline", request=request)
+        if failure == "timeout":
+            raise httpx.ReadTimeout("late", request=request)
+
+        response = deterministic_reference_action(payload).model_dump(mode="json")
+        if failure == "stale":
+            response["decision_id"] = "old-decision"
+        elif failure == "illegal":
+            response["action"] = "check"
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            json=response,
+        )
+
+    repository = InMemoryTableRepository()
+    coordinator = await start_heads_up_table(repository)
+    endpoint = BotEndpoint(ip="192.168.1.50", port=8_080)
+    async with BotGateway(
+        participant_subnet=ip_network("192.168.1.0/24"),
+        transport=httpx.MockTransport(handler),
+    ) as gateway:
+        result = await coordinator.request_actor_action(
+            BotActor(gateway, endpoint, "event-token"),
+            datetime.now(UTC) + timedelta(seconds=3),
+        )
+
+    assert requests == 1
+    assert result.table_version == 1
+    action = result.action_history[-1]
+    assert action.action is ActionType.FOLD
+    assert action.automatic
+    assert action.failure_reason is expected_reason
+    persisted = await repository.load_table("table-1")
+    assert persisted.snapshot == result
+    assert persisted.pending is None
+    assert len(repository.actions) == 1

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_network
@@ -126,6 +127,25 @@ async def test_connection_and_timeout_failures_are_distinguished() -> None:
 
 
 @pytest.mark.asyncio
+async def test_total_deadline_cancels_a_nonresponsive_bot() -> None:
+    async def no_response(_request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(1)
+        raise AssertionError("the bot request should have been cancelled")
+
+    request = conformance_request(
+        deadline_at=datetime.now(UTC) + timedelta(milliseconds=50),
+    )
+    async with BotGateway(
+        participant_subnet=ip_network("192.168.0.0/16"),
+        transport=httpx.MockTransport(no_response),
+    ) as gateway:
+        outcome = await gateway.request_action(ENDPOINT, TOKEN, request)
+
+    assert outcome.failure_reason is FailureReason.TIMEOUT
+    assert outcome.action.action is ActionType.CHECK
+
+
+@pytest.mark.asyncio
 async def test_gateway_revalidates_endpoint_at_the_outbound_boundary() -> None:
     called = False
 
@@ -153,6 +173,9 @@ async def test_gateway_revalidates_endpoint_at_the_outbound_boundary() -> None:
 @pytest.mark.parametrize(
     ("response", "reason"),
     [
+        (valid_response(tournament_id="old"), FailureReason.STALE),
+        (valid_response(table_id="old"), FailureReason.STALE),
+        (valid_response(hand_id="old"), FailureReason.STALE),
         (valid_response(decision_id="old"), FailureReason.STALE),
         (valid_response(table_version=0), FailureReason.STALE),
         (valid_response(action="call"), FailureReason.ILLEGAL_ACTION),

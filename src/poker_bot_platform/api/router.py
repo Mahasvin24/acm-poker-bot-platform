@@ -7,6 +7,7 @@ from poker_bot_platform.api.models import (
     AccountResponse,
     AdminCommandResponse,
     AdminTournamentRequest,
+    AdminTournamentStateResponse,
     AdminTournamentUpdateRequest,
     BotEndpointRegistrationResponse,
     BotEndpointRequest,
@@ -31,6 +32,8 @@ from poker_bot_platform.domain import EntryKind, Role, TournamentConfig
 
 
 class EntrantControlService(Protocol):
+    async def current(self, account_id: str, tournament_id: str) -> Entrant: ...
+
     async def register(
         self,
         account_id: str,
@@ -51,6 +54,8 @@ class EntrantControlService(Protocol):
 
 
 class AdminControlService(Protocol):
+    async def get_state(self, tournament_id: str) -> AdminTournamentStateResponse: ...
+
     async def create_tournament(
         self, tournament_id: str, config: TournamentConfig, actor_id: str
     ) -> AdminCommandResponse: ...
@@ -193,6 +198,20 @@ def create_api_router(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         return EntrantResponse.from_entrant(entrant)
 
+    @router.get(
+        "/tournaments/{tournament_id}/entrant",
+        response_model=EntrantResponse,
+    )
+    async def current_entrant(
+        tournament_id: str,
+        account: Annotated[Account, Depends(current_account)],
+    ) -> EntrantResponse:
+        try:
+            entrant = await entrants.current(account.id, tournament_id)
+        except AuthNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        return EntrantResponse.from_entrant(entrant)
+
     @router.put(
         "/tournaments/{tournament_id}/entrant/bot-endpoint",
         response_model=BotEndpointRegistrationResponse,
@@ -245,6 +264,16 @@ def create_api_router(
         account: Annotated[Account, Depends(current_admin)],
     ) -> AdminCommandResponse:
         return await admin.create_tournament(body.tournament_id, body.config, account.id)
+
+    @router.get(
+        "/admin/tournaments/{tournament_id}",
+        response_model=AdminTournamentStateResponse,
+    )
+    async def tournament_state(
+        tournament_id: str,
+        account: Annotated[Account, Depends(current_admin)],
+    ) -> AdminTournamentStateResponse:
+        return await admin.get_state(tournament_id)
 
     @router.put(
         "/admin/tournaments/{tournament_id}",

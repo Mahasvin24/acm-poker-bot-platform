@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 
-from poker_bot_platform.api.models import AdminCommandResponse
+from poker_bot_platform.api.models import AdminCommandResponse, AdminTournamentStateResponse
 from poker_bot_platform.auth.models import Entrant as AccountEntrant
 from poker_bot_platform.auth.repository import AuthConflictError
 from poker_bot_platform.auth.service import BotRegistrationResult, EntrantService
@@ -99,6 +99,9 @@ class SyncedEntrantService:
     accounts: EntrantService
     tournaments: TournamentRegistry
 
+    async def current(self, account_id: str, tournament_id: str) -> AccountEntrant:
+        return await self.accounts.current(account_id, tournament_id)
+
     async def register(
         self,
         account_id: str,
@@ -155,6 +158,27 @@ class SyncedEntrantService:
 @dataclass(slots=True)
 class AdminCoordinatorService:
     tournaments: TournamentRegistry
+
+    async def get_state(self, tournament_id: str) -> AdminTournamentStateResponse:
+        try:
+            state = (await self.tournaments.get(tournament_id)).state
+        except TournamentStoreError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        human_count = sum(item.kind is EntryKind.HUMAN for item in state.entrants)
+        bot_count = sum(item.kind is EntryKind.BOT for item in state.entrants)
+        return AdminTournamentStateResponse(
+            tournament_id=state.tournament_id,
+            status=state.status,
+            entrant_count=len(state.entrants),
+            human_count=human_count,
+            bot_count=bot_count,
+            verified_bot_count=sum(item.bot_verified for item in state.entrants),
+            table_count=len(state.tables),
+            level_number=state.level_number,
+            phase_remaining_seconds=state.phase_remaining_seconds,
+            revision=state.revision,
+            config=state.config,
+        )
 
     async def create_tournament(
         self,
