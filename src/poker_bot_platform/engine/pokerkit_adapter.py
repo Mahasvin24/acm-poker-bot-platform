@@ -14,6 +14,7 @@ from pokerkit import (
     BlindOrStraddlePosting,
     CheckingOrCalling,
     CompletionBettingOrRaisingTo,
+    ChipsPushing,
     Deck,
     HoleCardsShowingOrMucking,
     NoLimitTexasHoldem,
@@ -52,7 +53,7 @@ class PokerKitEngine:
     immutable player action history against the supplied deck order.
     """
 
-    adapter_version = f"pokerkit-{version('pokerkit')}-adapter-v1"
+    adapter_version = f"pokerkit-{version('pokerkit')}-adapter-v2"
 
     _AUTOMATIONS = (
         Automation.BET_COLLECTION,
@@ -350,6 +351,10 @@ class PokerKitEngine:
             )
             for pot in pots[1:]
         )
+        public_engine_state = {
+            **engine_state,
+            "pot_awards": self._pot_awards(state, restored.player_seats),
+        }
         return HandSnapshot(
             adapter_version=self.adapter_version,
             tournament_id=request.tournament_id,
@@ -371,8 +376,30 @@ class PokerKitEngine:
             legal_actions=self._legal_actions(state),
             action_history=action_history,
             completed=completed,
-            engine_state=engine_state,
+            engine_state=public_engine_state,
         )
+
+    @staticmethod
+    def _pot_awards(state: State, player_seats: tuple[int, ...]) -> list[dict[str, int]]:
+        """Return only chips actually pushed from pots to winning players.
+
+        Final stacks and payoffs also include uncalled overbets and chips a player
+        never committed.  PokerKit's ChipsPushing operations are the authoritative
+        record of who won each main or side pot.
+        """
+
+        totals: dict[int, int] = {}
+        for operation in state.operations:
+            if not isinstance(operation, ChipsPushing):
+                continue
+            for index, amount in enumerate(operation.amounts):
+                if amount > 0:
+                    seat = player_seats[index]
+                    totals[seat] = totals.get(seat, 0) + amount
+        return [
+            {"seat": seat, "amount": amount}
+            for seat, amount in sorted(totals.items())
+        ]
 
     @staticmethod
     def _public_hole_cards(
@@ -426,16 +453,25 @@ class PokerKitEngine:
             return []
         prior_seats = tuple(prior_seats)
         previous_stacks = {seat.seat: seat.stack for seat in prior_seats}
+        current_seats = {seat.seat: seat for seat in snapshot.seats}
         payouts = []
-        for seat in snapshot.seats:
-            if seat.seat not in previous_stacks:
+        for raw_award in snapshot.engine_state.get("pot_awards", []):
+            seat_number = raw_award.get("seat")
+            amount = raw_award.get("amount")
+            seat = current_seats.get(seat_number)
+            if seat is None or not isinstance(amount, int) or amount <= 0:
                 continue
-            net = seat.stack - previous_stacks[seat.seat]
-            amount = net + seat.committed_this_hand
-            if amount > 0:
-                payouts.append(
-                    {"seat": seat.seat, "amount": amount, "stack": seat.stack, "net": net}
-                )
+            starting_stack = previous_stacks.get(seat_number)
+            if starting_stack is None:
+                continue
+            payouts.append(
+                {
+                    "seat": seat_number,
+                    "amount": amount,
+                    "stack": seat.stack,
+                    "net": seat.stack - starting_stack,
+                }
+            )
         previously_eliminated = {seat.seat for seat in prior_seats if seat.eliminated}
         eliminated_seats = [
             seat.seat

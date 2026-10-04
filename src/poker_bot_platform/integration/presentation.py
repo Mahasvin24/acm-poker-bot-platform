@@ -22,23 +22,30 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
     request = StartHandRequest.model_validate(raw_request)
     starting_stacks = {seat.seat: seat.stack for seat in request.seats}
 
+    seats_by_number = {seat.seat: seat for seat in snapshot.seats}
     awards: list[HandAwardResponse] = []
-    for seat in snapshot.seats:
-        starting = starting_stacks.get(seat.seat)
-        if starting is None:
+    for raw_award in snapshot.engine_state.get("pot_awards", []):
+        if not isinstance(raw_award, dict):
             continue
-        net = seat.stack - starting
-        amount = net + seat.committed_this_hand
-        if amount > 0:
-            awards.append(HandAwardResponse(seat=seat.seat, amount=amount, net=net))
+        seat_number = raw_award.get("seat")
+        amount = raw_award.get("amount")
+        seat = seats_by_number.get(seat_number)
+        starting = starting_stacks.get(seat_number)
+        if seat is None or starting is None or not isinstance(amount, int) or amount <= 0:
+            continue
+        awards.append(
+            HandAwardResponse(
+                seat=seat.seat,
+                amount=amount,
+                net=seat.stack - starting,
+            )
+        )
 
     live_hands = [seat for seat in snapshot.seats if seat.hole_cards and not seat.folded]
     folded = len(live_hands) <= 1
     revealed: list[RevealedHandResponse] = []
     if not folded:
-        for seat in snapshot.seats:
-            if seat.eliminated and not seat.hole_cards:
-                continue
+        for seat in live_hands:
             try:
                 hand = StandardHighHand.from_game(
                     "".join(seat.hole_cards),

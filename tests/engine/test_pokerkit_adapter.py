@@ -18,6 +18,7 @@ from poker_bot_platform.domain import (
     Street,
 )
 from poker_bot_platform.engine.pokerkit_adapter import PokerKitEngine
+from poker_bot_platform.integration.presentation import natural_hand_result
 
 
 def _deck(*prefix: str) -> tuple[str, ...]:
@@ -268,6 +269,16 @@ def test_multiple_all_ins_create_correct_main_and_side_pot_payouts() -> None:
         {"seat": 2, "amount": 10, "stack": 10, "net": 0},
     ]
     assert completion.payload["eliminated_seats"] == []
+    assert snapshot.engine_state["pot_awards"] == [
+        {"seat": 1, "amount": 15},
+        {"seat": 2, "amount": 10},
+    ]
+    result = natural_hand_result(snapshot)
+    assert result is not None
+    assert [(award.seat, award.amount, award.net) for award in result.awards] == [
+        (1, 15, 10),
+        (2, 10, 0),
+    ]
 
 
 def test_all_in_from_forced_bets_preserves_private_cards_for_recovery() -> None:
