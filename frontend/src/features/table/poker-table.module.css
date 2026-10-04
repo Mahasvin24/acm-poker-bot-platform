@@ -480,7 +480,7 @@
 .seatPanel {
   position: relative;
   min-width: 142px;
-  padding: 10px 13px 10px 17px;
+  padding: 10px 13px 22px 17px;
   border: 1px solid rgb(23 35 30 / 24%);
   border-radius: 5px;
   background: #fffaf1;
@@ -575,47 +575,188 @@
   font: 700 7px/1 monospace;
 }
 
-.stack {
+.chipTower {
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.chipTower i {
+  position: absolute;
+  right: 1px;
+  bottom: calc(var(--chip-level, 0) * 3px);
+  width: 18px;
+  height: 7px;
+  border: 1px solid rgb(255 255 255 / 80%);
+  border-radius: 50%;
+  box-shadow: 0 1px 0 rgb(23 35 30 / 28%), inset 0 0 0 2px rgb(255 255 255 / 18%);
+}
+
+.chipTowerBalance i { background: #247457; }
+.chipTowerCommitted i { background: #bd493b; }
+.chipTower .emptyChip { bottom: 0; border-style: dashed; background: transparent; opacity: 0.35; }
+
+.boardChipRack {
+  position: absolute;
+  z-index: 7;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 5px;
-  color: #58635d;
-  font: 11px/1 monospace;
+  align-items: center;
+  gap: 13px;
+  color: #fffaf1;
+  white-space: nowrap;
+}
+
+.boardChipStack {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.boardChipCopy {
+  display: grid;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid rgb(255 250 241 / 24%);
+  border-radius: 3px;
+  background: rgb(10 44 33 / 84%);
+  box-shadow: 0 4px 12px rgb(3 24 17 / 18%);
   font-variant-numeric: tabular-nums;
 }
 
-.stack small,
-.commitment small,
-.betChip small {
-  color: #7c857f;
+.boardChipCopy small {
+  color: rgb(255 250 241 / 65%);
   font: 700 6px/1 monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.stackValue {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-}
+.boardChipCopy strong { font: 700 9px/1 monospace; }
 
-.stackValue em {
-  color: var(--table-green);
-  font: 700 7px/1 monospace;
+.boardChipCopy em {
+  color: #dfc36c;
+  font: 700 6px/1 monospace;
   font-style: normal;
-  white-space: nowrap;
 }
 
-.commitment {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 5px;
-  color: #6a736e;
-  font: 9px/1 monospace;
-  font-variant-numeric: tabular-nums;
+.seatPosition0 .boardChipRack {
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.seatPosition3 .boardChipRack,
+.headsUpOpponent .boardChipRack {
+  top: calc(100% + 10px);
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  flex-direction: row;
+  transform: translateX(-50%);
+}
+
+.seatPosition1 .boardChipRack,
+.seatPosition2 .boardChipRack {
+  top: 50%;
+  left: calc(100% + 12px);
+  flex-direction: column;
+  align-items: flex-start;
+  transform: translateY(-50%);
+}
+
+.seatPosition4 .boardChipRack,
+.seatPosition5 .boardChipRack {
+  top: 50%;
+  right: calc(100% + 12px);
+  left: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  transform: translateY(-50%);
+}
+
+.fourSeatPosition0 .boardChipRack {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  flex-direction: row;
+  transform: translateX(-50%);
+}
+
+.fourSeatPosition1 .boardChipRack {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: calc(100% + 12px);
+  flex-direction: column;
+  align-items: flex-start;
+  transform: translateY(-50%);
+}
+
+.fourSeatPosition2 .boardChipRack {
+  top: calc(100% + 10px);
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  flex-direction: row;
+  transform: translateX(-50%);
+}
+
+.fourSeatPosition3 .boardChipRack {
+  top: 50%;
+  right: calc(100% + 12px);
+  bottom: auto;
+  left: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  transform: translateY(-50%);
+}
+
+.turnMarker {
+  position: absolute;
+  z-index: 12;
+  top: -8px;
+  right: -34px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 3px solid #fffaf1;
+  border-radius: 50%;
+  background: var(--table-red);
+  color: white;
+  box-shadow: 0 0 0 4px rgb(189 73 59 / 22%), 0 7px 14px rgb(23 35 30 / 22%);
+  animation: turn-token 1.15s ease-in-out infinite;
+}
+
+.turnMarker i {
+  margin-left: 2px;
+  font: 700 11px/1 sans-serif;
+  font-style: normal;
+}
+
+.turnMarker b {
+  position: absolute;
+  top: 38px;
+  color: #7e2d25;
+  font: 800 7px/1 monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.seatPosition1 .turnMarker,
+.seatPosition2 .turnMarker,
+.fourSeatPosition1 .turnMarker {
+  right: -34px;
+  left: auto;
+}
+
+.seatPosition4 .turnMarker,
+.seatPosition5 .turnMarker,
+.fourSeatPosition3 .turnMarker {
+  right: auto;
+  left: -34px;
 }
 
 .seatState {
@@ -706,21 +847,6 @@
   opacity: 0.25;
   filter: grayscale(1);
 }
-
-.betChip {
-  display: grid;
-  gap: 3px;
-  justify-items: center;
-  margin-top: 7px;
-  padding: 5px 8px;
-  border-radius: 99px;
-  background: var(--table-red);
-  color: white;
-  font: 700 9px/1 monospace;
-  font-variant-numeric: tabular-nums;
-}
-
-.betChip small { color: rgb(255 255 255 / 72%); }
 
 .actionBadge {
   position: absolute;
@@ -1088,6 +1214,13 @@
 
 .resultPanel p { display: grid; gap: 3px; margin: 0; color: #59645e; font-size: 11px; line-height: 1.4; }
 .resultPanel small { color: #7a837e; font: 8px/1.2 monospace; }
+.resultPanel .settlementNote {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(23 35 30 / 13%);
+  color: #707a74;
+  font-size: 9px;
+}
 
 .history li > span {
   color: var(--table-red);
@@ -1199,6 +1332,13 @@
   50% { transform: scale(1.025); }
 }
 
+@keyframes turn-token {
+  50% {
+    box-shadow: 0 0 0 8px rgb(189 73 59 / 12%), 0 9px 18px rgb(23 35 30 / 28%);
+    transform: scale(1.08);
+  }
+}
+
 @keyframes card-enter {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }
 }
@@ -1287,10 +1427,24 @@
   .eventBanner strong { font-size: 11px; }
   .felt { inset: 20% -2%; }
   .seat { min-width: 112px; }
-  .seatPanel { min-width: 112px; padding: 8px 8px 8px 12px; }
+  .seatPanel { min-width: 112px; padding: 8px 8px 20px 12px; }
   .seatNameRow { gap: 4px; }
   .seatNameRow strong { max-width: 52px; font-size: 10px; }
   .playerKind { padding: 3px 4px; font-size: 6px; }
+  .chipTower { width: 17px; height: 18px; }
+  .chipTower i { width: 15px; height: 6px; }
+  .boardChipRack { gap: 8px; }
+  .boardChipStack { gap: 3px; }
+  .boardChipCopy { padding: 3px 4px; }
+  .boardChipCopy strong { font-size: 8px; }
+  .turnMarker { top: -7px; width: 29px; height: 29px; }
+  .seatPosition1 .turnMarker,
+  .seatPosition2 .turnMarker,
+  .fourSeatPosition1 .turnMarker { right: -32px; }
+  .seatPosition4 .turnMarker,
+  .seatPosition5 .turnMarker,
+  .fourSeatPosition3 .turnMarker { left: -32px; }
+  .turnMarker b { top: 33px; }
   .seatPosition0 { bottom: 2%; }
   .seatPosition1 { bottom: 19%; left: 2px; }
   .seatPosition2 { top: 13%; left: 2px; }
@@ -1329,6 +1483,7 @@
 @media (prefers-reduced-motion: reduce) {
   .connection i,
   .actingSeat .seatPanel,
+  .turnMarker,
   .yourTurnBanner .turnBannerCopy > h1,
   .winnerCrown,
   .showdownSeat .seatCards .card,

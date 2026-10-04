@@ -183,7 +183,12 @@ async def test_demo_match_can_play_through_to_a_natural_result() -> None:
     assert state.table.hand_result is not None
     assert state.table.hand_result.reason in {"fold", "showdown"}
     if state.table.hand_result.reason == "showdown":
-        assert len(state.table.hand_result.revealed_hands) == 4
+        live_seats = {
+            seat.seat
+            for seat in state.table.seats
+            if not seat.folded and seat.hole_cards
+        }
+        assert {hand.seat for hand in state.table.hand_result.revealed_hands} == live_seats
         assert all(hand.best_five for hand in state.table.hand_result.revealed_hands)
 
     # Terminal state is durable for the life of the ephemeral match. Polling after

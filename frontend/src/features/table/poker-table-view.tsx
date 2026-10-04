@@ -271,6 +271,34 @@ function PlayingCard({
   );
 }
 
+function ChipTower({
+  amount,
+  maximum,
+  tone,
+}: {
+  amount: number;
+  maximum: number;
+  tone: "balance" | "committed";
+}) {
+  const count = amount <= 0
+    ? 0
+    : Math.max(1, Math.min(5, Math.ceil((amount / Math.max(1, maximum)) * 5)));
+  return (
+    <span
+      aria-hidden="true"
+      className={`${styles.chipTower} ${styles[`chipTower${tone.charAt(0).toUpperCase()}${tone.slice(1)}`]}`}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <i
+          key={index}
+          style={{ "--chip-level": index } as CSSProperties}
+        />
+      ))}
+      {count === 0 && <i className={styles.emptyChip} />}
+    </span>
+  );
+}
+
 function SeatView({
   seat,
   viewerSeat,
@@ -283,6 +311,8 @@ function SeatView({
   winner,
   showdownIndex,
   bigBlind,
+  maxStack,
+  maxCommitted,
 }: {
   seat: PlayerSeat;
   viewerSeat: number;
@@ -295,6 +325,8 @@ function SeatView({
   winner: boolean;
   showdownIndex: number;
   bigBlind: number;
+  maxStack: number;
+  maxCommitted: number;
 }) {
   const relativePosition = (seat.seat - viewerSeat + 6) % 6;
   const resultHand = result?.revealed_hands.find((hand) => hand.seat === seat.seat);
@@ -319,6 +351,16 @@ function SeatView({
       ].join(" ")}
       style={resultHand ? ({ "--showdown-delay": `${Math.max(0, showdownIndex) * 650}ms` } as CSSProperties) : undefined}
     >
+      {seat.seat === actingSeat && (
+        <span
+          aria-label={`${seat.display_name}'s turn`}
+          className={styles.turnMarker}
+          title={`${seat.display_name}'s turn`}
+        >
+          <i aria-hidden="true">▶</i>
+          <b>Turn</b>
+        </span>
+      )}
       <div className={styles.seatCards} aria-label={`${seat.display_name}'s cards`}>
         {cards.slice(0, revealedCount).map((card) => (
           <PlayingCard card={card} highlighted={best.has(card)} key={card} />
@@ -336,23 +378,31 @@ function SeatView({
           {seat.seat === buttonSeat && <span className={styles.dealerChip}>D</span>}
           {winner && <span className={styles.winnerCrown} aria-label="Winner">♛</span>}
         </div>
-        <span className={styles.stack}>
-          <small>Stack</small>
-          <span className={styles.stackValue}>
-            {formatChips(seat.stack)}
-            {seat.seat === viewerSeat && <em>{blindDepth.format(seat.stack / bigBlind)} BB</em>}
-          </span>
-        </span>
-        <span className={styles.commitment}><small>In This Hand</small>{formatChips(seat.committed_this_hand)}</span>
         <span className={styles.seatState}>
           {winner ? "Winner" : seat.eliminated ? "Out" : seat.folded ? "Folded" : seat.all_in ? "All in" : "In hand"}
         </span>
       </div>
-      {seat.committed_this_street > 0 && (
-        <span className={styles.betChip} title="Bet this round">
-          <small>Bet This Round</small>{formatChips(seat.committed_this_street)}
+      <div
+        aria-label={`${seat.display_name} has ${formatChips(seat.stack)} left and has put ${formatChips(seat.committed_this_hand)} into this hand`}
+        className={styles.boardChipRack}
+      >
+        <span className={styles.boardChipStack} title={`${formatChips(seat.stack)} remaining`}>
+          <ChipTower amount={seat.stack} maximum={maxStack} tone="balance" />
+          <span className={styles.boardChipCopy}>
+            <small>Chips left</small>
+            <strong>{formatChips(seat.stack)}</strong>
+            {seat.seat === viewerSeat && <em>{blindDepth.format(seat.stack / bigBlind)} BB</em>}
+          </span>
         </span>
-      )}
+        <span className={styles.boardChipStack} title={`${formatChips(seat.committed_this_hand)} committed this hand`}>
+          <ChipTower amount={seat.committed_this_hand} maximum={maxCommitted} tone="committed" />
+          <span className={styles.boardChipCopy}>
+            <small>Put in hand</small>
+            <strong>{formatChips(seat.committed_this_hand)}</strong>
+            {seat.committed_this_street > 0 && <em>{formatChips(seat.committed_this_street)} this round</em>}
+          </span>
+        </span>
+      </div>
       {latestAction && <span className={styles.actionBadge}>{latestAction}</span>}
     </article>
   );
@@ -392,7 +442,7 @@ function ResultPanel({ result, names }: { result: HandResult; names: Map<number,
     .filter((award) => award.amount > 0)
     .map((award) => names.get(award.seat) ?? `Seat ${award.seat}`);
   const winnerHeadline = winners.length > 1
-    ? `${winners.join(" + ")} tie`
+    ? `${winners.join(" + ")} split the pot`
     : winners[0] === "You" ? "You win" : `${winners[0] ?? "Winner"} wins`;
   return (
     <section className={styles.resultPanel} aria-label="Hand result">
@@ -402,10 +452,15 @@ function ResultPanel({ result, names }: { result: HandResult; names: Map<number,
       {result.reason === "fold" && <p>The remaining player won after every opponent folded.</p>}
       {result.awards.map((award) => (
         <p key={award.seat}>
-          <strong>{names.get(award.seat) ?? `Seat ${award.seat}`}</strong> won {formatChips(award.amount)}
+          <strong>{names.get(award.seat) ?? `Seat ${award.seat}`}</strong> collected {formatChips(award.amount)}
           <small>{award.net >= 0 ? "+" : ""}{formatChips(award.net)} net</small>
         </p>
       ))}
+      {!result.synthetic && (
+        <p className={styles.settlementNote}>
+          Only matched chips in the pot are awarded. Chips a player never committed stay in their stack.
+        </p>
+      )}
       {result.revealed_hands.map((hand) => (
         <p key={hand.seat}>
           <strong>{names.get(hand.seat) ?? `Seat ${hand.seat}`}</strong> — {hand.label}
@@ -466,6 +521,8 @@ export function PokerTableView({
   const boardBest = new Set(result?.revealed_hands.flatMap((hand) => hand.best_five) ?? []);
   const raise = table.decision?.legal_actions.find((item) => item.action === "raise");
   const viewer = table.seats.find((seat) => seat.seat === table.viewer_seat);
+  const maxStack = Math.max(1, ...table.seats.map((seat) => seat.stack));
+  const maxCommitted = Math.max(1, ...table.seats.map((seat) => seat.committed_this_hand));
   const callAmount = table.decision?.legal_actions.find((item) => item.action === "call")?.amount ?? 0;
   const activeStage = currentHandStage(phase, table);
   const activeStageIndex = handStages.findIndex((stage) => stage.key === activeStage);
@@ -585,6 +642,8 @@ export function PokerTableView({
                 winner={winnerSeats.has(seat.seat)}
                 showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
                 bigBlind={table.big_blind}
+                maxStack={maxStack}
+                maxCommitted={maxCommitted}
                 key={seat.seat}
               />
             ))}
