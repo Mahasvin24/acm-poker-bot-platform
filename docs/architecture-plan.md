@@ -85,9 +85,11 @@ The baseline is the 2026 Poker TDA rules with these fixed house choices:
 - Disconnects do not stop a decision clock. Administrative pause waits for current hands and
   freezes the level clock.
 
-The default is 20,000 chips, 15-minute levels, and a 10-minute break after each third level. The
-canonical blind schedule lives in `domain/tournament.py`; after its final row all amounts double
-every 15 minutes. Tournament settings are mutable only in draft state.
+The default is 20,000 chips, 15-minute levels, and a five-minute break after every fourth level.
+The canonical blind schedule lives in `domain/tournament.py`; it uses the smooth 100/200 through
+75,000/150,000 progression published for a 20,000-chip WSOP Circuit event, then doubles all
+amounts after its final row if play somehow continues. Tournament settings are mutable only in
+draft state.
 
 ## Bot protocol v1
 

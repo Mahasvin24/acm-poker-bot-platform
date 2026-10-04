@@ -54,6 +54,7 @@ const chips = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0,
 });
+const blindDepth = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 const suits: Record<string, string> = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const suitNames: Record<string, string> = {
   c: "clubs",
@@ -281,6 +282,7 @@ function SeatView({
   playerCount,
   winner,
   showdownIndex,
+  bigBlind,
 }: {
   seat: PlayerSeat;
   viewerSeat: number;
@@ -292,6 +294,7 @@ function SeatView({
   playerCount: number;
   winner: boolean;
   showdownIndex: number;
+  bigBlind: number;
 }) {
   const relativePosition = (seat.seat - viewerSeat + 6) % 6;
   const resultHand = result?.revealed_hands.find((hand) => hand.seat === seat.seat);
@@ -333,7 +336,13 @@ function SeatView({
           {seat.seat === buttonSeat && <span className={styles.dealerChip}>D</span>}
           {winner && <span className={styles.winnerCrown} aria-label="Winner">♛</span>}
         </div>
-        <span className={styles.stack}><small>Stack</small>{formatChips(seat.stack)}</span>
+        <span className={styles.stack}>
+          <small>Stack</small>
+          <span className={styles.stackValue}>
+            {formatChips(seat.stack)}
+            {seat.seat === viewerSeat && <em>{blindDepth.format(seat.stack / bigBlind)} BB</em>}
+          </span>
+        </span>
         <span className={styles.commitment}><small>In This Hand</small>{formatChips(seat.committed_this_hand)}</span>
         <span className={styles.seatState}>
           {winner ? "Winner" : seat.eliminated ? "Out" : seat.folded ? "Folded" : seat.all_in ? "All in" : "In hand"}
@@ -575,6 +584,7 @@ export function PokerTableView({
                 playerCount={table.seats.length}
                 winner={winnerSeats.has(seat.seat)}
                 showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
+                bigBlind={table.big_blind}
                 key={seat.seat}
               />
             ))}
@@ -681,21 +691,41 @@ function RaiseControl({
   const clamp = (value: number) => Math.max(min, Math.min(max, Math.round(value)));
   const [amountText, setAmountText] = useState(String(min));
   const parsed = Number(amountText);
-  const amount = Number.isFinite(parsed) && amountText !== "" ? clamp(parsed) : null;
+  const amount = Number.isInteger(parsed) && amountText !== "" && parsed >= min && parsed <= max
+    ? parsed
+    : null;
   const additional = amount === null ? 0 : Math.max(0, amount - committed);
   const presets = [
-    ["Min", min],
+    ["Min raise", min],
     ["½ pot", committed + callAmount + (pot + callAmount) / 2],
+    ["¾ pot", committed + callAmount + (pot + callAmount) * 0.75],
     ["Pot", committed + callAmount + pot + callAmount],
     ["All in", max],
   ] as const;
+  const amountHint = amountText === ""
+    ? `Enter ${formatChips(min)}–${formatChips(max)}`
+    : !Number.isInteger(parsed)
+      ? "Use a whole-dollar amount"
+      : parsed < min
+        ? `Minimum raise is ${formatChips(min)}`
+        : parsed > max
+          ? `Maximum raise is ${formatChips(max)}`
+          : `Valid range: ${formatChips(min)}–${formatChips(max)}`;
 
   return (
-    <div className={styles.raiseControl}>
+    <form
+      className={styles.raiseControl}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (amount !== null && !disabled) onSubmit(amount);
+      }}
+    >
       <div className={styles.raiseTopline}>
         <label htmlFor={`raise-${decisionId}`}>Raise to</label>
         <input
           aria-label="Raise amount"
+          aria-describedby={`raise-hint-${decisionId}`}
+          aria-invalid={amount === null}
           autoComplete="off"
           disabled={disabled}
           id={`raise-${decisionId}`}
@@ -703,28 +733,18 @@ function RaiseControl({
           max={max}
           min={min}
           name={`raise-${decisionId}`}
-          onBlur={() => setAmountText(String(clamp(Number(amountText) || min)))}
           onChange={(event) => setAmountText(event.target.value)}
           step={1}
           type="number"
           value={amountText}
         />
       </div>
-      <input
-        aria-label="Raise amount slider"
-        className={styles.raiseSlider}
-        disabled={disabled}
-        max={max}
-        min={min}
-        name={`raise-slider-${decisionId}`}
-        onChange={(event) => setAmountText(event.target.value)}
-        step={1}
-        type="range"
-        value={amount ?? min}
-      />
+      <span className={`${styles.raiseHint} ${amount === null ? styles.raiseHintError : ""}`} id={`raise-hint-${decisionId}`}>
+        {amountHint}
+      </span>
       <div className={styles.raiseMath}>
-        <span>Adds <b>{formatChips(additional)}</b></span>
-        <span>Stack left <b>{formatChips(Math.max(0, stack - additional))}</b></span>
+        <span>Adds <b>{amount === null ? "—" : formatChips(additional)}</b></span>
+        <span>Stack left <b>{amount === null ? "—" : formatChips(Math.max(0, stack - additional))}</b></span>
       </div>
       <div className={styles.raiseBottom}>
         <div className={styles.presets}>
@@ -732,10 +752,10 @@ function RaiseControl({
             <button disabled={disabled} key={label} onClick={() => setAmountText(String(clamp(value)))} type="button">{label}</button>
           ))}
         </div>
-        <button className={styles.raiseButton} disabled={disabled || amount === null} onClick={() => amount !== null && onSubmit(amount)} type="button">
+        <button className={styles.raiseButton} disabled={disabled || amount === null} type="submit">
           Raise <span>{amount === null ? "—" : formatChips(amount)}</span>
         </button>
       </div>
-    </div>
+    </form>
   );
 }

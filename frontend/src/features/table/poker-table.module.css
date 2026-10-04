@@ -595,6 +595,19 @@
   text-transform: uppercase;
 }
 
+.stackValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.stackValue em {
+  color: var(--table-green);
+  font: 700 7px/1 monospace;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .commitment {
   display: flex;
   justify-content: space-between;
@@ -899,18 +912,24 @@
 }
 
 .raiseTopline input {
-  width: 105px;
-  padding: 7px 8px;
+  width: 138px;
+  padding: 10px 11px;
   border: 1px solid #bdb3a2;
   background: transparent;
   color: inherit;
-  font: 700 11px/1 monospace;
+  font: 700 13px/1 monospace;
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
-.raiseSlider {
-  width: 100%;
-  accent-color: var(--table-red);
+.raiseHint {
+  color: #6c756f;
+  font: 8px/1.3 monospace;
+  text-align: right;
+}
+
+.raiseHintError {
+  color: var(--table-red);
 }
 
 .presets {
@@ -951,8 +970,7 @@
 .raiseButton:focus-visible,
 .presets button:focus-visible,
 .gateActions button:focus-visible,
-.raiseTopline input:focus-visible,
-.raiseSlider:focus-visible {
+.raiseTopline input:focus-visible {
   outline: 3px solid var(--table-red);
   outline-offset: 3px;
 }
@@ -1299,7 +1317,7 @@
   .actionButton,
   .foldButton { width: 100%; }
   .raiseBottom { align-items: stretch; flex-direction: column; }
-  .presets { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .presets { display: grid; grid-template-columns: repeat(3, 1fr); }
   .presets button { min-height: 40px; }
   .raiseButton { width: 100%; }
   .handRail { grid-template-columns: 1fr; padding: 24px 16px; }

@@ -22,25 +22,34 @@ class BlindLevel(ContractModel):
 
 _DEFAULT_BLINDS = (
     (100, 200),
-    (100, 300),
+    (200, 300),
     (200, 400),
+    (300, 500),
     (300, 600),
     (400, 800),
     (500, 1_000),
     (600, 1_200),
     (1_000, 1_500),
     (1_000, 2_000),
+    (1_500, 2_500),
     (1_500, 3_000),
     (2_000, 4_000),
+    (3_000, 5_000),
     (3_000, 6_000),
     (4_000, 8_000),
     (5_000, 10_000),
+    (6_000, 12_000),
+    (10_000, 15_000),
     (10_000, 20_000),
+    (15_000, 25_000),
     (15_000, 30_000),
     (20_000, 40_000),
+    (25_000, 50_000),
     (30_000, 60_000),
     (40_000, 80_000),
     (50_000, 100_000),
+    (60_000, 120_000),
+    (75_000, 150_000),
 )
 
 
@@ -58,8 +67,8 @@ class TournamentConfig(ContractModel):
     # Bot timing is part of the public v1 wire contract, not a tournament knob.
     bot_action_timeout_ms: int = Field(default=3_000, ge=3_000, le=3_000)
     bot_connect_timeout_ms: int = Field(default=500, ge=500, le=500)
-    break_every_levels: int = Field(default=3, gt=0)
-    break_duration_seconds: int = Field(default=600, ge=0)
+    break_every_levels: int = Field(default=4, gt=0)
+    break_duration_seconds: int = Field(default=300, ge=0)
     levels: tuple[BlindLevel, ...] = Field(default_factory=default_blind_levels)
 
     @model_validator(mode="after")
