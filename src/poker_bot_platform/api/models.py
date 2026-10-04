@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -148,6 +148,33 @@ class PlayerDecisionResponse(ApiModel):
     legal_actions: tuple[LegalAction, ...]
 
 
+class PublicTurnResponse(ApiModel):
+    seat: int = Field(ge=1, le=6)
+    kind: EntryKind
+    deadline_at: datetime
+    duration_ms: int = Field(gt=0)
+
+
+class HandAwardResponse(ApiModel):
+    seat: int = Field(ge=1, le=6)
+    amount: int = Field(ge=0)
+    net: int
+
+
+class RevealedHandResponse(ApiModel):
+    seat: int = Field(ge=1, le=6)
+    hole_cards: tuple[str, ...]
+    label: str
+    best_five: tuple[str, ...]
+
+
+class HandResultResponse(ApiModel):
+    reason: Literal["showdown", "fold", "forced"]
+    awards: tuple[HandAwardResponse, ...]
+    revealed_hands: tuple[RevealedHandResponse, ...] = ()
+    synthetic: bool = False
+
+
 class PublicPlayerSeatResponse(ApiModel):
     seat: int
     entrant_id: str
@@ -198,3 +225,28 @@ class PlayerTableStateResponse(ApiModel):
     action_history: tuple[PublicPlayerActionResponse, ...]
     completed: bool
     decision: PlayerDecisionResponse | None = None
+    turn: PublicTurnResponse | None = None
+    hand_result: HandResultResponse | None = None
+
+
+class DemoMatchStateResponse(ApiModel):
+    status: Literal["idle", "active", "completed"]
+    match_id: str | None = None
+    result: Literal["human_win", "bot_win", "tie"] | None = None
+    table: PlayerTableStateResponse | None = None
+
+    @model_validator(mode="after")
+    def validate_match_shape(self) -> DemoMatchStateResponse:
+        if self.status == "idle" and (
+            self.table is not None or self.result is not None or self.match_id is not None
+        ):
+            raise ValueError("idle demo matches cannot expose table state or a result")
+        if self.status == "active" and (
+            self.table is None or self.result is not None or self.match_id is None
+        ):
+            raise ValueError("active demo matches require a table and no result")
+        if self.status == "completed" and (
+            self.table is None or self.result is None or self.match_id is None
+        ):
+            raise ValueError("completed demo matches require a table and result")
+        return self

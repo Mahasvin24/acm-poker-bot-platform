@@ -15,6 +15,7 @@ from poker_bot_platform.api.models import (
     PublicPlayerActionResponse,
     PublicPlayerSeatResponse,
     PublicSidePotResponse,
+    PublicTurnResponse,
 )
 from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.bots import BotEndpoint, BotGateway
@@ -37,6 +38,7 @@ from poker_bot_platform.domain import (
 )
 from poker_bot_platform.engine import PokerEngine, PokerKitEngine
 from poker_bot_platform.integration.actors import BotActor
+from poker_bot_platform.integration.presentation import natural_hand_result
 from poker_bot_platform.integration.services import (
     AdminCoordinatorService,
     TournamentRegistry,
@@ -96,6 +98,7 @@ class HeadlessGameplayRuntime:
         self._clock = clock or (lambda: datetime.now(UTC))
         self._engine_factory = engine_factory
         self._coordinators: dict[str, TableCoordinator] = {}
+        self._terminal_views: dict[tuple[str, str], PlayerTableStateResponse] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._locks_guard = asyncio.Lock()
 
@@ -114,6 +117,9 @@ class HeadlessGameplayRuntime:
         async with lock:
             tournament = await self._get_tournament(tournament_id)
             await self._synchronize_locked(tournament)
+            terminal = await self._take_terminal_view(account_id, tournament_id)
+            if terminal is not None:
+                return terminal
             player, table_id = await self._locate_player(
                 tournament,
                 account_id,
@@ -134,6 +140,9 @@ class HeadlessGameplayRuntime:
         async with lock:
             tournament = await self._get_tournament(tournament_id)
             await self._synchronize_locked(tournament)
+            terminal = await self._take_terminal_view(account_id, tournament_id)
+            if terminal is not None:
+                return terminal
             player, table_id = await self._locate_player(
                 tournament,
                 account_id,
@@ -219,6 +228,15 @@ class HeadlessGameplayRuntime:
             if snapshot is None:
                 raise GameplayConflictError("table coordinator has no snapshot")
             if snapshot.completed:
+                table = next(
+                    (item for item in tournament.state.tables if item.table_id == table_id),
+                    None,
+                )
+                if table is not None:
+                    for player in table.players:
+                        self._terminal_views[(snapshot.tournament_id, player.entrant_id)] = (
+                            self._project(tournament, coordinator, player)
+                        )
                 await tournament.record_hand_completed(
                     table_id,
                     {seat.entrant_id: seat.stack for seat in snapshot.seats},
@@ -332,6 +350,16 @@ class HeadlessGameplayRuntime:
                     return player, table.table_id
         raise GameplayNotFoundError("entrant does not have an active table")
 
+    async def _take_terminal_view(
+        self,
+        account_id: str,
+        tournament_id: str,
+    ) -> PlayerTableStateResponse | None:
+        entrant = await self._accounts.get_entrant(account_id, tournament_id)
+        if entrant is None:
+            return None
+        return self._terminal_views.pop((tournament_id, entrant.id), None)
+
     def _project(
         self,
         tournament: TournamentCoordinator,
@@ -353,6 +381,20 @@ class HeadlessGameplayRuntime:
                 deadline_at=pending.deadline_at,
                 legal_actions=pending.legal_actions,
             )
+        acting = next(
+            (seat for seat in snapshot.seats if pending is not None and seat.seat == pending.seat),
+            None,
+        )
+        turn = (
+            PublicTurnResponse(
+                seat=pending.seat,
+                kind=acting.kind,
+                deadline_at=pending.deadline_at,
+                duration_ms=tournament.state.config.human_action_timeout_ms,
+            )
+            if pending is not None and acting is not None and not snapshot.completed
+            else None
+        )
         return PlayerTableStateResponse(
             tournament_id=snapshot.tournament_id,
             tournament_status=tournament.state.status,
@@ -410,6 +452,8 @@ class HeadlessGameplayRuntime:
             ),
             completed=snapshot.completed,
             decision=decision,
+            turn=turn,
+            hand_result=natural_hand_result(snapshot),
         )
 
     def _hand_needs_dispatch(self, table_id: str, hand_number: int) -> bool:

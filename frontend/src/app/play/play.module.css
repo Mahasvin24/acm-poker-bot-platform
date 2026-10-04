@@ -142,6 +142,10 @@
   text-decoration: none;
 }
 
+.demoLink + .demoLink {
+  margin-top: 24px;
+}
+
 .demoLink span {
   color: #bd493b;
   font: 700 9px/1 monospace;

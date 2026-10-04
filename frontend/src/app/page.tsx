@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { MotionController } from "./motion-controller";
+import { MobileMenu } from "./mobile-menu";
 
 const tickerItems = [
   "No-limit Hold’em",
@@ -97,6 +98,7 @@ export default function Home() {
               <i aria-hidden="true" /> Sign In / Register
             </Link>
           </nav>
+          <MobileMenu />
         </div>
       </header>
 
@@ -126,10 +128,10 @@ export default function Home() {
               ACM presents · No-limit Hold’em · Play money
             </p>
             <h1 aria-label="One table. Any mind.">
-              <span className="title-line reveal">
+              <span className="title-line">
                 <span>One table.</span>
               </span>
-              <span className="title-line title-line--accent reveal">
+              <span className="title-line title-line--accent">
                 <span>Any mind.</span>
               </span>
             </h1>
@@ -224,10 +226,10 @@ export default function Home() {
 
             <div className="ticker" aria-label="Tournament format">
               <div>
-                {[...tickerItems, ...tickerItems].map((item, index) => (
-                  <span className="ticker-item" key={`${item}-${index}`}>
+                {tickerItems.map((item) => (
+                  <span className="ticker-item" key={item}>
                     <span>{item}</span>
-                    <i>◆</i>
+                    <i aria-hidden="true">◆</i>
                   </span>
                 ))}
               </div>
@@ -254,7 +256,7 @@ export default function Home() {
                     <p>{item.copy}</p>
                   </div>
                   <span className={item.live ? "when when--live" : "when"}>
-                    {item.live && <i />}
+                    {item.live && <i aria-hidden="true" />}
                     {item.timing}
                   </span>
                 </li>
@@ -276,8 +278,10 @@ export default function Home() {
                 <em>kept simple.</em>
               </h2>
               <p>
-                Full rules, bot documentation, and event logistics will arrive
-                when registration opens.
+                Build a bot with the{" "}
+                <Link href="/bot-guide">endpoint guide</Link>, or head straight
+                to your{" "}
+                <Link href="/dashboard">tournament dashboard</Link>.
               </p>
             </div>
             <div className="questions reveal">

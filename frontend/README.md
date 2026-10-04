@@ -6,10 +6,10 @@ and live human gameplay flows are connected to the FastAPI backend.
 
 ## Local development
 
-From this directory:
+Install the locked dependencies and start the frontend from this directory:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -22,6 +22,8 @@ Open <http://localhost:3000>. Useful routes are:
 - `/bot-guide` — bot protocol quickstart
 - `/play` — tournament ID entry
 - `/play/demo` — self-contained table demo, with no backend or login required
+- `/demo-human-verus-bot` — full-screen, four-player real-engine match using the shared
+  production table; each of the three built-in bots exposes a visible seven-second turn
 - `/play/<tournament-id>` — authenticated live table
 
 The frontend sends `/api/v1/*` requests through the Next.js development server so browser
@@ -41,4 +43,6 @@ npm run build
 The landing page is statically prerendered. Scroll behavior and the FAQ accordion are isolated
 in `src/app/motion-controller.tsx`; the rest of the page remains server-rendered. The table
 client polls the player-safe state endpoint, exposes only the signed-in player's private cards,
-and submits only server-advertised legal actions.
+and submits only server-advertised legal actions. Authenticated play, `/play/demo`, and the
+ephemeral match share `src/features/table/poker-table-view.tsx`, including timing, action,
+animation, history, reconnection, and showdown presentation.

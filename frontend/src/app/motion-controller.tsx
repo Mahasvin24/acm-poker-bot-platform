@@ -5,11 +5,20 @@ import { useEffect } from "react";
 export function MotionController() {
   useEffect(() => {
     const root = document.documentElement;
+    let animationFrame = 0;
 
     const updateScroll = () => {
       const max = root.scrollHeight - window.innerHeight;
       const progress = max > 0 ? window.scrollY / max : 0;
       root.style.setProperty("--scroll", progress.toFixed(4));
+    };
+
+    const queueScrollUpdate = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(() => {
+        updateScroll();
+        animationFrame = 0;
+      });
     };
 
     const revealObserver = new IntersectionObserver(
@@ -24,15 +33,13 @@ export function MotionController() {
     );
 
     const revealElements = document.querySelectorAll<HTMLElement>(".reveal");
-    revealElements.forEach((element, index) => {
-      element.style.setProperty(
-        "--reveal-delay",
-        `${Math.min(index % 4, 3) * 70}ms`,
-      );
+    revealElements.forEach((element) => {
       revealObserver.observe(element);
     });
 
-    const details = Array.from(document.querySelectorAll("details"));
+    const details = Array.from(
+      document.querySelectorAll<HTMLDetailsElement>(".questions details"),
+    );
     const cleanupDetails = details.map((detail) => {
       const handleToggle = () => {
         if (!detail.open) return;
@@ -46,14 +53,15 @@ export function MotionController() {
     });
 
     updateScroll();
-    window.addEventListener("scroll", updateScroll, { passive: true });
-    window.addEventListener("resize", updateScroll);
+    window.addEventListener("scroll", queueScrollUpdate, { passive: true });
+    window.addEventListener("resize", queueScrollUpdate);
 
     return () => {
       revealObserver.disconnect();
       cleanupDetails.forEach((cleanup) => cleanup());
-      window.removeEventListener("scroll", updateScroll);
-      window.removeEventListener("resize", updateScroll);
+      window.removeEventListener("scroll", queueScrollUpdate);
+      window.removeEventListener("resize", queueScrollUpdate);
+      window.cancelAnimationFrame(animationFrame);
     };
   }, []);
 

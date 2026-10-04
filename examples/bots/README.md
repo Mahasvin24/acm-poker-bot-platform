@@ -12,9 +12,10 @@ The JSON Schemas in `schemas/` are the public wire contract. Unknown fields, wro
 versions, numeric strings, and responses with missing identifiers are rejected. `amount_to` is
 only present for a raise and means the player's total commitment on the current street.
 
-The Python example uses FastAPI and the platform's installed models:
+From the repository root, the Python example uses FastAPI and the platform's installed models:
 
 ```shell
+source .venv/bin/activate
 cd examples/bots/python
 BOT_TOKEN=replace-with-registration-token uvicorn app:app --host 0.0.0.0 --port 8001
 ```
@@ -25,6 +26,10 @@ The JavaScript example needs Node.js 20 or newer and no packages:
 cd examples/bots/javascript
 BOT_TOKEN=replace-with-registration-token node server.mjs
 ```
+
+Register the bot machine's reachable numeric LAN IP and port `8001` in the participant
+dashboard. Do not register `localhost` or `127.0.0.1`; endpoint validation rejects loopback
+addresses. The configured `POKER_PARTICIPANT_SUBNET` must contain the bot's LAN address.
 
 From the project environment, run the production conformance client against either example:
 

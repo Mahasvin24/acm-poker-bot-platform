@@ -142,6 +142,12 @@ export function createDemoTableState(): PlayerTableState {
       },
     ],
     completed: false,
+    turn: {
+      seat: 4,
+      kind: "human",
+      deadline_at: new Date(Date.now() + 30_000).toISOString(),
+      duration_ms: 30_000,
+    },
     decision: {
       decision_id: "demo-decision-48",
       table_version: 47,

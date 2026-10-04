@@ -69,6 +69,11 @@ export function JoinTable() {
             <strong>Open a safe demo table</strong>
             <b>↗</b>
           </Link>
+          <Link className={styles.demoLink} href="/demo-human-verus-bot">
+            <span>Exercise the real engine</span>
+            <strong>Play three test bots</strong>
+            <b>↗</b>
+          </Link>
         </div>
       </section>
       <footer className={styles.footer}>

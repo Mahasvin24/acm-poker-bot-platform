@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from poker_bot_platform import __version__
-from poker_bot_platform.api import create_api_router
+from poker_bot_platform.api import create_api_router, create_demo_match_router
 from poker_bot_platform.auth.service import AuthService, EntrantService
 from poker_bot_platform.auth.sqlalchemy import SqlAlchemyAuthRepository
 from poker_bot_platform.bots import BotGateway
@@ -20,6 +20,7 @@ from poker_bot_platform.integration import (
     SyncedEntrantService,
     TournamentRegistry,
 )
+from poker_bot_platform.integration.demo_match import EphemeralDemoMatch
 from poker_bot_platform.persistence import create_database_components
 from poker_bot_platform.tournament import SqlAlchemyTournamentStore
 
@@ -57,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registry,
     )
     scheduler = GameplayScheduler(registry, gameplay)
+    demo_match = EphemeralDemoMatch()
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -65,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             await scheduler.stop()
+            await demo_match.aclose()
             await bot_gateway.aclose()
             await database_engine.dispose()
 
@@ -88,10 +91,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             cookie_secure=settings.cookie_secure,
         )
     )
+    application.include_router(
+        create_demo_match_router(
+            demo_match,
+            allowed_origin=settings.allowed_origin,
+        )
+    )
     application.state.database_engine = database_engine
     application.state.tournament_registry = registry
     application.state.gameplay_runtime = gameplay
     application.state.gameplay_scheduler = scheduler
+    application.state.demo_match = demo_match
     return application
 
 

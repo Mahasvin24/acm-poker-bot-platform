@@ -9,7 +9,7 @@ from ipaddress import ip_network
 import httpx
 import pytest
 
-from poker_bot_platform.api.models import PlayerActionRequest
+from poker_bot_platform.api.models import PlayerActionRequest, PlayerTableStateResponse
 from poker_bot_platform.auth import Account, AuthService, EntrantService, InMemoryAuthRepository
 from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.models import BotActionRequest, VerifyRequest
@@ -145,6 +145,18 @@ def bot_handler(request: httpx.Request) -> httpx.Response:
     raise AssertionError(f"unexpected bot route {request.url.path}")
 
 
+async def live_player_state(
+    runtime: HeadlessGameplayRuntime,
+    account_id: str,
+    tournament_id: str,
+) -> PlayerTableStateResponse:
+    state = await runtime.player_state(account_id, tournament_id)
+    if state.completed:
+        assert state.hand_result is not None
+        state = await runtime.player_state(account_id, tournament_id)
+    return state
+
+
 @pytest.mark.asyncio
 async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_state() -> None:
     bot_actions = 0
@@ -216,6 +228,12 @@ async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_stat
                     action=action,
                 ),
             )
+            if next_state.completed:
+                assert next_state.hand_result is not None
+                assert next_state.hand_result.awards
+                completed_hand_id = next_state.hand_id
+                next_state = await stack.runtime.player_state(human.id, "event")
+                assert next_state.hand_id != completed_hand_id
             if next_state.hand_id != state.hand_id:
                 break
 
@@ -244,6 +262,11 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
         actor = first if first_state.decision is not None else second
         original = first_state if first_state.decision is not None else second_state
         assert original.decision is not None
+        observer = second_state if actor.id == first.id else first_state
+        assert original.turn is not None
+        assert observer.decision is None
+        assert observer.turn == original.turn
+        assert observer.turn.duration_ms == 30_000
 
         # A new runtime represents a process restart. Restoring the table sees the
         # unresolved durable decision, applies exactly one restart fallback, and
@@ -264,11 +287,11 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
         assert len(stack.tables.actions) == 1
         await restored_scheduler.run_once(now=1_000.0)
         assert len(stack.tables.actions) == 1
-        after_restart = await restored_runtime.player_state(actor.id, "event")
+        after_restart = await live_player_state(restored_runtime, actor.id, "event")
         assert after_restart.hand_id != original.hand_id
 
         other = second if actor.id == first.id else first
-        other_state = await restored_runtime.player_state(other.id, "event")
+        other_state = await live_player_state(restored_runtime, other.id, "event")
         timeout_actor = actor if after_restart.decision is not None else other
         timeout_state = after_restart if after_restart.decision is not None else other_state
         assert timeout_state.decision is not None
@@ -305,8 +328,8 @@ async def test_scheduler_advances_levels_and_expires_disconnected_human() -> Non
 
         tournament = await stack.registry.get("event")
         assert tournament.state.phase_remaining_seconds == 900 - 31
-        updated_first = await stack.runtime.player_state(first.id, "event")
-        updated_second = await stack.runtime.player_state(second.id, "event")
+        updated_first = await live_player_state(stack.runtime, first.id, "event")
+        updated_second = await live_player_state(stack.runtime, second.id, "event")
         assert updated_first.hand_id != original.hand_id
         assert updated_second.hand_id != original.hand_id
 
@@ -420,7 +443,8 @@ async def test_engine_quarantine_does_not_stop_other_tournament_scheduler() -> N
             )
 
         progressed = [
-            await stack.runtime.player_state(player.id, "good-event") for player in good_players
+            await live_player_state(stack.runtime, player.id, "good-event")
+            for player in good_players
         ]
         assert all(state.hand_id != good_original.hand_id for state in progressed)
 

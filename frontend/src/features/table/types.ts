@@ -15,6 +15,33 @@ export interface PlayerDecision {
   legal_actions: LegalAction[];
 }
 
+export interface PublicTurn {
+  seat: number;
+  kind: EntryKind;
+  deadline_at: string;
+  duration_ms: number;
+}
+
+export interface HandAward {
+  seat: number;
+  amount: number;
+  net: number;
+}
+
+export interface RevealedHand {
+  seat: number;
+  hole_cards: string[];
+  label: string;
+  best_five: string[];
+}
+
+export interface HandResult {
+  reason: "showdown" | "fold" | "forced";
+  awards: HandAward[];
+  revealed_hands: RevealedHand[];
+  synthetic: boolean;
+}
+
 export interface PlayerSeat {
   seat: number;
   entrant_id: string;
@@ -65,6 +92,8 @@ export interface PlayerTableState {
   action_history: PlayerAction[];
   completed: boolean;
   decision: PlayerDecision | null;
+  turn?: PublicTurn | null;
+  hand_result?: HandResult | null;
 }
 
 export interface ActionSubmission {
