@@ -182,7 +182,7 @@ export function DemoMatch() {
       ) : null}
 
       <footer className={styles.footer}>
-        <span>IN-MEMORY ONLY</span><span>ONE CONCURRENT MATCH</span><span>30 SECOND HUMAN CLOCK</span><span>3 × 7 SECOND TEST BOTS</span>
+        <span>IN-MEMORY ONLY</span><span>ONE CONCURRENT MATCH</span><span>30 SECOND HUMAN CLOCK</span><span>3 × 4 SECOND TEST BOTS</span>
       </footer>
     </main>
   );

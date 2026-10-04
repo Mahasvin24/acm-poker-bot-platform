@@ -90,7 +90,8 @@ Open <http://localhost:3000>. The main routes are:
 - `/bot-guide` — bot protocol quickstart
 - `/play/demo` — table demo that does not require an account or backend
 - `/demo-human-verus-bot` — full-screen ephemeral real-engine match against three built-in bots;
-  every bot decision remains visible for seven seconds before the server invokes it
+  the deal and street changes pause before opening a decision, and every bot decision remains
+  visible for four seconds before the server invokes it
 - `/play/<tournament-id>` — authenticated live human table
 
 The frontend proxies `/api/v1/*` to `POKER_API_ORIGIN`, which defaults to

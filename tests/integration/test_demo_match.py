@@ -30,21 +30,13 @@ async def advance_past_bot_turn(
     assert before.table.turn.kind.value == "bot"
     version = before.table.table_version
 
-    clock.advance(6)
+    clock.advance(3)
     waiting = await demo.current()
     assert waiting.table is not None
     assert waiting.table.table_version == version
 
     clock.advance(1)
-    progressed = await demo.current()
-    if (
-        progressed.status == "active"
-        and progressed.table is not None
-        and progressed.table.turn is not None
-        and progressed.table.turn.kind.value == "bot"
-    ):
-        assert progressed.table.turn.deadline_at == clock.value + timedelta(seconds=7)
-    return progressed
+    return await demo.current()
 
 
 async def advance_until_human_or_complete(
@@ -52,14 +44,16 @@ async def advance_until_human_or_complete(
     clock: MutableClock,
     state,
 ):
-    while (
-        state.status == "active"
-        and state.table is not None
-        and state.table.turn is not None
-        and state.table.turn.kind.value == "bot"
-    ):
-        state = await advance_past_bot_turn(demo, clock)
-    return state
+    for _ in range(80):
+        if state.status != "active" or state.table is None or state.table.decision is not None:
+            return state
+        if state.table.turn is not None:
+            assert state.table.turn.kind.value == "bot"
+            state = await advance_past_bot_turn(demo, clock)
+            continue
+        clock.advance(3)
+        state = await demo.current()
+    raise AssertionError("demo did not reach a human decision or terminal state")
 
 
 async def test_demo_match_runs_without_durable_dependencies(
@@ -75,6 +69,18 @@ async def test_demo_match_runs_without_durable_dependencies(
     assert (await demo.current()).status == "idle"
 
     started = await demo.start()
+    assert started.table is not None
+    assert started.table.decision is None
+    assert started.table.turn is None
+
+    clock.advance(2)
+    still_dealing = await demo.current()
+    assert still_dealing.table is not None
+    assert still_dealing.table.decision is None
+    assert still_dealing.table.turn is None
+
+    clock.advance(1)
+    started = await demo.current()
     started = await advance_until_human_or_complete(demo, clock, started)
 
     assert started.status == "active"

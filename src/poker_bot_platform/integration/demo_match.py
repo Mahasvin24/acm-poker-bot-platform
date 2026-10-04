@@ -56,7 +56,10 @@ _BOT_IDENTITIES = (
 _STARTING_STACK = 20_000
 _HUMAN_TIMEOUT = timedelta(seconds=30)
 _BOT_TIMEOUT = timedelta(seconds=3)
-_BOT_DELAY = timedelta(seconds=7)
+_BOT_DELAY = timedelta(seconds=4)
+_INITIAL_DEAL_DELAY = timedelta(seconds=3)
+_ACTION_OBSERVATION_DELAY = timedelta(seconds=2)
+_STREET_OBSERVATION_DELAY = timedelta(seconds=3)
 _BOT_TOKEN = "ephemeral-demo-token"
 
 
@@ -75,6 +78,7 @@ class EphemeralDemoMatch:
         self._match_id: str | None = None
         self._bot_action_due_at: datetime | None = None
         self._bot_action_seat: int | None = None
+        self._presentation_due_at: datetime | None = None
         self._clock = clock or (lambda: datetime.now(UTC))
         self._gateway = BotGateway(
             participant_subnet=ip_network("10.99.0.0/24"),
@@ -153,6 +157,7 @@ class EphemeralDemoMatch:
             self._match_id = secrets.token_urlsafe(12)
             self._bot_action_due_at = None
             self._bot_action_seat = None
+            self._presentation_due_at = self._now() + _INITIAL_DEAL_DELAY
             await self._drive_until_human_or_complete()
             return self._response()
 
@@ -161,8 +166,8 @@ class EphemeralDemoMatch:
             coordinator = self._require_active_coordinator()
             if self._forced_outcome is not None:
                 raise DemoMatchError("the forced match result cannot accept actions")
-            snapshot = self._require_snapshot(coordinator)
-            if snapshot.completed:
+            before = self._require_snapshot(coordinator)
+            if before.completed:
                 raise DemoMatchError("the hand is already complete")
             pending = coordinator.state.pending
             if pending is None or pending.seat != _HUMAN_SEAT:
@@ -179,6 +184,7 @@ class EphemeralDemoMatch:
                 )
             except InvalidActionError as exc:
                 raise DemoMatchError(str(exc)) from exc
+            self._pause_after_action(before, self._require_snapshot(coordinator))
             await self._drive_until_human_or_complete()
             return self._response()
 
@@ -188,6 +194,7 @@ class EphemeralDemoMatch:
             self._forced_outcome = outcome
             self._bot_action_due_at = None
             self._bot_action_seat = None
+            self._presentation_due_at = None
             return self._response()
 
     async def end(self) -> DemoMatchStateResponse:
@@ -198,6 +205,7 @@ class EphemeralDemoMatch:
             self._match_id = None
             self._bot_action_due_at = None
             self._bot_action_seat = None
+            self._presentation_due_at = None
             return self._idle_response()
 
     async def _drive_until_human_or_complete(self) -> None:
@@ -209,7 +217,12 @@ class EphemeralDemoMatch:
             if snapshot.completed:
                 self._bot_action_due_at = None
                 self._bot_action_seat = None
+                self._presentation_due_at = None
                 return
+            if self._presentation_due_at is not None:
+                if self._now() < self._presentation_due_at:
+                    return
+                self._presentation_due_at = None
             if snapshot.acting_seat in _BOT_SEATS:
                 if self._bot_action_due_at is None or self._bot_action_seat != snapshot.acting_seat:
                     self._bot_action_due_at = self._now() + _BOT_DELAY
@@ -219,11 +232,13 @@ class EphemeralDemoMatch:
                     return
                 self._bot_action_due_at = None
                 self._bot_action_seat = None
+                before = snapshot
                 await coordinator.request_actor_action(
                     self._bot_actor,
                     self._now() + _BOT_TIMEOUT,
                 )
-                continue
+                self._pause_after_action(before, self._require_snapshot(coordinator))
+                return
             if snapshot.acting_seat != _HUMAN_SEAT:
                 raise DemoMatchError("the hand has an unexpected acting seat")
             pending = coordinator.state.pending
@@ -233,9 +248,24 @@ class EphemeralDemoMatch:
                 await coordinator.open_decision(self._now() + _HUMAN_TIMEOUT)
                 return
             if self._now() >= pending.deadline_at:
+                before = snapshot
                 await coordinator.expire_decision()
-                continue
+                self._pause_after_action(before, self._require_snapshot(coordinator))
+                return
             return
+
+    def _pause_after_action(self, before: HandSnapshot, after: HandSnapshot) -> None:
+        self._bot_action_due_at = None
+        self._bot_action_seat = None
+        if after.completed:
+            self._presentation_due_at = None
+            return
+        delay = (
+            _STREET_OBSERVATION_DELAY
+            if after.street != before.street
+            else _ACTION_OBSERVATION_DELAY
+        )
+        self._presentation_due_at = self._now() + delay
 
     @staticmethod
     def _test_bot_endpoint(request: httpx.Request) -> httpx.Response:

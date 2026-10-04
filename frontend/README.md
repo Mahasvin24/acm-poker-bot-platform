@@ -23,7 +23,8 @@ Open <http://localhost:3000>. Useful routes are:
 - `/play` — tournament ID entry
 - `/play/demo` — self-contained table demo, with no backend or login required
 - `/demo-human-verus-bot` — full-screen, four-player real-engine match using the shared
-  production table; each of the three built-in bots exposes a visible seven-second turn
+  production table; paced deal/street transitions protect the human decision clock, and each
+  of the three built-in bots exposes a visible four-second turn
 - `/play/<tournament-id>` — authenticated live table
 
 The frontend sends `/api/v1/*` requests through the Next.js development server so browser

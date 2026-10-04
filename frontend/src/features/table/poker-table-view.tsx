@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./poker-table.module.css";
@@ -48,7 +49,11 @@ const handStages = [
 
 type HandStage = (typeof handStages)[number]["key"];
 
-const chips = new Intl.NumberFormat("en-US");
+const chips = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
 const suits: Record<string, string> = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const suitNames: Record<string, string> = {
   c: "clubs",
@@ -76,6 +81,21 @@ function formatChips(value: number): string {
 
 function actionCopy(action: ActionType): string {
   return action.charAt(0).toUpperCase() + action.slice(1);
+}
+
+function actionNarrative(
+  action: PlayerTableState["action_history"][number] | undefined,
+  names: Map<number, string>,
+): string | null {
+  if (!action) return null;
+  const name = names.get(action.seat) ?? `Seat ${action.seat}`;
+  const automatic = action.automatic ? " automatically" : "";
+  if (action.action === "fold") return `${name}${automatic} folded.`;
+  if (action.action === "check") return `${name}${automatic} checked.`;
+  if (action.action === "call") {
+    return `${name}${automatic} called${action.amount_to === null ? "" : ` to ${formatChips(action.amount_to)}`}.`;
+  }
+  return `${name}${automatic} raised${action.amount_to === null ? "" : ` to ${formatChips(action.amount_to)}`}.`;
 }
 
 function automaticActionCopy(failureReason: string | null): string {
@@ -260,6 +280,7 @@ function SeatView({
   latestAction,
   playerCount,
   winner,
+  showdownIndex,
 }: {
   seat: PlayerSeat;
   viewerSeat: number;
@@ -270,6 +291,7 @@ function SeatView({
   latestAction?: string;
   playerCount: number;
   winner: boolean;
+  showdownIndex: number;
 }) {
   const relativePosition = (seat.seat - viewerSeat + 6) % 6;
   const resultHand = result?.revealed_hands.find((hand) => hand.seat === seat.seat);
@@ -288,9 +310,11 @@ function SeatView({
         seat.folded ? styles.foldedSeat : "",
         seat.eliminated ? styles.eliminatedSeat : "",
         winner ? styles.winnerSeat : "",
+        resultHand ? styles.showdownSeat : "",
         playerCount === 2 && seat.seat !== viewerSeat ? styles.headsUpOpponent : "",
         playerCount === 4 ? styles[`fourSeatPosition${relativePosition}`] : "",
       ].join(" ")}
+      style={resultHand ? ({ "--showdown-delay": `${Math.max(0, showdownIndex) * 650}ms` } as CSSProperties) : undefined}
     >
       <div className={styles.seatCards} aria-label={`${seat.display_name}'s cards`}>
         {cards.slice(0, revealedCount).map((card) => (
@@ -397,10 +421,18 @@ export function PokerTableView({
 }: PokerTableViewProps) {
   const { phase, revealedBySeat, boardCount } = useTablePresentation(table, animateInitialDeal);
   const [now, setNow] = useState(() => Date.now());
+  const [railOpen, setRailOpen] = useState(true);
   const turn = turnFor(table);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 200);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (window.matchMedia("(max-width: 1100px)").matches) setRailOpen(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const names = useMemo(
@@ -430,6 +462,16 @@ export function PokerTableView({
   const activeStageIndex = handStages.findIndex((stage) => stage.key === activeStage);
   const turnName = turn ? names.get(turn.seat) ?? `Seat ${turn.seat}` : null;
   const turnLabel = resolving ? "Resolving action…" : statusLabel(phase, table, names);
+  const latestNarrative = actionNarrative(latest, names);
+  const tableUpdate = phase === "dealing-private"
+    ? "Blinds are posted. The dealer is giving every player 2 private cards."
+    : phase === "revealing-flop"
+      ? "The flop is being dealt: 3 shared cards for everyone to use."
+      : phase === "revealing-turn"
+        ? "The turn is being dealt: the 4th shared card."
+        : phase === "revealing-river"
+          ? "The river is being dealt: the final shared card."
+          : latestNarrative ?? "The table is preparing the next decision.";
 
   return (
     <div className={`${styles.shell} ${embedded ? styles.embeddedShell : ""} ${fullScreen ? styles.fullScreenShell : ""}`}>
@@ -448,13 +490,13 @@ export function PokerTableView({
         </header>
       )}
 
-      <main className={styles.gameLayout} id={embedded ? undefined : "main-content"}>
+      <main className={`${styles.gameLayout} ${railOpen ? "" : styles.railClosed}`} id={embedded ? undefined : "main-content"}>
         <section className={styles.tableColumn} aria-label="Poker table">
           <div className={`${styles.turnBanner} ${decisionReady ? styles.yourTurnBanner : ""}`}>
             <div className={styles.turnBannerCopy}>
               <span>{activeStage === "showdown" ? "Final result" : `Stage ${activeStageIndex + 1} of ${handStages.length}`}</span>
-              <strong aria-live="polite">{turnLabel}</strong>
-              {turnName && !resolving && <small>{turn?.seat === table.viewer_seat ? "Choose your action now" : `${turnName} has the clock`}</small>}
+              <h1 aria-live="polite">{turnLabel}</h1>
+              <small>{turnName && !resolving ? (turn?.seat === table.viewer_seat ? "Review the table, then choose your action" : `${turnName} has the clock`) : tableUpdate}</small>
             </div>
             <div className={styles.topClock}>
               {turn && !resolving ? <strong>{secondsLeft.toFixed(1)}<small>s</small></strong> : <strong>—</strong>}
@@ -462,6 +504,18 @@ export function PokerTableView({
                 <span style={{ width: `${timerPercent}%` }} />
               </div>
             </div>
+            <button
+              aria-controls="hand-details"
+              aria-expanded={railOpen}
+              aria-label={`${railOpen ? "Hide" : "Show"} hand details`}
+              className={styles.railToggle}
+              onClick={() => setRailOpen((open) => !open)}
+              title={`${railOpen ? "Hide" : "Show"} hand details`}
+              type="button"
+            >
+              <span aria-hidden="true">{railOpen ? "→" : "←"}</span>
+              {railOpen ? "Hide details" : "Show details"}
+            </button>
           </div>
 
           <ol className={styles.phaseTrack} aria-label="Hand stages">
@@ -485,6 +539,12 @@ export function PokerTableView({
           </div>
 
           <div className={styles.tableStage}>
+            {!turn && !result && (
+              <div className={styles.eventBanner} aria-live="polite">
+                <span>Table update</span>
+                <strong>{tableUpdate}</strong>
+              </div>
+            )}
             <div className={styles.felt}>
               <div className={styles.board}>
                 <span className={styles.potLabel}>Total Pot</span>
@@ -507,13 +567,14 @@ export function PokerTableView({
               <SeatView
                 seat={seat}
                 viewerSeat={table.viewer_seat}
-                actingSeat={table.acting_seat}
+                actingSeat={turn?.seat ?? null}
                 buttonSeat={table.button_seat}
                 revealedCount={revealedBySeat[seat.seat] ?? 0}
                 result={result}
                 latestAction={latest?.seat === seat.seat ? `${actionCopy(latest.action)}${latest.amount_to !== null ? ` ${formatChips(latest.amount_to)}` : ""}` : undefined}
                 playerCount={table.seats.length}
                 winner={winnerSeats.has(seat.seat)}
+                showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
                 key={seat.seat}
               />
             ))}
@@ -522,7 +583,7 @@ export function PokerTableView({
           <div className={`${styles.actionDock} ${decisionReady ? styles.yourTurn : ""}`}>
             <div className={styles.turnCopy}>
               <span>{decisionReady ? "Your options" : result ? "Hand settled" : "Table update"}</span>
-              <strong>{decisionReady ? "Act before the clock expires" : result ? "Winner confirmed" : "Waiting for the next decision"}</strong>
+              <strong>{decisionReady ? "The table is yours—review the pot, then act" : result ? "Winner confirmed" : tableUpdate}</strong>
               {notice && <p aria-live="polite" className={styles.notice}>{notice}</p>}
               {error && <p className={styles.errorNotice} role="alert">Connection interrupted · Retrying… {error}</p>}
             </div>
@@ -564,7 +625,7 @@ export function PokerTableView({
           </div>
         </section>
 
-        <aside className={styles.handRail}>
+        <aside className={styles.handRail} hidden={!railOpen} id="hand-details">
           <div className={styles.railHead}>
             <div><span>Current hand</span><strong>#{table.hand_number}</strong></div>
             <span>{table.street}</span>
@@ -635,10 +696,13 @@ function RaiseControl({
         <label htmlFor={`raise-${decisionId}`}>Raise to</label>
         <input
           aria-label="Raise amount"
+          autoComplete="off"
           disabled={disabled}
           id={`raise-${decisionId}`}
+          inputMode="numeric"
           max={max}
           min={min}
+          name={`raise-${decisionId}`}
           onBlur={() => setAmountText(String(clamp(Number(amountText) || min)))}
           onChange={(event) => setAmountText(event.target.value)}
           step={1}
@@ -652,6 +716,7 @@ function RaiseControl({
         disabled={disabled}
         max={max}
         min={min}
+        name={`raise-slider-${decisionId}`}
         onChange={(event) => setAmountText(event.target.value)}
         step={1}
         type="range"

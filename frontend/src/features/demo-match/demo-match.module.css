@@ -40,6 +40,8 @@
 .liveControls > div { display: grid; padding: 0 8px 8px; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .liveControls button { min-height: 32px; border: 1px solid #9fa59f; background: transparent; color: inherit; cursor: pointer; font: 700 7px/1 monospace; text-transform: uppercase; }
 .liveControls button:hover:not(:disabled) { border-color: #bd493b; color: #bd493b; }
+.liveControls button:focus-visible,
+.liveControls summary:focus-visible { outline: 3px solid #bd493b; outline-offset: 2px; }
 .liveControls button:disabled { cursor: not-allowed; opacity: 0.42; }
 
 .header {
@@ -95,6 +97,8 @@
 .empty button { background: var(--demo-ink); color: var(--demo-paper); }
 .controlBar button:hover:not(:disabled),
 .empty button:hover:not(:disabled) { border-color: var(--demo-red); background: var(--demo-red); color: white; }
+.controlBar button:focus-visible,
+.empty button:focus-visible { outline: 3px solid var(--demo-red); outline-offset: 3px; }
 .controlBar button:disabled,
 .empty button:disabled { cursor: not-allowed; opacity: 0.42; }
 .controlDivider { width: 1px; height: 30px; margin: 0 8px; background: rgb(20 36 29 / 24%); }
