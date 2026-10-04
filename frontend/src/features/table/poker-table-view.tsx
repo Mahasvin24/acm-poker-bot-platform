@@ -438,9 +438,8 @@ function statusLabel(
 }
 
 function ResultPanel({ result, names }: { result: HandResult; names: Map<number, string> }) {
-  const winners = result.awards
-    .filter((award) => award.amount > 0)
-    .map((award) => names.get(award.seat) ?? `Seat ${award.seat}`);
+  const winners = result.winner_seats
+    .map((seat) => names.get(seat) ?? `Seat ${seat}`);
   const winnerHeadline = winners.length > 1
     ? `${winners.join(" + ")} split the pot`
     : winners[0] === "You" ? "You win" : `${winners[0] ?? "Winner"} wins`;
@@ -450,12 +449,15 @@ function ResultPanel({ result, names }: { result: HandResult; names: Map<number,
       <h2>{winnerHeadline}</h2>
       {result.synthetic && <p>This result was forced for testing and was not determined by hand strength.</p>}
       {result.reason === "fold" && <p>The remaining player won after every opponent folded.</p>}
-      {result.awards.map((award) => (
-        <p key={award.seat}>
-          <strong>{names.get(award.seat) ?? `Seat ${award.seat}`}</strong> collected {formatChips(award.amount)}
-          <small>{award.net >= 0 ? "+" : ""}{formatChips(award.net)} net</small>
-        </p>
-      ))}
+      {result.awards.map((award) => {
+        const wonPot = result.winner_seats.includes(award.seat);
+        return (
+          <p key={award.seat}>
+            <strong>{names.get(award.seat) ?? `Seat ${award.seat}`}</strong> {wonPot ? "collected" : "had"} {formatChips(award.amount)}{wonPot ? "" : " returned"}
+            <small>{award.net >= 0 ? "+" : ""}{formatChips(award.net)} net</small>
+          </p>
+        );
+      })}
       {!result.synthetic && (
         <p className={styles.settlementNote}>
           Only matched chips in the pot are awarded. Chips a player never committed stay in their stack.
@@ -515,7 +517,7 @@ export function PokerTableView({
   const latest = recentActions[0];
   const result = table.hand_result ?? null;
   const winnerSeats = useMemo(
-    () => new Set(result?.awards.filter((award) => award.amount > 0).map((award) => award.seat) ?? []),
+    () => new Set(result?.winner_seats ?? []),
     [result],
   );
   const boardBest = new Set(result?.revealed_hands.flatMap((hand) => hand.best_five) ?? []);

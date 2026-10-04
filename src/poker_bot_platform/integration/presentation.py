@@ -44,6 +44,7 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
     live_hands = [seat for seat in snapshot.seats if seat.hole_cards and not seat.folded]
     folded = len(live_hands) <= 1
     revealed: list[RevealedHandResponse] = []
+    ranked_hands: list[tuple[int, StandardHighHand]] = []
     if not folded:
         for seat in live_hands:
             try:
@@ -53,6 +54,7 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
                 )
             except ValueError:
                 continue
+            ranked_hands.append((seat.seat, hand))
             revealed.append(
                 RevealedHandResponse(
                     seat=seat.seat,
@@ -62,8 +64,21 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
                 )
             )
 
+    if folded:
+        winner_seats = tuple(seat.seat for seat in live_hands)
+    elif ranked_hands and not snapshot.side_pots:
+        best_hand = max(hand for _, hand in ranked_hands)
+        winner_seats = tuple(
+            seat_number for seat_number, hand in ranked_hands if hand == best_hand
+        )
+    else:
+        # A side-pot winner can hold a weaker hand than the main-pot winner.
+        # In that case, PokerKit's pot awards remain the authoritative source.
+        winner_seats = tuple(award.seat for award in awards)
+
     return HandResultResponse(
         reason="fold" if folded else "showdown",
         awards=tuple(awards),
+        winner_seats=winner_seats,
         revealed_hands=tuple(revealed),
     )

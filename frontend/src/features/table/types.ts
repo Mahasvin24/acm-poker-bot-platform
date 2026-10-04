@@ -38,6 +38,7 @@ export interface RevealedHand {
 export interface HandResult {
   reason: "showdown" | "fold" | "forced";
   awards: HandAward[];
+  winner_seats: number[];
   revealed_hands: RevealedHand[];
   synthetic: boolean;
 }

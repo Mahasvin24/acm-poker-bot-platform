@@ -171,6 +171,7 @@ class RevealedHandResponse(ApiModel):
 class HandResultResponse(ApiModel):
     reason: Literal["showdown", "fold", "forced"]
     awards: tuple[HandAwardResponse, ...]
+    winner_seats: tuple[int, ...] = ()
     revealed_hands: tuple[RevealedHandResponse, ...] = ()
     synthetic: bool = False
 

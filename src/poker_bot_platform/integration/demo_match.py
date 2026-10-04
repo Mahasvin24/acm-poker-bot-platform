@@ -434,6 +434,7 @@ class EphemeralDemoMatch:
                             net=total_chips - _STARTING_STACK,
                         ),
                     ),
+                    winner_seats=(winner_seat,),
                     revealed_hands=tuple(
                         RevealedHandResponse(
                             seat=seat.seat,

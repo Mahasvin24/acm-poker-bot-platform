@@ -299,6 +299,51 @@ def test_all_in_from_forced_bets_preserves_private_cards_for_recovery() -> None:
     assert engine.restore(transition.snapshot) == transition.snapshot
 
 
+def test_fully_called_river_raise_crowns_only_the_best_hand() -> None:
+    """Regression for the demo hand whose three trailing stacks retain 200 each."""
+
+    engine = PokerKitEngine()
+    snapshot = engine.start_hand(
+        _request(
+            _seat(1, 20_000),
+            _seat(2, 20_000),
+            _seat(3, 20_000),
+            _seat(4, 20_000),
+            button=4,
+            small_blind=100,
+            big_blind=200,
+            big_blind_ante=200,
+            deck=_deck(
+                # Seat 1: 9c Ah (three nines); seat 2: 2d 2h (full house).
+                "9c", "2d", "3c", "As", "Ah", "2h", "4c", "Ks",
+                "5c", "9h", "9d", "2c", "5d", "3d", "6c", "4s",
+            ),
+        )
+    ).snapshot
+
+    # Four pre-flop actions, followed by two checked streets.
+    for action in (*([ActionType.CALL] * 3), ActionType.CHECK, *([ActionType.CHECK] * 8)):
+        snapshot = _act(engine, snapshot, action).snapshot
+
+    snapshot = _act(engine, snapshot, ActionType.RAISE, 19_600).snapshot
+    for _ in range(3):
+        snapshot = _act(engine, snapshot, ActionType.CALL).snapshot
+
+    assert snapshot.completed
+    assert {seat.seat: seat.stack for seat in snapshot.seats} == {
+        1: 200,
+        2: 79_400,
+        3: 200,
+        4: 200,
+    }
+    result = natural_hand_result(snapshot)
+    assert result is not None
+    assert result.winner_seats == (2,)
+    assert [(award.seat, award.amount, award.net) for award in result.awards] == [
+        (2, 79_400, 59_400),
+    ]
+
+
 def test_folded_hand_does_not_publish_opponent_cards() -> None:
     engine = PokerKitEngine()
     snapshot = engine.start_hand(_request(_seat(1), _seat(2), button=2)).snapshot
