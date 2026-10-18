@@ -1532,7 +1532,7 @@
   box-shadow: 0 18px 48px rgb(9 35 27 / 18%);
 }
 
-.finishOverlay span {
+.finishOverlay > div > span {
   color: var(--table-red);
   font: 700 9px/1 monospace;
   letter-spacing: 0.12em;
@@ -1583,9 +1583,36 @@
   font-size: 11px;
 }
 
+.finishActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.finishActions button,
+.finishReopen {
+  padding: 12px 14px;
+  border: 1px solid rgb(23 35 30 / 35%);
+  background: transparent;
+  color: var(--table-ink);
+  cursor: pointer;
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.finishReopen {
+  position: absolute;
+  z-index: 20;
+  top: 16px;
+  right: 16px;
+  background: #fffaf1;
+}
+
 .finishOverlay a {
   justify-self: start;
-  margin-top: 8px;
   padding: 13px 16px;
   background: var(--table-green);
   color: white;

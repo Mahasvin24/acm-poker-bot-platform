@@ -95,12 +95,24 @@ function actionCopy(action: ActionType, betting: boolean): string {
   return action.charAt(0).toUpperCase() + action.slice(1);
 }
 
-function historyActionCopy(action: ActionType): string {
-  return action === "raise" ? "Bet/raise" : action.charAt(0).toUpperCase() + action.slice(1);
+type HistoryEntry = PlayerTableState["action_history"][number];
+
+/** A raise is a "bet" when nobody has bet earlier on the same post-flop street. */
+function isOpeningBet(action: HistoryEntry, history: HistoryEntry[]): boolean {
+  if (action.action !== "raise" || !action.street || action.street === "preflop") return false;
+  return !history.some(
+    (other) => other.sequence < action.sequence && other.street === action.street && other.action === "raise",
+  );
+}
+
+function actionLabel(action: HistoryEntry, history: HistoryEntry[]): string {
+  if (action.action === "raise") return isOpeningBet(action, history) ? "Bet" : "Raise";
+  return action.action.charAt(0).toUpperCase() + action.action.slice(1);
 }
 
 function actionNarrative(
-  action: PlayerTableState["action_history"][number] | undefined,
+  action: HistoryEntry | undefined,
+  history: HistoryEntry[],
   names: Map<number, string>,
 ): string | null {
   if (!action) return null;
@@ -109,7 +121,8 @@ function actionNarrative(
   if (action.action === "fold") return `${name}${automatic} folded.`;
   if (action.action === "check") return `${name}${automatic} checked.`;
   if (action.action === "call") return `${name}${automatic} called.`;
-  return `${name}${automatic} bet or raised to ${formatChips(action.amount_to ?? 0)}.`;
+  const verb = isOpeningBet(action, history) ? "bet" : "raised to";
+  return `${name}${automatic} ${verb} ${formatChips(action.amount_to ?? 0)}.`;
 }
 
 function automaticActionCopy(failureReason: string | null): string {
@@ -513,10 +526,18 @@ function ResultPanel({ result, names, title }: { result: HandResult; names: Map<
 }
 
 function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref: string }) {
+  const [hidden, setHidden] = useState(false);
   const viewer = table.viewer;
   const standings = table.match?.standings ?? [];
   const finished = table.match_status === "completed" || table.match_status === "cancelled";
   if (!finished && viewer?.status !== "eliminated") return null;
+  if (hidden) {
+    return (
+      <button className={styles.finishReopen} onClick={() => setHidden(false)} type="button">
+        Show standings
+      </button>
+    );
+  }
   const headline = viewer?.status === "winner"
     ? "You won the match"
     : viewer?.finish_position
@@ -541,7 +562,12 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
             ))}
           </ol>
         )}
-        <Link href={exitHref}>Back to dashboard</Link>
+        <div className={styles.finishActions}>
+          <Link href={exitHref}>Back to dashboard</Link>
+          <button onClick={() => setHidden(true)} type="button">
+            {finished ? "See the final hand" : "Keep watching"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -629,7 +655,7 @@ export function PokerTableView({
   const activeStageIndex = handStages.findIndex((stage) => stage.key === activeStage);
   const turnName = turn ? names.get(turn.seat) ?? `Seat ${turn.seat}` : null;
   const turnLabel = resolving ? "Resolving action…" : statusLabel(phase, table, names, waitSeconds);
-  const latestNarrative = actionNarrative(latest, names);
+  const latestNarrative = actionNarrative(latest, table.action_history, names);
   const banner = statusBanner(table);
   const spectating = table.viewer_seat === null || table.viewer?.status !== "seated";
   const tableUpdate = phase === "dealing-private"
@@ -789,7 +815,7 @@ export function PokerTableView({
                 buttonSeat={table.button_seat}
                 revealedCount={revealedBySeat[seat.seat] ?? 0}
                 result={result}
-                latestAction={latest?.seat === seat.seat ? `${historyActionCopy(latest.action)}${latest.amount_to !== null ? ` ${formatChips(latest.amount_to)}` : ""}` : undefined}
+                latestAction={latest?.seat === seat.seat ? `${actionLabel(latest, table.action_history)}${latest.amount_to !== null ? ` ${formatChips(latest.amount_to)}` : ""}` : undefined}
                 playerCount={table.seats.length}
                 winner={winnerSeats.has(seat.seat)}
                 showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
@@ -900,7 +926,7 @@ export function PokerTableView({
                     <strong>{names.get(action.seat) ?? `Seat ${action.seat}`}</strong>
                     <p>
                       {action.street ? `${action.street} · ` : ""}
-                      {historyActionCopy(action.action)}{action.amount_to !== null ? ` to ${formatChips(action.amount_to)}` : ""}
+                      {actionLabel(action, table.action_history)}{action.amount_to !== null ? ` to ${formatChips(action.amount_to)}` : ""}
                       {action.automatic ? ` · ${automaticActionCopy(action.failure_reason)}` : ""}
                     </p>
                   </div>

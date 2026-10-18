@@ -21,6 +21,10 @@
   border-bottom: 1px solid rgb(23 35 30 / 22%);
 }
 
+.header > :last-child {
+  justify-self: end;
+}
+
 .wordmark {
   justify-self: start;
   color: inherit;

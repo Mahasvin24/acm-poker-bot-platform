@@ -140,6 +140,7 @@ export function AdminMatchConsole({ matchId }: { matchId: string }) {
           </div>
         </section>
 
+        {(!over || notice || error) && (
         <section className={styles.commandBar} aria-label="Match controls">
           {match.status === "lobby" && (
             <>
@@ -175,6 +176,7 @@ export function AdminMatchConsole({ matchId }: { matchId: string }) {
           {notice && <span className={styles.successMessage} role="status">{notice}</span>}
           {error && <span className={styles.formError} role="alert">{error}</span>}
         </section>
+        )}
 
         <div className={styles.consoleGrid}>
           <section className={styles.panel}>

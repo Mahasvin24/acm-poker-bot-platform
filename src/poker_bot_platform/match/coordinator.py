@@ -27,6 +27,14 @@ from poker_bot_platform.match.models import (
 from poker_bot_platform.match.store import MatchStore
 
 _STANDARD_DECK = tuple(f"{rank}{suit}" for rank in "23456789TJQKA" for suit in "cdhs")
+# Seats spread evenly around the six-seat table so short-handed matches look balanced.
+_SPREAD_SEATS = {
+    2: (1, 4),
+    3: (1, 3, 5),
+    4: (1, 2, 4, 5),
+    5: (1, 2, 3, 4, 5),
+    6: (1, 2, 3, 4, 5, 6),
+}
 _TERMINAL = frozenset({MatchStatus.COMPLETED, MatchStatus.CANCELLED})
 
 
@@ -158,7 +166,7 @@ class MatchCoordinator:
                     seat=seat,
                     stack=state.config.starting_stack,
                 )
-                for seat, entry in enumerate(entries, start=1)
+                for seat, entry in zip(_SPREAD_SEATS[len(entries)], entries, strict=True)
             )
             table = MatchTable(
                 table_id=f"{state.match_id}-table",
