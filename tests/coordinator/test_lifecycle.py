@@ -16,13 +16,11 @@ from poker_bot_platform.domain import (
     PlayerAction,
     StartHandRequest,
     TableStatus,
-    TournamentStatus,
 )
 from poker_bot_platform.engine import FakePokerEngine
 from poker_bot_platform.persistence import (
     InMemoryTableRepository,
     PersistenceError,
-    StatusConflictError,
     VersionConflictError,
 )
 
@@ -131,39 +129,6 @@ async def test_next_hand_repository_commit_is_idempotent(
     assert second.idempotent
     assert first.snapshot == second.snapshot
     assert len(repository.events) == event_count
-
-
-@pytest.mark.asyncio
-async def test_tournament_updates_use_status_and_version_compare_and_swap(
-    repository: InMemoryTableRepository,
-) -> None:
-    initial = await repository.load_tournament("tournament-1")
-    assert initial.version == 0
-    updated = await repository.update_tournament(
-        "tournament-1",
-        expected_version=0,
-        expected_status=TournamentStatus.DRAFT,
-        status=TournamentStatus.REGISTRATION_OPEN,
-        config={"starting_stack": 30_000},
-    )
-    assert updated.version == 1
-    assert updated.status is TournamentStatus.REGISTRATION_OPEN
-    assert updated.config == {"starting_stack": 30_000}
-
-    with pytest.raises(VersionConflictError):
-        await repository.update_tournament(
-            "tournament-1",
-            expected_version=0,
-            expected_status=TournamentStatus.DRAFT,
-            status=TournamentStatus.SEATED,
-        )
-    with pytest.raises(StatusConflictError):
-        await repository.update_tournament(
-            "tournament-1",
-            expected_version=1,
-            expected_status=TournamentStatus.DRAFT,
-            status=TournamentStatus.SEATED,
-        )
 
 
 @pytest.mark.asyncio

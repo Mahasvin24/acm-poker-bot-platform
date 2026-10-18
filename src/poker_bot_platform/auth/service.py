@@ -11,20 +11,21 @@ from typing import Protocol
 
 from pwdlib import PasswordHash
 
-from poker_bot_platform.auth.models import Account, Entrant
+from poker_bot_platform.auth.models import Account, BotProfile
 from poker_bot_platform.auth.repository import (
     AuthConflictError,
     AuthNotFoundError,
     AuthRepository,
 )
 from poker_bot_platform.bots import BotEndpoint, VerificationOutcome
+from poker_bot_platform.bots.messages import explain_failure
 from poker_bot_platform.bots.network import validate_bot_endpoint
 from poker_bot_platform.bots.tokens import (
     EncryptedTokenStore,
     generate_bearer_token,
     generate_verification_challenge,
 )
-from poker_bot_platform.domain import EntryKind, Role
+from poker_bot_platform.domain import Role
 
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -122,6 +123,30 @@ class AuthService:
             raise InvalidSessionError("session account no longer exists")
         return account
 
+    async def change_password(
+        self,
+        account: Account,
+        current_password: str,
+        new_password: str,
+    ) -> Account:
+        if not self.passwords.verify(current_password, account.password_hash):
+            raise InvalidCredentialsError("current password is incorrect")
+        return await self.repository.set_password_hash(
+            account.id,
+            self.passwords.hash(new_password),
+        )
+
+    async def list_accounts(self) -> tuple[Account, ...]:
+        return await self.repository.list_accounts()
+
+    async def reset_password(self, account_id: str) -> str:
+        """Set a temporary password, sign the account out everywhere, and return it once."""
+
+        temporary = secrets.token_urlsafe(12)
+        await self.repository.set_password_hash(account_id, self.passwords.hash(temporary))
+        await self.repository.revoke_account_sessions(account_id, self._now())
+        return temporary
+
     def _now(self) -> datetime:
         value = self._clock()
         if value.tzinfo is None or value.utcoffset() is None:
@@ -139,12 +164,14 @@ class BotVerificationClient(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class BotRegistrationResult:
-    entrant: Entrant
+class BotTokenResult:
+    profile: BotProfile
     bearer_token: str
 
 
-class EntrantService:
+class BotProfileService:
+    """Owner-facing lifecycle for reusable participant bots."""
+
     def __init__(
         self,
         repository: AuthRepository,
@@ -162,93 +189,118 @@ class EntrantService:
         self.verifier = verifier
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    async def register(
+    async def list(self, account_id: str) -> tuple[BotProfile, ...]:
+        return await self.repository.list_bot_profiles(account_id)
+
+    async def get(self, account_id: str, profile_id: str) -> BotProfile:
+        return await self._owned(account_id, profile_id)
+
+    async def create(self, account_id: str, name: str, ip: str, port: int) -> BotTokenResult:
+        clean_name = _clean_name(name)
+        endpoint = self._validate(ip, port)
+        token = generate_bearer_token()
+        profile = await self.repository.create_bot_profile(
+            account_id,
+            clean_name,
+            str(endpoint.ip),
+            endpoint.port,
+            self.token_store.encrypt(token),
+        )
+        return BotTokenResult(profile=profile, bearer_token=token)
+
+    async def update(
         self,
         account_id: str,
-        tournament_id: str,
-        kind: EntryKind,
-        display_name: str,
-    ) -> Entrant:
-        clean_name = display_name.strip()
-        if not clean_name or len(clean_name) > 80:
-            raise ValueError("display name must contain between 1 and 80 characters")
-        return await self.repository.create_entrant(
-            account_id,
-            tournament_id,
-            kind,
-            clean_name,
+        profile_id: str,
+        *,
+        name: str | None = None,
+        ip: str | None = None,
+        port: int | None = None,
+    ) -> BotProfile:
+        current = await self._owned(account_id, profile_id)
+        clean_name = _clean_name(name) if name is not None else None
+        endpoint = None
+        if ip is not None or port is not None:
+            endpoint = self._validate(
+                ip if ip is not None else current.bot_ip,
+                port if port is not None else current.bot_port,
+            )
+        changed_endpoint = endpoint is not None and (
+            str(endpoint.ip) != current.bot_ip or endpoint.port != current.bot_port
+        )
+        return await self.repository.update_bot_profile(
+            profile_id,
+            name=clean_name,
+            ip=str(endpoint.ip) if changed_endpoint and endpoint else None,
+            port=endpoint.port if changed_endpoint and endpoint else None,
         )
 
-    async def current(self, account_id: str, tournament_id: str) -> Entrant:
-        return await self._owned_entrant(account_id, tournament_id)
+    async def rotate_token(self, account_id: str, profile_id: str) -> BotTokenResult:
+        await self._owned(account_id, profile_id)
+        token = generate_bearer_token()
+        profile = await self.repository.update_bot_profile(
+            profile_id,
+            token_ciphertext=self.token_store.encrypt(token),
+        )
+        return BotTokenResult(profile=profile, bearer_token=token)
 
-    async def configure_bot(
-        self,
-        account_id: str,
-        tournament_id: str,
-        ip: str,
-        port: int,
-    ) -> BotRegistrationResult:
-        entrant = await self._owned_entrant(account_id, tournament_id)
-        if entrant.kind is not EntryKind.BOT:
-            raise AuthConflictError("only bot entrants can configure an endpoint")
-        endpoint = validate_bot_endpoint(
+    async def delete(self, account_id: str, profile_id: str) -> None:
+        await self._owned(account_id, profile_id)
+        await self.repository.delete_bot_profile(profile_id)
+
+    async def verify(self, account_id: str, profile_id: str) -> BotProfile:
+        if self.verifier is None:
+            raise BotVerificationError("bot verification client is not configured")
+        profile = await self._owned(account_id, profile_id)
+        try:
+            endpoint = self._validate(profile.bot_ip, profile.bot_port)
+        except ValueError as exc:
+            await self.repository.record_bot_verification(
+                profile_id,
+                profile.bot_token_ciphertext,
+                verified_at=None,
+                error=str(exc),
+            )
+            raise BotVerificationError(str(exc)) from exc
+        token = self.token_store.decrypt(profile.bot_token_ciphertext)
+        outcome = await self.verifier.verify(endpoint, token, generate_verification_challenge())
+        if not outcome.verified:
+            message = explain_failure(outcome.failure_reason)
+            await self.repository.record_bot_verification(
+                profile_id,
+                profile.bot_token_ciphertext,
+                verified_at=None,
+                error=message,
+            )
+            raise BotVerificationError(message)
+        return await self.repository.record_bot_verification(
+            profile_id,
+            profile.bot_token_ciphertext,
+            verified_at=self._now(),
+            error=None,
+        )
+
+    def endpoint_for(self, profile: BotProfile) -> BotEndpoint:
+        return self._validate(profile.bot_ip, profile.bot_port)
+
+    def _validate(self, ip: str, port: int) -> BotEndpoint:
+        return validate_bot_endpoint(
             ip,
             port,
             participant_subnet=self.participant_subnet,
             blocked_ips=self.blocked_ips,
         )
-        token = generate_bearer_token()
-        updated = await self.repository.configure_bot(
-            entrant.id,
-            str(endpoint.ip),
-            endpoint.port,
-            self.token_store.encrypt(token),
-        )
-        return BotRegistrationResult(entrant=updated, bearer_token=token)
 
-    async def verify_bot(self, account_id: str, tournament_id: str) -> Entrant:
-        if self.verifier is None:
-            raise BotVerificationError("bot verification client is not configured")
-        entrant = await self._owned_entrant(account_id, tournament_id)
-        if (
-            entrant.kind is not EntryKind.BOT
-            or entrant.bot_ip is None
-            or entrant.bot_port is None
-            or entrant.bot_token_ciphertext is None
-        ):
-            raise BotVerificationError("bot endpoint is not configured")
-        endpoint = validate_bot_endpoint(
-            entrant.bot_ip,
-            entrant.bot_port,
-            participant_subnet=self.participant_subnet,
-            blocked_ips=self.blocked_ips,
-        )
-        token = self.token_store.decrypt(entrant.bot_token_ciphertext)
-        outcome = await self.verifier.verify(
-            endpoint,
-            token,
-            generate_verification_challenge(),
-        )
-        if not outcome.verified:
-            reason = outcome.failure_reason.value if outcome.failure_reason else "unknown"
-            raise BotVerificationError(f"bot verification failed: {reason}")
-        return await self.repository.mark_bot_verified(
-            entrant.id,
-            entrant.bot_token_ciphertext,
-            self._now(),
-        )
-
-    async def _owned_entrant(self, account_id: str, tournament_id: str) -> Entrant:
-        entrant = await self.repository.get_entrant(account_id, tournament_id)
-        if entrant is None:
-            raise AuthNotFoundError("entrant not found")
-        return entrant
+    async def _owned(self, account_id: str, profile_id: str) -> BotProfile:
+        profile = await self.repository.get_bot_profile(profile_id)
+        if profile is None or profile.account_id != account_id:
+            raise AuthNotFoundError("bot not found")
+        return profile
 
     def _now(self) -> datetime:
         value = self._clock()
         if value.tzinfo is None or value.utcoffset() is None:
-            raise RuntimeError("entrant clock must return a timezone-aware datetime")
+            raise RuntimeError("bot profile clock must return a timezone-aware datetime")
         return value
 
 
@@ -278,12 +330,19 @@ async def bootstrap_admin(
 def normalize_email(value: str) -> str:
     normalized = value.strip().casefold()
     if len(normalized) > 320 or not _EMAIL_PATTERN.fullmatch(normalized):
-        raise ValueError("invalid email address")
+        raise ValueError("enter a valid email address")
     return normalized
 
 
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _clean_name(value: str) -> str:
+    clean = " ".join(value.split())
+    if not clean or len(clean) > 80:
+        raise ValueError("name must contain between 1 and 80 characters")
+    return clean
 
 
 def _validate_password(password: str) -> None:

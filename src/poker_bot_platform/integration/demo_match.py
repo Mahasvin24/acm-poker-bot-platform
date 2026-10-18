@@ -26,18 +26,18 @@ from poker_bot_platform.coordinator import InvalidActionError, TableCoordinator
 from poker_bot_platform.domain import (
     EntryKind,
     HandSnapshot,
+    MatchStatus,
     PlayerAction,
     SeatState,
     StartHandRequest,
     TableStatus,
-    TournamentStatus,
 )
 from poker_bot_platform.engine import PokerKitEngine
 from poker_bot_platform.integration.actors import BotActor
 from poker_bot_platform.integration.presentation import natural_hand_result
 from poker_bot_platform.persistence import InMemoryTableRepository
 
-_TOURNAMENT_ID = "ephemeral-human-versus-bot"
+_MATCH_ID = "ephemeral-human-versus-bot"
 _TABLE_ID = "ephemeral-four-player-table"
 _HUMAN_ENTRANT_ID = "ephemeral-human"
 _HUMAN_SEAT = 1
@@ -81,9 +81,7 @@ class DemoMatchSessions:
         async with self._lock:
             now = self._clock()
             expired = [
-                key
-                for key, (_match, seen) in self._matches.items()
-                if now - seen > self._idle_ttl
+                key for key, (_match, seen) in self._matches.items() if now - seen > self._idle_ttl
             ]
             for key in expired:
                 await self._matches.pop(key)[0].aclose()
@@ -140,11 +138,6 @@ class EphemeralDemoMatch:
     async def start(self) -> DemoMatchStateResponse:
         async with self._lock:
             repository = InMemoryTableRepository()
-            await repository.create_tournament(
-                _TOURNAMENT_ID,
-                {"starting_stack": _STARTING_STACK, "ephemeral": True},
-                status=TournamentStatus.RUNNING,
-            )
             coordinator = TableCoordinator(
                 _TABLE_ID,
                 PokerKitEngine(),
@@ -157,7 +150,7 @@ class EphemeralDemoMatch:
             button_seat = secrets.choice((_HUMAN_SEAT, *_BOT_SEATS))
             await coordinator.start_table(
                 StartHandRequest(
-                    tournament_id=_TOURNAMENT_ID,
+                    match_id=_MATCH_ID,
                     table_id=_TABLE_ID,
                     hand_id="ephemeral-hand-1",
                     hand_number=1,
@@ -324,6 +317,7 @@ class EphemeralDemoMatch:
                 decision_id=pending.decision_id,
                 table_version=pending.table_version,
                 deadline_at=pending.deadline_at,
+                duration_ms=int(_HUMAN_TIMEOUT.total_seconds() * 1000),
                 legal_actions=pending.legal_actions,
             )
         turn = None
@@ -343,10 +337,8 @@ class EphemeralDemoMatch:
             )
         completed = snapshot.completed
         return PlayerTableStateResponse(
-            tournament_id=snapshot.tournament_id,
-            tournament_status=(
-                TournamentStatus.COMPLETED if completed else TournamentStatus.RUNNING
-            ),
+            match_id=snapshot.match_id,
+            match_status=(MatchStatus.COMPLETED if completed else MatchStatus.RUNNING),
             table_status=TableStatus.COMPLETED if completed else TableStatus.RUNNING,
             table_id=snapshot.table_id,
             hand_id=snapshot.hand_id,

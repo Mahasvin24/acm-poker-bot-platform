@@ -47,7 +47,7 @@ def _request(
     big_blind_ante: int = 0,
 ) -> StartHandRequest:
     return StartHandRequest(
-        tournament_id="tournament-1",
+        match_id="tournament-1",
         table_id="table-1",
         hand_id="hand-1",
         hand_number=1,
@@ -315,8 +315,22 @@ def test_fully_called_river_raise_crowns_only_the_best_hand() -> None:
             big_blind_ante=200,
             deck=_deck(
                 # Seat 1: 9c Ah (three nines); seat 2: 2d 2h (full house).
-                "9c", "2d", "3c", "As", "Ah", "2h", "4c", "Ks",
-                "5c", "9h", "9d", "2c", "5d", "3d", "6c", "4s",
+                "9c",
+                "2d",
+                "3c",
+                "As",
+                "Ah",
+                "2h",
+                "4c",
+                "Ks",
+                "5c",
+                "9h",
+                "9d",
+                "2c",
+                "5d",
+                "3d",
+                "6c",
+                "4s",
             ),
         )
     ).snapshot

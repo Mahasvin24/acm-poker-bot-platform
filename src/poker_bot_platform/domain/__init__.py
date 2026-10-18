@@ -1,3 +1,9 @@
+from poker_bot_platform.domain.match import (
+    BOT_ACTION_TIMEOUT_MS,
+    BOT_CONNECT_TIMEOUT_MS,
+    BlindLevel,
+    MatchConfig,
+)
 from poker_bot_platform.domain.models import (
     ActionRecord,
     ActionType,
@@ -7,6 +13,7 @@ from poker_bot_platform.domain.models import (
     FailureReason,
     HandSnapshot,
     LegalAction,
+    MatchStatus,
     PendingDecision,
     PlayerAction,
     Role,
@@ -15,11 +22,11 @@ from poker_bot_platform.domain.models import (
     StartHandRequest,
     Street,
     TableStatus,
-    TournamentStatus,
 )
-from poker_bot_platform.domain.tournament import BlindLevel, TournamentConfig, default_blind_levels
 
 __all__ = [
+    "BOT_ACTION_TIMEOUT_MS",
+    "BOT_CONNECT_TIMEOUT_MS",
     "ActionRecord",
     "ActionType",
     "BlindLevel",
@@ -29,6 +36,8 @@ __all__ = [
     "FailureReason",
     "HandSnapshot",
     "LegalAction",
+    "MatchConfig",
+    "MatchStatus",
     "PendingDecision",
     "PlayerAction",
     "Role",
@@ -37,7 +46,4 @@ __all__ = [
     "StartHandRequest",
     "Street",
     "TableStatus",
-    "TournamentConfig",
-    "TournamentStatus",
-    "default_blind_levels",
 ]

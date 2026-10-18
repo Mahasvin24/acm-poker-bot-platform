@@ -10,7 +10,6 @@ from poker_bot_platform.domain import (
     HandSnapshot,
     PendingDecision,
     TableStatus,
-    TournamentStatus,
 )
 
 
@@ -35,14 +34,6 @@ class StatusConflictError(PersistenceError):
 
 
 @dataclass(frozen=True, slots=True)
-class PersistedTournamentState:
-    tournament_id: str
-    status: TournamentStatus
-    config: dict[str, object]
-    version: int
-
-
-@dataclass(frozen=True, slots=True)
 class PersistedTableState:
     snapshot: HandSnapshot
     status: TableStatus
@@ -63,26 +54,6 @@ class HandStartCommitResult:
 
 
 class TableRepository(Protocol):
-    async def create_tournament(
-        self,
-        tournament_id: str,
-        config: dict[str, object],
-        *,
-        status: TournamentStatus = TournamentStatus.DRAFT,
-    ) -> PersistedTournamentState: ...
-
-    async def load_tournament(self, tournament_id: str) -> PersistedTournamentState: ...
-
-    async def update_tournament(
-        self,
-        tournament_id: str,
-        *,
-        expected_version: int,
-        expected_status: TournamentStatus,
-        status: TournamentStatus | None = None,
-        config: dict[str, object] | None = None,
-    ) -> PersistedTournamentState: ...
-
     async def create_table(
         self,
         snapshot: HandSnapshot,
@@ -108,7 +79,7 @@ class TableRepository(Protocol):
         *,
         expected_version: int,
         expected_status: TableStatus,
-        tournament_id: str,
+        match_id: str,
         detail: str,
     ) -> TableStatus: ...
 
@@ -137,7 +108,7 @@ class TableRepository(Protocol):
         actor_id: str,
         command: str,
         outcome: str,
-        tournament_id: str | None = None,
+        match_id: str | None = None,
         payload: dict[str, object] | None = None,
         detail: str | None = None,
     ) -> None: ...

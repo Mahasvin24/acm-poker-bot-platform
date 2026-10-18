@@ -148,7 +148,7 @@ class TableCoordinator:
                 raise CoordinatorNotReadyError("table still has a pending decision")
             if not previous.completed:
                 raise CoordinatorNotReadyError("current hand is not complete")
-            if request.table_id != self.table_id or request.tournament_id != previous.tournament_id:
+            if request.table_id != self.table_id or request.match_id != previous.match_id:
                 raise CoordinatorError("next hand targets a different table or tournament")
             if request.hand_id == previous.hand_id:
                 raise CoordinatorError("next hand requires a new hand identifier")
@@ -371,7 +371,7 @@ class TableCoordinator:
         self, request: StartHandRequest, transition: EngineTransition
     ) -> None:
         snapshot = transition.snapshot
-        if snapshot.table_id != request.table_id or snapshot.tournament_id != request.tournament_id:
+        if snapshot.table_id != request.table_id or snapshot.match_id != request.match_id:
             raise CoordinatorError("engine returned the wrong table identity")
         if snapshot.table_version != request.table_version:
             raise CoordinatorError("starting a hand must not advance table version")
@@ -429,7 +429,7 @@ class TableCoordinator:
                 self.table_id,
                 expected_version=snapshot.table_version,
                 expected_status=self._status,
-                tournament_id=snapshot.tournament_id,
+                match_id=snapshot.match_id,
                 detail=detail,
             )
         except PersistenceError:

@@ -24,14 +24,11 @@ class EntryKind(StrEnum):
     BOT = "bot"
 
 
-class TournamentStatus(StrEnum):
-    DRAFT = "draft"
-    REGISTRATION_OPEN = "registration_open"
-    SEATED = "seated"
+class MatchStatus(StrEnum):
+    LOBBY = "lobby"
     RUNNING = "running"
     PAUSE_REQUESTED = "pause_requested"
     PAUSED = "paused"
-    BREAK = "break"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
@@ -123,6 +120,7 @@ class ActionRecord(ContractModel):
     sequence: int = Field(ge=1)
     decision_id: Identifier
     seat: int = Field(ge=1, le=6)
+    street: Street | None = None
     action: ActionType
     amount_to: int | None = Field(default=None, ge=0)
     automatic: bool = False
@@ -174,7 +172,7 @@ class PendingDecision(ContractModel):
 class HandSnapshot(ContractModel):
     ruleset_version: str = "tda-2026-v1"
     adapter_version: str
-    tournament_id: Identifier
+    match_id: Identifier
     table_id: Identifier
     hand_id: Identifier
     hand_number: int = Field(ge=1)
@@ -197,7 +195,7 @@ class HandSnapshot(ContractModel):
 
 
 class StartHandRequest(ContractModel):
-    tournament_id: Identifier
+    match_id: Identifier
     table_id: Identifier
     hand_id: Identifier
     hand_number: int = Field(ge=1)

@@ -21,7 +21,7 @@ TOKEN = "test-bearer-token"
 def valid_response(**updates: Any) -> dict[str, Any]:
     response: dict[str, Any] = {
         "protocol": "poker-bot.v1",
-        "tournament_id": "conformance",
+        "match_id": "conformance",
         "table_id": "table-1",
         "hand_id": "hand-1",
         "decision_id": "decision-1",
@@ -173,7 +173,7 @@ async def test_gateway_revalidates_endpoint_at_the_outbound_boundary() -> None:
 @pytest.mark.parametrize(
     ("response", "reason"),
     [
-        (valid_response(tournament_id="old"), FailureReason.STALE),
+        (valid_response(match_id="old"), FailureReason.STALE),
         (valid_response(table_id="old"), FailureReason.STALE),
         (valid_response(hand_id="old"), FailureReason.STALE),
         (valid_response(decision_id="old"), FailureReason.STALE),

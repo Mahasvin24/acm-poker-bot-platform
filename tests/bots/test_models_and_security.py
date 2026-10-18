@@ -38,7 +38,7 @@ def test_action_request_exposes_only_acting_players_cards() -> None:
 def test_wire_models_forbid_extras_and_coercion() -> None:
     valid = {
         "protocol": "poker-bot.v1",
-        "tournament_id": "t",
+        "match_id": "t",
         "table_id": "table",
         "hand_id": "hand",
         "decision_id": "decision",
@@ -63,7 +63,7 @@ def test_request_requires_a_legal_deterministic_fallback() -> None:
 def test_snapshot_converter_strips_deck_and_other_private_cards() -> None:
     snapshot = HandSnapshot(
         adapter_version="test",
-        tournament_id="tournament",
+        match_id="tournament",
         table_id="table",
         hand_id="hand",
         hand_number=1,
@@ -119,7 +119,7 @@ def test_snapshot_converter_strips_deck_and_other_private_cards() -> None:
 
 def test_strict_parser_rejects_duplicate_keys() -> None:
     payload = (
-        b'{"protocol":"poker-bot.v1","tournament_id":"t","table_id":"x",'
+        b'{"protocol":"poker-bot.v1","match_id":"t","table_id":"x",'
         b'"hand_id":"h","decision_id":"d","table_version":1,'
         b'"action":"check","action":"fold"}'
     )

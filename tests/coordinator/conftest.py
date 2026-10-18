@@ -13,7 +13,7 @@ NOW = datetime(2026, 10, 1, 19, 0, tzinfo=UTC)
 
 def start_request(*, table_version: int = 0) -> StartHandRequest:
     return StartHandRequest(
-        tournament_id="tournament-1",
+        match_id="match-1",
         table_id="table-1",
         hand_id="hand-1",
         hand_number=1,
@@ -46,9 +46,7 @@ def start_request(*, table_version: int = 0) -> StartHandRequest:
 
 @pytest.fixture
 async def repository() -> InMemoryTableRepository:
-    repository = InMemoryTableRepository()
-    await repository.create_tournament("tournament-1", {"starting_stack": 20_000})
-    return repository
+    return InMemoryTableRepository()
 
 
 @pytest.fixture

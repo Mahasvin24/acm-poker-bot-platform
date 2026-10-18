@@ -32,16 +32,19 @@ def validate_bot_endpoint(
     """Validate a numeric participant address against the event allowlist."""
 
     if not isinstance(ip_text, str) or not ip_text or ip_text != ip_text.strip():
-        raise ValueError("bot IP must be a numeric address")
+        raise ValueError("bot IP must be a numeric address such as 192.168.1.42")
     if "%" in ip_text:
         raise ValueError("scoped IPv6 addresses are not supported")
     try:
         address = ip_address(ip_text)
     except ValueError as exc:
-        raise ValueError("bot IP must be a numeric address") from exc
+        raise ValueError("bot IP must be a numeric address such as 192.168.1.42") from exc
 
     if address.version != participant_subnet.version or address not in participant_subnet:
-        raise ValueError("bot IP is outside the participant subnet")
+        raise ValueError(
+            f"bot IP must be on the event network ({participant_subnet}); "
+            "use your laptop's LAN address, not localhost"
+        )
     if (
         address.is_loopback
         or address.is_link_local
@@ -49,7 +52,7 @@ def validate_bot_endpoint(
         or address.is_unspecified
         or address.is_reserved
     ):
-        raise ValueError("bot IP is not an eligible participant address")
+        raise ValueError("bot IP cannot be a loopback, link-local, or multicast address")
     if (
         address == participant_subnet.network_address
         or address == participant_subnet.broadcast_address
@@ -61,7 +64,7 @@ def validate_bot_endpoint(
         for item in blocked_ips
     }
     if address in blocked:
-        raise ValueError("bot IP is reserved for tournament infrastructure")
+        raise ValueError("bot IP belongs to event infrastructure (router or server)")
     return BotEndpoint(ip=address, port=port)
 
 

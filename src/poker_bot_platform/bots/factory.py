@@ -58,7 +58,7 @@ def action_request_from_snapshot(
     )
     return BotActionRequest(
         protocol="poker-bot.v1",
-        tournament_id=snapshot.tournament_id,
+        match_id=snapshot.match_id,
         table_id=snapshot.table_id,
         hand_id=snapshot.hand_id,
         decision_id=pending.decision_id,

@@ -52,7 +52,7 @@ def conformance_request(*, deadline_at: datetime | None = None) -> BotActionRequ
     )
     return BotActionRequest(
         protocol="poker-bot.v1",
-        tournament_id="conformance",
+        match_id="conformance",
         table_id="table-1",
         hand_id="hand-1",
         decision_id="decision-1",

@@ -23,16 +23,26 @@ class Base(DeclarativeBase):
     pass
 
 
-class TournamentRow(Base):
-    __tablename__ = "tournaments"
+class MatchRow(Base):
+    __tablename__ = "matches"
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False)
-    config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    join_code: Mapped[str | None] = mapped_column(String(16))
+    state: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_matches_join_code",
+            "join_code",
+            unique=True,
+            postgresql_where=(join_code.isnot(None)),
+        ),
     )
 
 
@@ -40,8 +50,8 @@ class TableRow(Base):
     __tablename__ = "poker_tables"
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    tournament_id: Mapped[str] = mapped_column(
-        ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
+    match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches.id", ondelete="CASCADE"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
@@ -98,7 +108,7 @@ class ActionRow(Base):
     __tablename__ = "table_actions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tournament_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    match_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     table_id: Mapped[str] = mapped_column(
         ForeignKey("poker_tables.id", ondelete="CASCADE"), nullable=False
     )
@@ -107,6 +117,7 @@ class ActionRow(Base):
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     decision_id: Mapped[str] = mapped_column(String(128), nullable=False)
     seat: Mapped[int] = mapped_column(Integer, nullable=False)
+    street: Mapped[str | None] = mapped_column(String(16))
     action: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_to: Mapped[int | None] = mapped_column(BigInteger)
     automatic: Mapped[bool] = mapped_column(nullable=False, default=False)
@@ -123,7 +134,7 @@ class DomainEventRow(Base):
     __tablename__ = "domain_events"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tournament_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    match_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     table_id: Mapped[str] = mapped_column(
         ForeignKey("poker_tables.id", ondelete="CASCADE"), nullable=False
     )
@@ -143,7 +154,7 @@ class AuditLogRow(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tournament_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    match_id: Mapped[str | None] = mapped_column(String(128), index=True)
     actor_id: Mapped[str] = mapped_column(String(128), nullable=False)
     command: Mapped[str] = mapped_column(String(80), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)

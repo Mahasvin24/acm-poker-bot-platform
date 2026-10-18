@@ -73,9 +73,7 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
         winner_seats = tuple(seat.seat for seat in live_hands)
     elif ranked_hands and not snapshot.side_pots:
         best_hand = max(hand for _, hand in ranked_hands)
-        winner_seats = tuple(
-            seat_number for seat_number, hand in ranked_hands if hand == best_hand
-        )
+        winner_seats = tuple(seat_number for seat_number, hand in ranked_hands if hand == best_hand)
     else:
         # A side-pot winner can hold a weaker hand than the main-pot winner.
         # In that case, PokerKit's pot awards remain the authoritative source.
