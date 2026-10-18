@@ -25,6 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "hypothesis>=6.122,<7",
+  "jsonschema>=4.23,<5",
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
   "pytest-asyncio>=0.25,<1",

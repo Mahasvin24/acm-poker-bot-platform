@@ -4,6 +4,7 @@ import json
 from ipaddress import ip_network
 from pathlib import Path
 
+import jsonschema
 import pytest
 from pydantic import ValidationError
 
@@ -12,6 +13,8 @@ from poker_bot_platform.bots.factory import action_request_from_snapshot
 from poker_bot_platform.bots.models import BotActionResponse
 from poker_bot_platform.bots.network import BotPath, endpoint_url, validate_bot_endpoint
 from poker_bot_platform.bots.parsing import DuplicateKeyError, parse_json_strict
+from poker_bot_platform.bots.reference import deterministic_reference_action
+from poker_bot_platform.bots.schemas import generate_schemas, render
 from poker_bot_platform.bots.tokens import (
     EncryptedTokenStore,
     generate_bearer_token,
@@ -37,7 +40,7 @@ def test_action_request_exposes_only_acting_players_cards() -> None:
 
 def test_wire_models_forbid_extras_and_coercion() -> None:
     valid = {
-        "protocol": "poker-bot.v1",
+        "protocol": "poker-bot.v2",
         "match_id": "t",
         "table_id": "table",
         "hand_id": "hand",
@@ -119,7 +122,7 @@ def test_snapshot_converter_strips_deck_and_other_private_cards() -> None:
 
 def test_strict_parser_rejects_duplicate_keys() -> None:
     payload = (
-        b'{"protocol":"poker-bot.v1","match_id":"t","table_id":"x",'
+        b'{"protocol":"poker-bot.v2","match_id":"t","table_id":"x",'
         b'"hand_id":"h","decision_id":"d","table_version":1,'
         b'"action":"check","action":"fold"}'
     )
@@ -177,11 +180,26 @@ def test_token_storage_round_trip_and_tamper_rejection() -> None:
     assert len(generate_verification_challenge()) >= 32
 
 
-def test_published_schema_artifacts_are_valid_json_and_forbid_root_extras() -> None:
+def test_published_schemas_are_generated_from_the_wire_models() -> None:
     schema_dir = Path(__file__).parents[2] / "schemas"
-    schemas = sorted(schema_dir.glob("bot-*-v1.schema.json"))
-    assert len(schemas) == 5
-    for path in schemas:
-        schema = json.loads(path.read_text())
-        assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    published = {path.name: path.read_text() for path in schema_dir.glob("bot-*.schema.json")}
+    generated = {name: render(schema) for name, schema in generate_schemas().items()}
+    assert published == generated, "run python -m poker_bot_platform.bots.schemas"
+    for schema in generate_schemas().values():
         assert schema["additionalProperties"] is False
+
+
+def test_real_payloads_validate_against_the_published_schemas() -> None:
+    schemas = generate_schemas()
+    request_schema = schemas["bot-action-request-v2.schema.json"]
+    response_schema = schemas["bot-action-response-v2.schema.json"]
+    request = conformance_request()
+    jsonschema.validate(request.model_dump(mode="json"), request_schema)
+    jsonschema.validate(request.model_dump(mode="json", exclude_none=True), request_schema)
+
+    response = deterministic_reference_action(request).model_dump(mode="json")
+    jsonschema.validate(response, response_schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**response, "action": "raise", "amount_to": None}, response_schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({**response, "surprise": 1}, response_schema)

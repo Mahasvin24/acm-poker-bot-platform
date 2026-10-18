@@ -27,7 +27,9 @@ from poker_bot_platform.api.models import (
 from poker_bot_platform.auth.models import BotProfile
 from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.bots import BotEndpoint, BotGateway
+from poker_bot_platform.bots.factory import previous_hand_from_snapshot
 from poker_bot_platform.bots.messages import explain_failure
+from poker_bot_platform.bots.models import MatchContext, PreviousHand
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.coordinator import (
     ActorDecisionFailure,
@@ -114,6 +116,7 @@ class _TableRuntime:
     retry_at: datetime | None = None
     backoff_seconds: float = 0.0
     last_hand: LastHandResponse | None = None
+    previous_hand: PreviousHand | None = None
     decision_durations: dict[str, int] = field(default_factory=dict)
 
 
@@ -356,6 +359,7 @@ class MatchRuntime:
                     result=result,
                     names={seat.seat: seat.display_name for seat in snapshot.seats},
                 )
+            runtime.previous_hand = previous_hand_from_snapshot(snapshot)
             runtime.decision_durations.clear()
             await match.record_hand_completed(
                 table.table_id,
@@ -377,7 +381,11 @@ class MatchRuntime:
 
         if acting.kind is EntryKind.BOT:
             profile_id = player.bot_profile_id if player is not None else None
-            actor = await self._bot_actor(profile_id)
+            actor = await self._bot_actor(
+                profile_id,
+                _bot_match_context(match.state, snapshot),
+                runtime.previous_hand,
+            )
             started = self._monotonic()
             after = await coordinator.request_actor_action(
                 actor,
@@ -508,7 +516,12 @@ class MatchRuntime:
         )
         runtime.next_action_at = self._now() + timedelta(seconds=seconds)
 
-    async def _bot_actor(self, profile_id: str | None) -> TableActor:
+    async def _bot_actor(
+        self,
+        profile_id: str | None,
+        context: MatchContext | None = None,
+        previous_hand: PreviousHand | None = None,
+    ) -> TableActor:
         profile = await self._profile(profile_id) if profile_id else None
         if profile is None or profile.verified_at is None:
             return _unavailable_bot
@@ -517,7 +530,7 @@ class MatchRuntime:
             endpoint = BotEndpoint(ip=ip_address(profile.bot_ip), port=profile.bot_port)
         except ValueError:
             return _unavailable_bot
-        actor = BotActor(self._gateway, endpoint, token)
+        actor = BotActor(self._gateway, endpoint, token, context, previous_hand)
         stats = self._bot_stats.get(profile.id)
         if stats is None or stats.consecutive_failures < self.pacing.breaker_failures:
             return actor
@@ -761,6 +774,18 @@ def _viewer(state: MatchState, entry: MatchEntry | None) -> ViewerResponse | Non
         entry_id=entry.entry_id,
         display_name=entry.display_name,
         status="seated",
+    )
+
+
+def _bot_match_context(state: MatchState, snapshot: HandSnapshot) -> MatchContext:
+    next_level = state.config.level(state.level_number + 1) if state.config.escalates else None
+    return MatchContext(
+        hand_number=snapshot.hand_number,
+        level_number=state.level_number,
+        players_remaining=max(1, min(6, state.players_remaining)),
+        seconds_until_next_level=state.level_remaining_seconds,
+        next_small_blind=next_level.small_blind if next_level else None,
+        next_big_blind=next_level.big_blind if next_level else None,
     )
 
 

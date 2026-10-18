@@ -20,7 +20,7 @@ TOKEN = "test-bearer-token"
 
 def valid_response(**updates: Any) -> dict[str, Any]:
     response: dict[str, Any] = {
-        "protocol": "poker-bot.v1",
+        "protocol": "poker-bot.v2",
         "match_id": "conformance",
         "table_id": "table-1",
         "hand_id": "hand-1",
@@ -87,13 +87,13 @@ async def test_success_uses_fixed_path_bearer_token_and_no_proxy() -> None:
         (
             lambda _request: httpx.Response(
                 200,
-                content=b'{"protocol":"poker-bot.v1","protocol":"bad"}',
+                content=b'{"protocol":"poker-bot.v2","protocol":"bad"}',
                 headers={"content-type": "application/json"},
             ),
             FailureReason.MALFORMED_JSON,
         ),
         (
-            lambda _request: httpx.Response(200, json={"protocol": "poker-bot.v1"}),
+            lambda _request: httpx.Response(200, json={"protocol": "poker-bot.v2"}),
             FailureReason.SCHEMA,
         ),
         (
@@ -179,8 +179,8 @@ async def test_gateway_revalidates_endpoint_at_the_outbound_boundary() -> None:
         (valid_response(decision_id="old"), FailureReason.STALE),
         (valid_response(table_version=0), FailureReason.STALE),
         (valid_response(action="call"), FailureReason.ILLEGAL_ACTION),
-        (valid_response(action="raise", amount_to=399), FailureReason.ILLEGAL_ACTION),
-        (valid_response(action="raise", amount_to=20_001), FailureReason.ILLEGAL_ACTION),
+        (valid_response(action="raise", amount_to=199), FailureReason.ILLEGAL_ACTION),
+        (valid_response(action="raise", amount_to=19_801), FailureReason.ILLEGAL_ACTION),
     ],
 )
 async def test_stale_or_illegal_response_is_rejected(
@@ -250,7 +250,7 @@ async def test_verification_requires_exact_challenge_echo() -> None:
         assert request.headers["authorization"] == f"Bearer {TOKEN}"
         return httpx.Response(
             200,
-            json={"protocol": "poker-bot.v1", "challenge": "x" * 32},
+            json={"protocol": "poker-bot.v2", "challenge": "x" * 32},
         )
 
     async with BotGateway(

@@ -7,6 +7,7 @@ from poker_bot_platform.bots import (
     BotGateway,
     action_request_from_snapshot,
 )
+from poker_bot_platform.bots.models import MatchContext, PreviousHand
 from poker_bot_platform.coordinator import ActorDecisionFailure
 from poker_bot_platform.domain import HandSnapshot, PendingDecision, PlayerAction
 
@@ -22,13 +23,20 @@ class BotActor:
     gateway: BotGateway
     endpoint: BotEndpoint
     bearer_token: str
+    match: MatchContext | None = None
+    previous_hand: PreviousHand | None = None
 
     async def __call__(
         self,
         pending: PendingDecision,
         snapshot: HandSnapshot,
     ) -> PlayerAction:
-        request = action_request_from_snapshot(snapshot, pending)
+        request = action_request_from_snapshot(
+            snapshot,
+            pending,
+            match=self.match,
+            previous_hand=self.previous_hand,
+        )
         outcome = await self.gateway.request_action(
             self.endpoint,
             self.bearer_token,

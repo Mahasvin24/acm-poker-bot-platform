@@ -1,21 +1,60 @@
 from __future__ import annotations
 
 from poker_bot_platform.bots.models import (
+    BOT_PROTOCOL_VERSION,
     ActingPlayerState,
     BlindState,
     BotActionRequest,
     BotLegalAction,
+    FinalStack,
+    MatchContext,
+    PotAward,
+    PreviousHand,
     PublicAction,
     PublicSeat,
     PublicSidePot,
     PublicTableState,
+    ShownHand,
 )
 from poker_bot_platform.domain.models import HandSnapshot, PendingDecision
+
+
+def previous_hand_from_snapshot(snapshot: HandSnapshot) -> PreviousHand | None:
+    """Summarize a completed hand using only information that became public."""
+
+    if not snapshot.completed:
+        return None
+    awards = tuple(
+        PotAward(seat=raw["seat"], amount=raw["amount"])
+        for raw in snapshot.engine_state.get("pot_awards", [])
+        if isinstance(raw, dict)
+        and isinstance(raw.get("seat"), int)
+        and isinstance(raw.get("amount"), int)
+        and raw["amount"] > 0
+    )
+    return PreviousHand(
+        hand_id=snapshot.hand_id,
+        hand_number=snapshot.hand_number,
+        community_cards=snapshot.community_cards,
+        shown_hands=tuple(
+            ShownHand(seat=seat.seat, hole_cards=seat.public_hole_cards)
+            for seat in snapshot.seats
+            if seat.public_hole_cards
+        ),
+        awards=awards,
+        final_stacks=tuple(
+            FinalStack(seat=seat.seat, entrant_id=seat.entrant_id, stack=seat.stack)
+            for seat in snapshot.seats
+        ),
+    )
 
 
 def action_request_from_snapshot(
     snapshot: HandSnapshot,
     pending: PendingDecision,
+    *,
+    match: MatchContext | None = None,
+    previous_hand: PreviousHand | None = None,
 ) -> BotActionRequest:
     """Build the bot view without exposing another player or recovery-only state."""
 
@@ -50,6 +89,7 @@ def action_request_from_snapshot(
         PublicAction(
             sequence=record.sequence,
             seat=record.seat,
+            street=record.street or snapshot.street,
             action=record.action,
             amount_to=record.amount_to,
             automatic=record.automatic,
@@ -57,7 +97,7 @@ def action_request_from_snapshot(
         for record in snapshot.action_history
     )
     return BotActionRequest(
-        protocol="poker-bot.v1",
+        protocol=BOT_PROTOCOL_VERSION,
         match_id=snapshot.match_id,
         table_id=snapshot.table_id,
         hand_id=snapshot.hand_id,
@@ -87,4 +127,6 @@ def action_request_from_snapshot(
         legal_actions=tuple(
             BotLegalAction.model_validate(action.model_dump()) for action in pending.legal_actions
         ),
+        match=match,
+        previous_hand=previous_hand,
     )

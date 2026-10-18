@@ -162,13 +162,13 @@ async def test_bot_failures_become_one_durable_automatic_fallback(
             return httpx.Response(
                 200,
                 headers={"content-type": "application/json"},
-                content=b'{"protocol":"poker-bot.v1","protocol":"poker-bot.v1"}',
+                content=b'{"protocol":"poker-bot.v2","protocol":"poker-bot.v2"}',
             )
         if failure == "schema":
             return httpx.Response(
                 200,
                 headers={"content-type": "application/json"},
-                json={"protocol": "poker-bot.v1"},
+                json={"protocol": "poker-bot.v2"},
             )
         if failure == "http":
             return httpx.Response(503, json={"error": "unavailable"})

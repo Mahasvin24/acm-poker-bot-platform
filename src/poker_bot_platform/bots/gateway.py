@@ -138,7 +138,7 @@ class BotGateway:
         bearer_token: str,
         challenge: str,
     ) -> VerificationOutcome:
-        request = VerifyRequest(protocol="poker-bot.v1", challenge=challenge)
+        request = VerifyRequest(protocol="poker-bot.v2", challenge=challenge)
         try:
             response = await self._request_json(
                 endpoint=endpoint,

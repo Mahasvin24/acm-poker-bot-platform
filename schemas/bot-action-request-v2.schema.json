@@ -1,0 +1,776 @@
+{
+  "$defs": {
+    "ActingPlayerState": {
+      "additionalProperties": false,
+      "properties": {
+        "committed_this_street": {
+          "minimum": 0,
+          "title": "Committed This Street",
+          "type": "integer"
+        },
+        "hole_cards": {
+          "items": {
+            "pattern": "^[2-9TJQKA][cdhs]$",
+            "type": "string"
+          },
+          "title": "Hole Cards",
+          "type": "array"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        },
+        "stack": {
+          "minimum": 0,
+          "title": "Stack",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "stack",
+        "committed_this_street",
+        "hole_cards"
+      ],
+      "title": "ActingPlayerState",
+      "type": "object"
+    },
+    "ActionType": {
+      "enum": [
+        "fold",
+        "check",
+        "call",
+        "raise"
+      ],
+      "title": "ActionType",
+      "type": "string"
+    },
+    "BlindState": {
+      "additionalProperties": false,
+      "properties": {
+        "big_blind": {
+          "exclusiveMinimum": 0,
+          "title": "Big Blind",
+          "type": "integer"
+        },
+        "big_blind_ante": {
+          "minimum": 0,
+          "title": "Big Blind Ante",
+          "type": "integer"
+        },
+        "small_blind": {
+          "minimum": 0,
+          "title": "Small Blind",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "small_blind",
+        "big_blind",
+        "big_blind_ante"
+      ],
+      "title": "BlindState",
+      "type": "object"
+    },
+    "BotLegalAction": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "call"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount": {
+                "type": "integer"
+              },
+              "max_amount_to": {
+                "type": "null"
+              },
+              "min_amount_to": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "amount"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "const": "raise"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount": {
+                "type": "null"
+              },
+              "max_amount_to": {
+                "type": "integer"
+              },
+              "min_amount_to": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "min_amount_to",
+              "max_amount_to"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "action": {
+                "enum": [
+                  "fold",
+                  "check"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount": {
+                "type": "null"
+              },
+              "max_amount_to": {
+                "type": "null"
+              },
+              "min_amount_to": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionType"
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amount"
+        },
+        "max_amount_to": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Amount To"
+        },
+        "min_amount_to": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Amount To"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "BotLegalAction",
+      "type": "object"
+    },
+    "EntryKind": {
+      "enum": [
+        "human",
+        "bot"
+      ],
+      "title": "EntryKind",
+      "type": "string"
+    },
+    "FinalStack": {
+      "additionalProperties": false,
+      "properties": {
+        "entrant_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Entrant Id",
+          "type": "string"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        },
+        "stack": {
+          "minimum": 0,
+          "title": "Stack",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "entrant_id",
+        "stack"
+      ],
+      "title": "FinalStack",
+      "type": "object"
+    },
+    "MatchContext": {
+      "additionalProperties": false,
+      "properties": {
+        "hand_number": {
+          "minimum": 1,
+          "title": "Hand Number",
+          "type": "integer"
+        },
+        "level_number": {
+          "minimum": 1,
+          "title": "Level Number",
+          "type": "integer"
+        },
+        "next_big_blind": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Big Blind"
+        },
+        "next_small_blind": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Small Blind"
+        },
+        "players_remaining": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Players Remaining",
+          "type": "integer"
+        },
+        "seconds_until_next_level": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seconds Until Next Level"
+        }
+      },
+      "required": [
+        "hand_number",
+        "level_number",
+        "players_remaining"
+      ],
+      "title": "MatchContext",
+      "type": "object"
+    },
+    "PotAward": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "exclusiveMinimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "amount"
+      ],
+      "title": "PotAward",
+      "type": "object"
+    },
+    "PreviousHand": {
+      "additionalProperties": false,
+      "description": "The last completed hand at this table: only public showdown information.",
+      "properties": {
+        "awards": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PotAward"
+          },
+          "title": "Awards",
+          "type": "array"
+        },
+        "community_cards": {
+          "default": [],
+          "items": {
+            "pattern": "^[2-9TJQKA][cdhs]$",
+            "type": "string"
+          },
+          "title": "Community Cards",
+          "type": "array"
+        },
+        "final_stacks": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/FinalStack"
+          },
+          "title": "Final Stacks",
+          "type": "array"
+        },
+        "hand_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Hand Id",
+          "type": "string"
+        },
+        "hand_number": {
+          "minimum": 1,
+          "title": "Hand Number",
+          "type": "integer"
+        },
+        "shown_hands": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ShownHand"
+          },
+          "title": "Shown Hands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "hand_id",
+        "hand_number"
+      ],
+      "title": "PreviousHand",
+      "type": "object"
+    },
+    "PublicAction": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "amount_to": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "action": {
+                "const": "raise"
+              }
+            },
+            "required": [
+              "action"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount_to": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "amount_to"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionType"
+        },
+        "amount_to": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amount To"
+        },
+        "automatic": {
+          "default": false,
+          "title": "Automatic",
+          "type": "boolean"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "street": {
+          "$ref": "#/$defs/Street"
+        }
+      },
+      "required": [
+        "sequence",
+        "seat",
+        "street",
+        "action"
+      ],
+      "title": "PublicAction",
+      "type": "object"
+    },
+    "PublicSeat": {
+      "additionalProperties": false,
+      "properties": {
+        "all_in": {
+          "title": "All In",
+          "type": "boolean"
+        },
+        "committed_this_hand": {
+          "minimum": 0,
+          "title": "Committed This Hand",
+          "type": "integer"
+        },
+        "committed_this_street": {
+          "minimum": 0,
+          "title": "Committed This Street",
+          "type": "integer"
+        },
+        "display_name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "eliminated": {
+          "title": "Eliminated",
+          "type": "boolean"
+        },
+        "entrant_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Entrant Id",
+          "type": "string"
+        },
+        "folded": {
+          "title": "Folded",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntryKind"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        },
+        "stack": {
+          "minimum": 0,
+          "title": "Stack",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "entrant_id",
+        "display_name",
+        "kind",
+        "stack",
+        "committed_this_street",
+        "committed_this_hand",
+        "folded",
+        "all_in",
+        "eliminated"
+      ],
+      "title": "PublicSeat",
+      "type": "object"
+    },
+    "PublicSidePot": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "minimum": 0,
+          "title": "Amount",
+          "type": "integer"
+        },
+        "eligible_seats": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Eligible Seats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "amount",
+        "eligible_seats"
+      ],
+      "title": "PublicSidePot",
+      "type": "object"
+    },
+    "PublicTableState": {
+      "additionalProperties": false,
+      "properties": {
+        "action_history": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PublicAction"
+          },
+          "title": "Action History",
+          "type": "array"
+        },
+        "blinds": {
+          "$ref": "#/$defs/BlindState"
+        },
+        "button_seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Button Seat",
+          "type": "integer"
+        },
+        "community_cards": {
+          "default": [],
+          "items": {
+            "pattern": "^[2-9TJQKA][cdhs]$",
+            "type": "string"
+          },
+          "title": "Community Cards",
+          "type": "array"
+        },
+        "pot": {
+          "minimum": 0,
+          "title": "Pot",
+          "type": "integer"
+        },
+        "seats": {
+          "items": {
+            "$ref": "#/$defs/PublicSeat"
+          },
+          "title": "Seats",
+          "type": "array"
+        },
+        "side_pots": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PublicSidePot"
+          },
+          "title": "Side Pots",
+          "type": "array"
+        },
+        "street": {
+          "$ref": "#/$defs/Street"
+        }
+      },
+      "required": [
+        "street",
+        "button_seat",
+        "blinds",
+        "seats",
+        "pot"
+      ],
+      "title": "PublicTableState",
+      "type": "object"
+    },
+    "ShownHand": {
+      "additionalProperties": false,
+      "properties": {
+        "hole_cards": {
+          "items": {
+            "pattern": "^[2-9TJQKA][cdhs]$",
+            "type": "string"
+          },
+          "title": "Hole Cards",
+          "type": "array"
+        },
+        "seat": {
+          "maximum": 6,
+          "minimum": 1,
+          "title": "Seat",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seat",
+        "hole_cards"
+      ],
+      "title": "ShownHand",
+      "type": "object"
+    },
+    "Street": {
+      "enum": [
+        "preflop",
+        "flop",
+        "turn",
+        "river",
+        "showdown",
+        "complete"
+      ],
+      "title": "Street",
+      "type": "string"
+    }
+  },
+  "$id": "https://acm.example/schemas/bot-action-request-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deadline_at": {
+      "format": "date-time",
+      "title": "Deadline At",
+      "type": "string"
+    },
+    "decision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "hand_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Hand Id",
+      "type": "string"
+    },
+    "legal_actions": {
+      "contains": {
+        "properties": {
+          "action": {
+            "enum": [
+              "check",
+              "fold"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "items": {
+        "$ref": "#/$defs/BotLegalAction"
+      },
+      "minItems": 1,
+      "title": "Legal Actions",
+      "type": "array"
+    },
+    "match": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MatchContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "match_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Match Id",
+      "type": "string"
+    },
+    "player": {
+      "$ref": "#/$defs/ActingPlayerState"
+    },
+    "previous_hand": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PreviousHand"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "protocol": {
+      "const": "poker-bot.v2",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "table": {
+      "$ref": "#/$defs/PublicTableState"
+    },
+    "table_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Table Id",
+      "type": "string"
+    },
+    "table_version": {
+      "minimum": 0,
+      "title": "Table Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "protocol",
+    "match_id",
+    "table_id",
+    "hand_id",
+    "decision_id",
+    "table_version",
+    "deadline_at",
+    "table",
+    "player",
+    "legal_actions"
+  ],
+  "title": "Poker Bot Action Request v2",
+  "type": "object"
+}

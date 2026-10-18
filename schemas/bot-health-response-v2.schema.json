@@ -1,0 +1,23 @@
+{
+  "$id": "https://acm.example/schemas/bot-health-response-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "protocol": {
+      "const": "poker-bot.v2",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "status": {
+      "const": "ready",
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "status"
+  ],
+  "title": "Poker Bot Health Response v2",
+  "type": "object"
+}
