@@ -1,135 +1,130 @@
-# Headless Tournament Architecture
+# Match Platform Architecture
 
-Status: frozen v1 contract
-Last reviewed: 2026-10-01
+Status: v2 (code-joined matches)
+Last reviewed: 2026-10-18
 
 ## Scope
 
-Version 1 is a play-money, server-authoritative no-limit Texas Hold'em freezeout for
-2–36 entrants at six-player tables. An entrant is either a human controlled through the
-central application or a bot hosted by its owner on the event LAN. The first milestone is
-headless: poker correctness, recovery, and bot isolation must pass before any Next.js client is
-built. 3D rendering, spectators, chat, payouts, re-entry, rebuys, and polish are deferred.
+The platform runs play-money, server-authoritative no-limit Texas Hold'em **matches**: one table
+of two to six seats, created by an administrator and joined with a short code. A seat is held by
+a human playing in the browser or by a participant-hosted bot. Tournaments (levels as phases,
+breaks, multi-table balancing) were removed in v2; a match can still escalate blinds on a timer.
+3D rendering, chat, payouts, re-entry, and rebuys remain out of scope.
 
 ## Runtime topology
 
 ```text
-human/admin client ──HTTP──> FastAPI (exactly one worker)
-                              ├── tournament coordinator
-                              ├── one serialized coordinator per active table
-                              ├── PokerEngine adapter ──> PokerKit 0.7.6
-                              ├── bot gateway ──HTTP──> participant bot APIs
-                              └── SQLAlchemy ──> PostgreSQL 17
+browser ──HTTP──> Next.js (/api/v1 proxy) ──> FastAPI (exactly one worker)
+                                              ├── MatchRegistry + MatchCoordinator (per match)
+                                              ├── GameplayScheduler ──> MatchRuntime.drive
+                                              │     └── TableCoordinator ──> PokerKit 0.7.6
+                                              ├── BotGateway ──HTTP──> participant bot APIs
+                                              └── SQLAlchemy ──> PostgreSQL 17
 ```
 
-PostgreSQL is the only durable authority. Redis is intentionally absent from v1. The process
-may keep coordinator objects in memory, but every accepted action is committed as an immutable
-action plus a complete private recovery snapshot before in-memory state advances. A database
-failure therefore pauses the affected table rather than creating divergent state.
-
-The deployment must use exactly one application worker. Adding another worker requires a new
-cross-process ownership design and is not a supported tuning knob.
+PostgreSQL is the only durable authority. The process keeps coordinator objects in memory, but
+every accepted action is committed as an immutable action plus a complete private recovery
+snapshot before in-memory state advances. Exactly one application worker is supported.
 
 ## Component boundaries
 
-- `domain/` owns frozen commands, events, snapshots, versions, failure reasons, and tournament
-  configuration. Chip values are integers; a raise is always `amount_to` for the current street.
-- `engine/` contains the application-owned `PokerEngine` interface and the PokerKit adapter.
-  PokerKit objects never cross this boundary. Recovery uses the stored deck and adapter state.
+- `domain/` owns frozen commands, events, snapshots, `MatchConfig`, and blind levels. Chip values
+  are integers; a raise is always `amount_to` for the current street. Every recorded action
+  carries its street.
+- `engine/` contains the `PokerEngine` interface and the PokerKit adapter. PokerKit objects never
+  cross this boundary.
 - `coordinator/` serializes commands for one table. It persists a pending decision before any
   bot call, never waits inside a database transaction, and commits exactly one action.
-- `tournament/` owns seating, levels, breaks, balancing, table breaking, elimination order,
-  pause boundaries, and completion. It emits deterministic `StartHandRequest` values.
-- `bots/` owns the versioned wire contract, endpoint allowlisting, challenge verification,
-  strict parsing, deadlines, and failure-to-fallback conversion.
-- `auth/` owns Argon2id accounts, hashed sessions, entrant ownership, roles, and encrypted bot
-  tokens. Admin rights are explicit; no email address is magical.
-- `integration/` joins account entrants, tournaments, table coordinators, bots, and safe player
-  projections without weakening the boundaries above.
+- `match/` owns the match state machine (lobby, running, pause requested, paused, completed,
+  cancelled), join codes, seating, elimination standings, and blind-level ticks. It emits
+  deterministic `StartHandRequest` values. State is stored as one JSONB document per match with a
+  unique partial index on the active join code.
+- `bots/` owns the versioned wire contract (`poker-bot.v2`), schema generation, endpoint
+  allowlisting, verification, strict parsing, deadlines, and failure explanations.
+- `auth/` owns Argon2id accounts, hashed revocable sessions, roles, password reset, and reusable
+  bot profiles whose bearer tokens are encrypted under `POKER_SECRET_KEY`.
+- `integration/` joins matches, tables, bots, and per-viewer projections: `MatchService` for
+  commands and views, `MatchRuntime` for driving tables, `GameplayScheduler` for timing.
 - `api/` is a transport layer. It never calculates poker legality and never serializes private
   recovery snapshots.
+
+## Driving tables
+
+Only the scheduler drives tables. Every 250 ms (or immediately when woken by a command) it
+starts one background drive per running match, skipping a match whose previous drive is still
+in progress. Reads never take the drive lock, so a bot request in flight cannot delay another
+player's poll. Human actions are applied directly under the table coordinator's lock.
+
+**Pacing.** At tables with a seated human the runtime pauses 3 s after a deal, 1.5 s after an
+action, 2.5 s after a street change, and 5 s after a hand before dealing the next. A human's
+decision clock opens only after the pause ends. Bots never see these pauses; bot-only tables run
+at full speed.
+
+**Absent humans.** After two consecutive timeouts a human is marked away (visible to everyone)
+and receives a 5 s clock until they act again.
+
+**Failing bots.** After three consecutive connection, timeout, or HTTP failures, each decision
+first probes `/v1/health` with a 500 ms budget and records an immediate fallback if the bot is
+still down. One successful action resets the breaker. Per-bot decision logs with latency and
+failure explanations are kept in memory for owner diagnostics and the admin roster.
 
 ## Durable write and recovery rules
 
 For a player decision, the coordinator first commits a `pending_decision` containing the acting
-seat, legal actions, table version, and UTC deadline. A human response or the single bot request
-is processed outside a database transaction. The accepted action, emitted events, next private
-snapshot, table version increment, and pending-decision resolution are committed atomically.
+seat, legal actions, table version, and UTC deadline. The accepted action, emitted events, next
+private snapshot, table version increment, and pending-decision resolution are committed
+atomically.
 
-On restart, a table is reconstructed from its last snapshot. If a pending decision survived the
-crash, it is not reissued to the bot: the coordinator records the deterministic fallback (check
-when legal, otherwise fold) with `restart_recovery`. A failure after commit but before client
-notification is harmless because clients resync from the stored version.
+On restart, a table is reconstructed from its last snapshot. A pending decision that survived is
+not reissued: the coordinator records the deterministic fallback (check when legal, otherwise
+fold) with `restart_recovery`. The same path handles a database failure during play: the paused
+coordinator is evicted and restored from durable state with exponential backoff (1 s to 30 s).
 
-Snapshots contain the full deck order and engine recovery state. Those fields are server-only.
-Player views are allowlisted and may reveal only that player's hole cards plus public cards and
-public action history.
+Snapshots contain the full deck order and engine recovery state. Player views are allowlisted
+and reveal only the viewer's hole cards plus cards PokerKit actually showed; mucked losing hands
+stay private in table views, hand results, and the bot `previous_hand` summary.
 
-## Tournament rules
+## Match rules
 
-The baseline is the 2026 Poker TDA rules with these fixed house choices:
-
-- Six seats per table and at most 36 entrants; one entrant per account per tournament.
-- Big-blind ante equals the big blind. The big blind is taken first, then the ante from the
-  remaining stack.
-- Blinds change only for new hands. Heads-up uses button/small-blind, first action preflop, and
-  last action postflop.
-- Incomplete all-in raises and reopening follow the pinned adapter tests.
-- Each side pot is split independently. Its odd chip goes to the first winning seat left of the
-  button.
-- All live hands are exposed at an all-in showdown; otherwise only cards needed to establish a
-  winning or tied hand become public.
+- Two to six seats; an account may hold one human seat and any number of bot seats per match;
+  a bot profile may hold one seat per match. Seats are spread evenly around the table.
+- Default 20,000 chips with 100/200 fixed blinds. Optional big-blind ante. Optional escalation
+  scales the opening blinds along the smooth WSOP Circuit progression every N minutes; new blinds
+  apply from the next hand.
+- Heads-up uses button/small-blind, first action preflop, last action postflop. Side pots are
+  split independently; odd chips go to the first winning seat left of the button.
 - Simultaneous bust-outs are ordered by start-of-hand stack; equal stacks tie.
-- Tables balance only between hands, moving next-big-blind to the worst legal position. The
-  shortest removable table breaks first; ties use highest table ID and seeded assignment.
-- Disconnects do not stop a decision clock. Administrative pause waits for current hands and
-  freezes the level clock.
+- Pause and end take effect after the current hand. Ending ranks remaining players by chips.
+  Cancelling abandons the current hand and keeps no standings. Join codes are released when a
+  match completes or is cancelled.
 
-The default is 20,000 chips, 15-minute levels, and a five-minute break after every fourth level.
-The canonical blind schedule lives in `domain/tournament.py`; it uses the smooth 100/200 through
-75,000/150,000 progression published for a 20,000-chip WSOP Circuit event, then doubles all
-amounts after its final row if play somehow continues. Tournament settings are mutable only in
-draft state.
+## Bot protocol v2
 
-## Bot protocol v1
+Bots implement `GET /v1/health`, `POST /v1/verify`, and `POST /v1/action`. The platform accepts a
+numeric LAN IP and bounded port and rejects hostnames, redirects, proxies, loopback, link-local,
+multicast, event infrastructure, and addresses outside `POKER_PARTICIPANT_SUBNET`.
 
-Bots implement fixed `GET /v1/health`, `POST /v1/verify`, and `POST /v1/action` endpoints. The
-platform accepts a numeric LAN IP and bounded port, constructs the URL, and rejects hostnames,
-redirects, proxies, loopback, link-local, multicast, tournament infrastructure, and addresses
-outside `POKER_PARTICIPANT_SUBNET`.
+Action requests include the public table, the acting player's hole cards, legal actions, the
+current hand's action history with streets, match context (hand number, level, players
+remaining, next blinds), and a public summary of the previous hand. Live calls use a 500 ms
+connect timeout, a three-second decision deadline, no retry, a 64 KiB request ceiling, and a
+4 KiB response ceiling. All JSON objects reject extra properties, duplicate keys, wrong protocol
+versions, non-integer chip values, stale identifiers, wrong content types, and illegal actions.
+The schemas in `schemas/` are generated from the models by
+`python -m poker_bot_platform.bots.schemas` and checked by the test suite.
 
-Registration displays a random bearer token once and stores it encrypted under
-`POKER_SECRET_KEY`. Verification authenticates that token and echoes a short-lived challenge.
-Live action calls use a 500 ms connect timeout, a three-second total decision deadline, no
-redirect, proxy, or retry, a 64 KiB request ceiling, and a 4 KiB response ceiling.
+## Security
 
-All JSON objects reject extra properties, duplicate keys, unsupported protocol versions,
-non-integer chip values, stale identifiers, wrong content types, illegal actions, and late
-responses. Every failure becomes one recorded fallback and cannot stop the table. The public
-schemas are in `schemas/`; starter bots and conformance instructions are in `examples/bots/`.
-
-Direct HTTP on the trusted club LAN is an explicit v1 tradeoff. Bot TLS, signatures, pinning,
-anti-collusion, and casino-grade controls are out of scope.
-
-## Deployment and operations
-
-- Run PostgreSQL and the application on the event machine; prefer wiring the server to the AP.
-- Set a stable server address, a unique 32+ character secret, the actual participant subnet,
-  router/server addresses in `POKER_BLOCKED_IPS`, and the browser origin.
-- Run `alembic upgrade head`, bootstrap the admin explicitly, and start one Uvicorn worker.
-- Plain HTTP is acceptable on the trusted event LAN if local certificate provisioning threatens
-  rehearsal reliability. Set secure cookies only when the central application is HTTPS.
-- Use the runbook in `docs/event-runbook.md` on the actual router and representative bot laptops.
+- Placeholder or low-entropy `POKER_SECRET_KEY` values stop the server at startup.
+- Login is rate-limited per client and per email; join-code lookups are limited per account.
+- Every state-changing route requires a same-origin `Origin` header.
+- The demo match is per browser session, bounded in count and idle age, with no forcing route.
 
 ## Acceptance gates
 
-The automated suite must cover heads-up order, button movement, minimum/under raises, reopening,
-side pots, ties, odd chips, short-stack BBA, showdown, elimination order, seating, balancing,
-breaking, and heads-up transition. Property tests execute at least 10,000 generated hands and
-check chip/card/state/version/replay invariants.
-
-Recovery tests cover termination before dispatch, during the bot call, after response and before
-commit, and after commit before notification. The milestone also requires 100 seeded 36-player
-tournaments, an eight-hour six-table soak, and a dress rehearsal on event-equivalent hardware.
-Those hardware/time gates are operational acceptance activities, not facts established by the
-unit test suite.
+The automated suite covers engine rules, coordinator recovery, match lifecycle, join codes,
+pacing, away state, the bot breaker, database-failure recovery, non-blocking reads, API flows,
+showdown privacy, and generated schemas; Postgres-backed tests run when
+`POKER_TEST_DATABASE_URL` names a database ending in `_test`. `scripts/smoke_match.py` exercises
+the full flow against a running deployment. The eight-hour soak and a rehearsal on the event
+router remain operational gates.

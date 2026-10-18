@@ -21,7 +21,7 @@ The important backend variables are:
 | Variable | Local default | Purpose |
 | --- | --- | --- |
 | `POKER_DATABASE_URL` | `postgresql+asyncpg://poker:poker@localhost:5432/poker` | Application database |
-| `POKER_SECRET_KEY` | No safe default for real use | Session signing secret; use at least 32 characters |
+| `POKER_SECRET_KEY` | None; required | Encrypts bot tokens. The server refuses placeholder or low-entropy values |
 | `POKER_PARTICIPANT_SUBNET` | `192.168.0.0/16` | LAN range allowed to host participant bots |
 | `POKER_BLOCKED_IPS` | Router/service addresses | LAN addresses bots must not target |
 | `POKER_ALLOWED_ORIGIN` | `http://localhost:3000` | Browser origin allowed by the API |
@@ -84,15 +84,15 @@ npm run dev
 
 Open <http://localhost:3000>. The main routes are:
 
-- `/account` — create an account or sign in
-- `/dashboard` — join a tournament, configure a bot, or open an assigned table
-- `/admin` — create and operate tournaments
+- `/join` and `/join/<code>` — enter a match code, then sit down or seat one of your bots
+- `/account` — create an account or sign in (`?next=` returns you to where you were)
+- `/dashboard` — your matches, your reusable bots, tokens, verification, and diagnostics
+- `/match/<match-id>` — live lobby that turns into your table when the match starts
+- `/admin` — create matches and reset passwords
+- `/admin/match/<match-id>` — join code, live roster, start/pause/end/cancel, spectator table
 - `/bot-guide` — bot protocol quickstart
-- `/play/demo` — table demo that does not require an account or backend
-- `/demo-human-verus-bot` — full-screen ephemeral real-engine match against three built-in bots;
-  the deal and street changes pause before opening a decision, and every bot decision remains
-  visible for four seconds before the server invokes it
-- `/play/<tournament-id>` — authenticated live human table
+- `/demo` — ephemeral real-engine hand against three built-in bots, private to your browser
+- `/play/demo` — static preview of the table controls
 
 The frontend proxies `/api/v1/*` to `POKER_API_ORIGIN`, which defaults to
 `http://127.0.0.1:8000`.
@@ -150,15 +150,21 @@ uvicorn poker_bot_platform.app:app \
 Do not combine `--reload` and `--workers`. The API documentation is at
 <http://localhost:8000/docs>, and the health check is at <http://localhost:8000/health>.
 
-To run a live local tournament:
+To run a live local match:
 
 1. Sign in as the administrator at <http://localhost:3000/account>.
-2. Create a tournament in `/admin`, save its settings, and open registration.
-3. Share the participant invite from the admin page.
-4. Each participant creates an account and registers one human or bot entry.
-5. Verify all bot endpoints, seat the entrants, and start the tournament.
-6. Human entrants open their assigned tables from `/dashboard`; bot turns are dispatched
-   automatically.
+2. Create a match in `/admin`. The console shows a six-character join code such as `K7Q-4PM`.
+3. Players open `/join`, enter the code, and choose **Me** or one of their verified bots.
+4. Watch the roster fill in the console, then press **Start**. Bots that fail their health
+   check are listed; **Start anyway** lets them play with automatic check/fold.
+5. Players' lobbies switch to the table automatically. Bot turns are dispatched by the server.
+
+To exercise the whole flow without a browser, run the smoke test with this machine's LAN IP:
+
+```bash
+python scripts/smoke_match.py --base-url http://localhost:3000 \
+  --admin-email organizer@example.com --admin-password '…' --bot-ip 192.168.1.20
+```
 
 Run the backend checks with:
 
@@ -184,8 +190,8 @@ in the `poker-postgres` Docker volume.
 
 ## How to run a sample bot's API endpoint
 
-First register a bot entrant from `/dashboard`. Save the one-time bearer token and enter the
-machine's numeric LAN IP and port `8001`. Do not use `localhost` or `127.0.0.1`: bot endpoint
+First add a bot under **My Bots** on `/dashboard`. Enter the machine's numeric LAN IP and port
+`8001`, then save the one-time bearer token. Do not use `localhost` or `127.0.0.1`: bot endpoint
 validation intentionally rejects loopback addresses. Ensure `POKER_PARTICIPANT_SUBNET` contains
 the bot machine's LAN address and that the machine firewall allows the backend to reach port
 `8001`.
@@ -222,7 +228,7 @@ Confirm that the bot is listening from the bot machine:
 curl http://127.0.0.1:8001/v1/health
 ```
 
-The response should be `{"protocol":"poker-bot.v1","status":"ready"}`. The verification and
+The response should be `{"protocol":"poker-bot.v2","status":"ready"}`. The verification and
 action endpoints require `Authorization: Bearer <token>`. Run the
 conformance client against either bot by replacing the IP and token:
 
@@ -235,7 +241,8 @@ python -m poker_bot_platform.bots.conformance \
   --participant-subnet 192.168.0.0/16
 ```
 
-See [`../examples/bots/README.md`](../examples/bots/README.md) for the complete wire contract.
+Then press **Verify** on the dashboard. See [`../examples/bots/README.md`](../examples/bots/README.md)
+for the complete wire contract.
 Malformed JSON, duplicate keys, schema mismatches, stale identifiers, illegal actions, wrong
 content types, non-success responses, oversized responses, connection failures, and timeouts all
 produce one deterministic automatic check-or-fold.

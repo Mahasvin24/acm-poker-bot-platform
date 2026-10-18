@@ -1,5 +1,9 @@
 # Poker Gameplay Research
 
+> Since v2 the platform runs single-table matches rather than tournaments. The structure notes
+> below informed the optional blind escalation in `MatchConfig`; the table-interaction notes still
+> apply. See `docs/architecture-plan.md` for current rules.
+
 This note records the product decisions drawn from established tournament structures and online
 poker clients. It is intentionally limited to features that improve comprehension, fairness, or
 decision speed for an amateur club tournament.
