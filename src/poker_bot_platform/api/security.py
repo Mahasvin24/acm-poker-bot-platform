@@ -1,8 +1,34 @@
 from __future__ import annotations
 
+from ipaddress import ip_address
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, status
+
+from poker_bot_platform.api.rate_limit import RateLimitExceeded
+
+
+def client_key(request: Request) -> str:
+    """Identify the browser client, trusting X-Forwarded-For only from a local proxy."""
+
+    peer = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        try:
+            trusted_proxy = ip_address(peer).is_loopback
+        except ValueError:
+            trusted_proxy = False
+        if trusted_proxy:
+            return forwarded.split(",", 1)[0].strip() or peer
+    return peer
+
+
+def too_many_attempts(exc: RateLimitExceeded) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="too many attempts; try again in a few minutes",
+        headers={"Retry-After": str(exc.retry_after_seconds)},
+    )
 
 
 class SameOriginGuard:

@@ -445,9 +445,8 @@ function ResultPanel({ result, names }: { result: HandResult; names: Map<number,
     : winners[0] === "You" ? "You win" : `${winners[0] ?? "Winner"} wins`;
   return (
     <section className={styles.resultPanel} aria-label="Hand result">
-      <span>{result.synthetic ? "Test override" : result.reason === "fold" ? "Won uncontested" : "Showdown"}</span>
+      <span>{result.reason === "fold" ? "Won uncontested" : "Showdown"}</span>
       <h2>{winnerHeadline}</h2>
-      {result.synthetic && <p>This result was forced for testing and was not determined by hand strength.</p>}
       {result.reason === "fold" && <p>The remaining player won after every opponent folded.</p>}
       {result.awards.map((award) => {
         const wonPot = result.winner_seats.includes(award.seat);
@@ -458,11 +457,9 @@ function ResultPanel({ result, names }: { result: HandResult; names: Map<number,
           </p>
         );
       })}
-      {!result.synthetic && (
-        <p className={styles.settlementNote}>
-          Only matched chips in the pot are awarded. Chips a player never committed stay in their stack.
-        </p>
-      )}
+      <p className={styles.settlementNote}>
+        Only matched chips in the pot are awarded. Chips a player never committed stay in their stack.
+      </p>
       {result.revealed_hands.map((hand) => (
         <p key={hand.seat}>
           <strong>{names.get(hand.seat) ?? `Seat ${hand.seat}`}</strong> — {hand.label}

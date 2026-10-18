@@ -20,13 +20,13 @@ from poker_bot_platform.integration import (
     SyncedEntrantService,
     TournamentRegistry,
 )
-from poker_bot_platform.integration.demo_match import EphemeralDemoMatch
+from poker_bot_platform.integration.demo_match import DemoMatchSessions
 from poker_bot_platform.persistence import create_database_components
 from poker_bot_platform.tournament import SqlAlchemyTournamentStore
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()
+    settings = settings or Settings()  # type: ignore[call-arg]
     database_engine, sessions, table_repository = create_database_components(settings.database_url)
     auth_repository = SqlAlchemyAuthRepository(sessions)
     tournament_store = SqlAlchemyTournamentStore(sessions)
@@ -58,7 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registry,
     )
     scheduler = GameplayScheduler(registry, gameplay)
-    demo_match = EphemeralDemoMatch()
+    demo_match = DemoMatchSessions()
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -95,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         create_demo_match_router(
             demo_match,
             allowed_origin=settings.allowed_origin,
+            cookie_secure=settings.cookie_secure,
         )
     )
     application.state.database_engine = database_engine
@@ -105,4 +106,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return application
 
 
-app = create_app()
+def __getattr__(name: str) -> FastAPI:
+    # Built on first access so importing create_app never requires deployment settings.
+    if name != "app":
+        raise AttributeError(name)
+    application = create_app()
+    globals()["app"] = application
+    return application

@@ -12,8 +12,6 @@ from pokerkit import Deck
 
 from poker_bot_platform.api.models import (
     DemoMatchStateResponse,
-    HandAwardResponse,
-    HandResultResponse,
     PlayerActionRequest,
     PlayerDecisionResponse,
     PlayerTableStateResponse,
@@ -21,7 +19,6 @@ from poker_bot_platform.api.models import (
     PublicPlayerSeatResponse,
     PublicSidePotResponse,
     PublicTurnResponse,
-    RevealedHandResponse,
 )
 from poker_bot_platform.bots import BotActionRequest, BotEndpoint, BotGateway
 from poker_bot_platform.bots.reference import deterministic_reference_action
@@ -32,7 +29,6 @@ from poker_bot_platform.domain import (
     PlayerAction,
     SeatState,
     StartHandRequest,
-    Street,
     TableStatus,
     TournamentStatus,
 )
@@ -40,8 +36,6 @@ from poker_bot_platform.engine import PokerKitEngine
 from poker_bot_platform.integration.actors import BotActor
 from poker_bot_platform.integration.presentation import natural_hand_result
 from poker_bot_platform.persistence import InMemoryTableRepository
-
-DemoOutcome = Literal["human_win", "bot_win"]
 
 _TOURNAMENT_ID = "ephemeral-human-versus-bot"
 _TABLE_ID = "ephemeral-four-player-table"
@@ -67,6 +61,50 @@ class DemoMatchError(RuntimeError):
     pass
 
 
+class DemoMatchSessions:
+    """Gives each browser session its own demo match, bounded in count and idle age."""
+
+    def __init__(
+        self,
+        *,
+        max_sessions: int = 64,
+        idle_ttl: timedelta = timedelta(minutes=30),
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._max_sessions = max_sessions
+        self._idle_ttl = idle_ttl
+        self._clock = clock or (lambda: datetime.now(UTC))
+        self._matches: dict[str, tuple[EphemeralDemoMatch, datetime]] = {}
+        self._lock = asyncio.Lock()
+
+    async def get(self, session_id: str) -> EphemeralDemoMatch:
+        async with self._lock:
+            now = self._clock()
+            expired = [
+                key
+                for key, (_match, seen) in self._matches.items()
+                if now - seen > self._idle_ttl
+            ]
+            for key in expired:
+                await self._matches.pop(key)[0].aclose()
+            entry = self._matches.get(session_id)
+            if entry is None:
+                if len(self._matches) >= self._max_sessions:
+                    oldest = min(self._matches, key=lambda key: self._matches[key][1])
+                    await self._matches.pop(oldest)[0].aclose()
+                match = EphemeralDemoMatch(clock=self._clock)
+            else:
+                match = entry[0]
+            self._matches[session_id] = (match, now)
+            return match
+
+    async def aclose(self) -> None:
+        async with self._lock:
+            for match, _seen in self._matches.values():
+                await match.aclose()
+            self._matches.clear()
+
+
 class EphemeralDemoMatch:
     """Single-process, non-durable four-player match used only by the test page."""
 
@@ -74,7 +112,6 @@ class EphemeralDemoMatch:
         self._lock = asyncio.Lock()
         self._repository: InMemoryTableRepository | None = None
         self._coordinator: TableCoordinator | None = None
-        self._forced_outcome: DemoOutcome | None = None
         self._match_id: str | None = None
         self._bot_action_due_at: datetime | None = None
         self._bot_action_seat: int | None = None
@@ -153,7 +190,6 @@ class EphemeralDemoMatch:
             )
             self._repository = repository
             self._coordinator = coordinator
-            self._forced_outcome = None
             self._match_id = secrets.token_urlsafe(12)
             self._bot_action_due_at = None
             self._bot_action_seat = None
@@ -164,8 +200,6 @@ class EphemeralDemoMatch:
     async def submit(self, request: PlayerActionRequest) -> DemoMatchStateResponse:
         async with self._lock:
             coordinator = self._require_active_coordinator()
-            if self._forced_outcome is not None:
-                raise DemoMatchError("the forced match result cannot accept actions")
             before = self._require_snapshot(coordinator)
             if before.completed:
                 raise DemoMatchError("the hand is already complete")
@@ -188,20 +222,10 @@ class EphemeralDemoMatch:
             await self._drive_until_human_or_complete()
             return self._response()
 
-    async def force(self, outcome: DemoOutcome) -> DemoMatchStateResponse:
-        async with self._lock:
-            self._require_active_coordinator()
-            self._forced_outcome = outcome
-            self._bot_action_due_at = None
-            self._bot_action_seat = None
-            self._presentation_due_at = None
-            return self._response()
-
     async def end(self) -> DemoMatchStateResponse:
         async with self._lock:
             self._coordinator = None
             self._repository = None
-            self._forced_outcome = None
             self._match_id = None
             self._bot_action_due_at = None
             self._bot_action_seat = None
@@ -210,8 +234,6 @@ class EphemeralDemoMatch:
 
     async def _drive_until_human_or_complete(self) -> None:
         coordinator = self._require_active_coordinator()
-        if self._forced_outcome is not None:
-            return
         while True:
             snapshot = self._require_snapshot(coordinator)
             if snapshot.completed:
@@ -283,18 +305,6 @@ class EphemeralDemoMatch:
         coordinator = self._require_active_coordinator()
         table = self._project(coordinator)
         match_id = self._require_match_id()
-        if self._forced_outcome is not None:
-            table = self._forced_table(
-                table,
-                self._require_snapshot(coordinator),
-                self._forced_outcome,
-            )
-            return DemoMatchStateResponse(
-                status="completed",
-                match_id=match_id,
-                result=self._forced_outcome,
-                table=table,
-            )
         snapshot = self._require_snapshot(coordinator)
         if snapshot.completed:
             return DemoMatchStateResponse(
@@ -390,64 +400,6 @@ class EphemeralDemoMatch:
             decision=decision,
             turn=turn,
             hand_result=natural_hand_result(snapshot),
-        )
-
-    @staticmethod
-    def _forced_table(
-        table: PlayerTableStateResponse,
-        snapshot: HandSnapshot,
-        outcome: DemoOutcome,
-    ) -> PlayerTableStateResponse:
-        winner_seat = _HUMAN_SEAT if outcome == "human_win" else _BOT_SEATS[0]
-        total_chips = _STARTING_STACK * (len(_BOT_SEATS) + 1)
-        seats = tuple(
-            seat.model_copy(
-                update={
-                    "stack": total_chips if seat.seat == winner_seat else 0,
-                    "committed_this_street": 0,
-                    "committed_this_hand": 0,
-                    "folded": False,
-                    "all_in": False,
-                    "eliminated": seat.seat != winner_seat,
-                }
-            )
-            for seat in table.seats
-        )
-        return table.model_copy(
-            update={
-                "tournament_status": TournamentStatus.COMPLETED,
-                "table_status": TableStatus.COMPLETED,
-                "street": Street.COMPLETE,
-                "acting_seat": None,
-                "seats": seats,
-                "pot": 0,
-                "side_pots": (),
-                "completed": True,
-                "decision": None,
-                "turn": None,
-                "hand_result": HandResultResponse(
-                    reason="forced",
-                    awards=(
-                        HandAwardResponse(
-                            seat=winner_seat,
-                            amount=total_chips,
-                            net=total_chips - _STARTING_STACK,
-                        ),
-                    ),
-                    winner_seats=(winner_seat,),
-                    revealed_hands=tuple(
-                        RevealedHandResponse(
-                            seat=seat.seat,
-                            hole_cards=seat.hole_cards,
-                            label="Test override — not ranked",
-                            best_five=(),
-                        )
-                        for seat in snapshot.seats
-                        if seat.hole_cards
-                    ),
-                    synthetic=True,
-                ),
-            }
         )
 
     @staticmethod

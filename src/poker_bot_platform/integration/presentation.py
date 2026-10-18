@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pokerkit import StandardHighHand
+from pokerkit import Hand, StandardHighHand
 
 from poker_bot_platform.api.models import (
     HandAwardResponse,
@@ -29,9 +29,11 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
             continue
         seat_number = raw_award.get("seat")
         amount = raw_award.get("amount")
+        if not isinstance(seat_number, int) or not isinstance(amount, int) or amount <= 0:
+            continue
         seat = seats_by_number.get(seat_number)
         starting = starting_stacks.get(seat_number)
-        if seat is None or starting is None or not isinstance(amount, int) or amount <= 0:
+        if seat is None or starting is None:
             continue
         awards.append(
             HandAwardResponse(
@@ -44,12 +46,15 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
     live_hands = [seat for seat in snapshot.seats if seat.hole_cards and not seat.folded]
     folded = len(live_hands) <= 1
     revealed: list[RevealedHandResponse] = []
-    ranked_hands: list[tuple[int, StandardHighHand]] = []
+    ranked_hands: list[tuple[int, Hand]] = []
     if not folded:
+        # Only hands PokerKit actually showed are public; mucked losing hands stay private.
         for seat in live_hands:
+            if not seat.public_hole_cards:
+                continue
             try:
                 hand = StandardHighHand.from_game(
-                    "".join(seat.hole_cards),
+                    "".join(seat.public_hole_cards),
                     "".join(snapshot.community_cards),
                 )
             except ValueError:
@@ -58,7 +63,7 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
             revealed.append(
                 RevealedHandResponse(
                     seat=seat.seat,
-                    hole_cards=seat.hole_cards,
+                    hole_cards=seat.public_hole_cards,
                     label=hand.entry.label.value,
                     best_five=tuple(repr(card) for card in hand.cards),
                 )

@@ -60,5 +60,3 @@ async function post(path: string, body?: ActionSubmission): Promise<DemoMatchSta
 export const startDemoMatch = () => post("/start");
 export const endDemoMatch = () => post("/end");
 export const submitDemoAction = (action: ActionSubmission) => post("/action", action);
-export const forceDemoResult = (result: "human_win" | "bot_win") =>
-  post(`/cheat/${result}`);
