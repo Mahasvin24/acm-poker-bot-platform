@@ -1,5 +1,5 @@
-import { JoinTable } from "./join-table";
+import { redirect } from "next/navigation";
 
 export default function PlayPage() {
-  return <JoinTable />;
+  redirect("/join");
 }

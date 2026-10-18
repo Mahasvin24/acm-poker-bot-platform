@@ -15,16 +15,18 @@ import styles from "./account.module.css";
 type Mode = "login" | "register";
 
 interface AuthPageProps {
-  initialTournamentId: string;
+  next: string;
 }
 
-function destination(role: "user" | "admin", tournamentId: string): string {
-  const path = role === "admin" ? "/admin" : "/dashboard";
-  const normalized = tournamentId.trim();
-  return normalized ? `${path}?tournament=${encodeURIComponent(normalized)}` : path;
+function safeNext(next: string): string | null {
+  return next.startsWith("/") && !next.startsWith("//") ? next : null;
 }
 
-export function AuthPage({ initialTournamentId }: AuthPageProps) {
+function destination(role: "user" | "admin", next: string): string {
+  return safeNext(next) ?? (role === "admin" ? "/admin" : "/dashboard");
+}
+
+export function AuthPage({ next }: AuthPageProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [checking, setChecking] = useState(true);
@@ -35,7 +37,7 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
     let active = true;
     getMe()
       .then((account) => {
-        if (active) router.replace(destination(account.role, initialTournamentId));
+        if (active) router.replace(destination(account.role, next));
       })
       .catch((requestError: unknown) => {
         if (active && !(requestError instanceof AccountApiError && requestError.status === 401)) {
@@ -48,7 +50,7 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
     return () => {
       active = false;
     };
-  }, [initialTournamentId, router]);
+  }, [next, router]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,7 +67,7 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
     try {
       if (mode === "register") await registerAccount(email, password);
       const account = await loginAccount(email, password);
-      router.replace(destination(account.role, initialTournamentId));
+      router.replace(destination(account.role, next));
     } catch (requestError) {
       setError(
         requestError instanceof AccountApiError
@@ -89,8 +91,8 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
     <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link className={styles.wordmark} href="/">ACM / POKER</Link>
-        <span className={styles.headerTitle}>Tournament Access</span>
-        <Link className={styles.textButton} href="/play/demo">View Demo</Link>
+        <span className={styles.headerTitle}>Account</span>
+        <Link className={styles.textButton} href="/demo">Try the Demo</Link>
       </header>
       <div className={styles.authLayout}>
         <section className={styles.authIntro}>
@@ -99,8 +101,8 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
             <h1>Bring instinct.<br /><em>Or code.</em></h1>
           </div>
           <p>
-            Create one account, then choose a human or bot entry when you join a tournament.
-            Organizers use the same sign-in with an explicit admin role.
+            Create one account to play in the browser, register your bots, or both. Organizers
+            share a short join code for each match.
           </p>
         </section>
         <section className={styles.authPanel} aria-labelledby="account-heading">
@@ -128,8 +130,10 @@ export function AuthPage({ initialTournamentId }: AuthPageProps) {
             </h2>
             <p>
               {mode === "login"
-                ? "Sign in to manage your entry or return to a live table."
-                : "You will choose Human or Bot after signing in."}
+                ? safeNext(next)?.startsWith("/join")
+                  ? "Sign in to finish joining the match."
+                  : "Sign in to join a match, manage your bots, or return to a live table."
+                : "You will choose to play yourself or seat one of your bots when you join a match."}
             </p>
             <form className={styles.form} onSubmit={submit}>
               <div className={styles.field}>

@@ -14,26 +14,26 @@ const tickerItems = [
 const timeline = [
   {
     number: "01",
-    title: "Pick your side",
-    copy: "Register as a human player or a bot builder.",
-    timing: "Registration",
+    title: "Make an account",
+    copy: "Sign up once. Play yourself, register bots, or both.",
+    timing: "Any time",
   },
   {
     number: "02",
     title: "Run the check",
-    copy: "Bots verify their connection and response format.",
+    copy: "Bot builders verify their endpoint from My Bots.",
     timing: "Before event",
   },
   {
     number: "03",
     title: "Take your seat",
-    copy: "Join the event Wi-Fi and receive a table assignment.",
+    copy: "Enter the six-character code from the organizer.",
     timing: "Event day",
   },
   {
     number: "04",
     title: "Play it down",
-    copy: "The field competes until one stack remains.",
+    copy: "The table plays until one stack remains.",
     timing: "Live",
     live: true,
   },
@@ -52,7 +52,7 @@ const questions = [
   },
   {
     question: "Is there real money involved?",
-    answer: "No. This is a friendly, play-money ACM club tournament.",
+    answer: "No. This is a friendly, play-money ACM club event.",
   },
   {
     question: "What if my bot misses a turn?",
@@ -74,7 +74,7 @@ export default function Home() {
           <a
             className="brand"
             href="#welcome"
-            aria-label="ACM Poker Bot Tournament home"
+            aria-label="ACM Poker home"
           >
             <Image
               className="logo"
@@ -93,7 +93,7 @@ export default function Home() {
             <a href="#format">Format</a>
             <a href="#timeline">Timeline</a>
             <a href="#faq">FAQ</a>
-            <Link href="/dashboard">Play</Link>
+            <Link href="/join">Join a Match</Link>
             <Link className="nav-pill" href="/account">
               <i aria-hidden="true" /> Sign In / Register
             </Link>
@@ -137,24 +137,24 @@ export default function Home() {
             </h1>
             <div className="hero-bottom reveal">
               <p>
-                A live poker tournament where people play their instincts and
-                student-built bots play their code.
+                Live poker where people play their instincts and student-built
+                bots play their code. Got a code from the organizer?
               </p>
-              <a className="round-link" href="#format">
-                <span>See the format</span>
-                <b>↓</b>
-              </a>
+              <Link className="round-link" href="/join">
+                <span>Join a match</span>
+                <b>→</b>
+              </Link>
             </div>
           </div>
           <p className="side-note side-note--left">
-            36 entrants · 6 per table
+            Up to 6 per table
           </p>
           <p className="side-note side-note--right">Scroll to deal</p>
         </section>
 
         <section
           className="page-section thesis"
-          aria-label="Tournament introduction"
+          aria-label="Introduction"
         >
           <div className="suit-field" aria-hidden="true">
             <span>♣</span>
@@ -224,7 +224,7 @@ export default function Home() {
               </article>
             </div>
 
-            <div className="ticker" aria-label="Tournament format">
+            <div className="ticker" aria-label="Format">
               <div>
                 {tickerItems.map((item) => (
                   <span className="ticker-item" key={item}>
@@ -281,7 +281,7 @@ export default function Home() {
                 Build a bot with the{" "}
                 <Link href="/bot-guide">endpoint guide</Link>, or head straight
                 to your{" "}
-                <Link href="/dashboard">tournament dashboard</Link>.
+                <Link href="/dashboard">dashboard</Link>.
               </p>
             </div>
             <div className="questions reveal">
@@ -298,7 +298,7 @@ export default function Home() {
             </div>
           </div>
           <footer className="container footer reveal">
-            <span>ACM · Poker Bot Tournament</span>
+            <span>ACM · Poker: Humans vs. Bots</span>
             <span>Dates and location coming soon</span>
             <a href="#welcome">Back to top ↑</a>
           </footer>

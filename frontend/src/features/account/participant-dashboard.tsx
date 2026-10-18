@@ -2,187 +2,297 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { CodeEntry } from "../match/join-match";
+import { relativeTime } from "../match/format";
 import {
-  AccountApiError,
-  configureBot,
-  getEntrant,
-  getMe,
+  changePassword,
+  createBot,
+  deleteBot,
+  getBotDiagnostics,
+  listBots,
   logoutAccount,
-  registerEntrant,
+  myMatches,
+  rotateBotToken,
+  updateBot,
   verifyBot,
 } from "./api";
 import styles from "./account.module.css";
-import type { Account, Entrant, EntrantKind } from "./types";
+import {
+  MATCH_STATUS_LABELS,
+  type BotDiagnostics,
+  type BotProfile,
+  type MyMatch,
+} from "./types";
+import { useAccount } from "./use-account";
 
-interface ParticipantDashboardProps {
-  initialTournamentId: string;
+function TokenReveal({ token, onDismiss }: { token: string; onDismiss: () => void }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error("unavailable");
+      await navigator.clipboard.writeText(token);
+      setCopied("Copied. Paste it into your bot as BOT_TOKEN.");
+    } catch {
+      setCopied("Select the token and copy it manually.");
+    }
+  };
+  return (
+    <div className={styles.tokenBox}>
+      <span className={styles.tokenLabel}>Shown once · Save this bearer token</span>
+      <code translate="no">{token}</code>
+      <div className={styles.tokenActions}>
+        <button className={styles.copyButton} onClick={() => void copy()} type="button">Copy Token</button>
+        <button className={styles.textButton} onClick={onDismiss} type="button">I saved it</button>
+      </div>
+      {copied && <p className={styles.fieldHint}>{copied}</p>}
+    </div>
+  );
 }
 
-export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboardProps) {
-  const router = useRouter();
-  const [account, setAccount] = useState<Account | null>(null);
-  const [tournamentId, setTournamentId] = useState(initialTournamentId);
-  const [activeTournamentId, setActiveTournamentId] = useState(initialTournamentId);
-  const [entrant, setEntrant] = useState<Entrant | null>(null);
-  const [lookupComplete, setLookupComplete] = useState(false);
-  const [kind, setKind] = useState<EntrantKind>("human");
+function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [bearerToken, setBearerToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<{ data: BotDiagnostics; loadedAt: number } | null>(null);
+
+  const run = async (label: string, operation: () => Promise<void>) => {
+    setBusy(label);
+    setError(null);
+    try {
+      await operation();
+      await onChange();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "That did not work.");
+      await onChange();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveEndpoint = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    void run("save", async () => {
+      await updateBot(bot.id, {
+        name: String(form.get("name") ?? "").trim(),
+        ip: String(form.get("ip") ?? "").trim(),
+        port: Number(form.get("port")),
+      });
+      setEditing(false);
+    });
+  };
+
+  const loadDiagnostics = async () => {
+    if (diagnostics) {
+      setDiagnostics(null);
+      return;
+    }
+    try {
+      setDiagnostics({ data: await getBotDiagnostics(bot.id), loadedAt: Date.now() });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Diagnostics are unavailable.");
+    }
+  };
+
+  return (
+    <article className={styles.botCard}>
+      <div className={styles.botCardHead}>
+        <div>
+          <h3>{bot.name}</h3>
+          <code>{bot.ip}:{bot.port}</code>
+        </div>
+        <span className={styles.statusPill} data-status={bot.verified_at ? "running" : "closed"}>
+          {bot.verified_at ? "Ready" : "Not verified"}
+        </span>
+      </div>
+      {bot.last_verification_error && !bot.verified_at && (
+        <p className={styles.formError}>{bot.last_verification_error}</p>
+      )}
+      {token && <TokenReveal onDismiss={() => setToken(null)} token={token} />}
+      {editing && (
+        <form className={styles.form} onSubmit={saveEndpoint}>
+          <div className={styles.inlineFields}>
+            <div className={styles.field}>
+              <label htmlFor={`name-${bot.id}`}>Name</label>
+              <input defaultValue={bot.name} id={`name-${bot.id}`} maxLength={80} name="name" required />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor={`ip-${bot.id}`}>LAN IP</label>
+              <input defaultValue={bot.ip} id={`ip-${bot.id}`} inputMode="decimal" name="ip" required spellCheck={false} />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor={`port-${bot.id}`}>Port</label>
+              <input defaultValue={bot.port} id={`port-${bot.id}`} max={65535} min={1024} name="port" required type="number" />
+            </div>
+          </div>
+          <p className={styles.fieldHint}>Changing the address requires verifying again. Your token stays the same.</p>
+          <div className={styles.panelActions}>
+            <button className={styles.secondaryButton} disabled={busy !== null} type="submit">Save</button>
+            <button className={styles.textButton} onClick={() => setEditing(false)} type="button">Cancel</button>
+          </div>
+        </form>
+      )}
+      <div className={styles.panelActions}>
+        <button
+          className={styles.primaryButton}
+          disabled={busy !== null}
+          onClick={() => void run("verify", async () => { await verifyBot(bot.id); })}
+          type="button"
+        >
+          {busy === "verify" ? "Contacting bot…" : bot.verified_at ? "Verify Again" : "Verify Connection"}
+        </button>
+        <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => setEditing((value) => !value)} type="button">Edit</button>
+        <button
+          className={styles.secondaryButton}
+          disabled={busy !== null}
+          onClick={() => void run("rotate", async () => { setToken((await rotateBotToken(bot.id)).bearer_token); })}
+          type="button"
+        >
+          New Token
+        </button>
+        <button className={styles.secondaryButton} onClick={() => void loadDiagnostics()} type="button">
+          {diagnostics ? "Hide Diagnostics" : "Diagnostics"}
+        </button>
+        <button
+          className={styles.textButton}
+          disabled={busy !== null}
+          onClick={() => {
+            if (window.confirm(`Delete ${bot.name}? Seats it already holds keep playing with automatic actions.`)) {
+              void run("delete", async () => { await deleteBot(bot.id); });
+            }
+          }}
+          type="button"
+        >
+          Delete
+        </button>
+      </div>
+      {error && <p className={styles.formError} role="alert">{error}</p>}
+      {diagnostics && (
+        <div className={styles.diagnostics}>
+          <p>
+            {diagnostics.data.decisions} decisions this session ·{" "}
+            {Object.values(diagnostics.data.failures).reduce((total, count) => total + count, 0)} automatic fallbacks
+            {diagnostics.data.consecutive_failures >= 3 ? " · health-check mode (bot looks unreachable)" : ""}
+          </p>
+          {diagnostics.data.recent.length === 0 ? (
+            <p>No decisions yet. They appear here once your bot plays a hand.</p>
+          ) : (
+            <ol>
+              {diagnostics.data.recent.slice(0, 12).map((item) => (
+                <li data-failed={item.failure_reason ? "true" : undefined} key={`${item.hand_id}-${item.at}`}>
+                  <span>{relativeTime(item.at, diagnostics.loadedAt)}</span>
+                  <strong>{item.failure_reason ? `${item.action} (automatic)` : `${item.action}${item.amount_to ? ` to ${item.amount_to}` : ""}`}</strong>
+                  <small>{item.latency_ms} ms</small>
+                  {item.explanation && <p>{item.explanation}</p>}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function PasswordCard() {
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await changePassword(String(data.get("current")), String(data.get("next")));
+      form.reset();
+      setMessage({ ok: true, text: "Password updated." });
+    } catch (reason) {
+      setMessage({ ok: false, text: reason instanceof Error ? reason.message : "Password change failed." });
+    }
+  };
+  return (
+    <details className={styles.sidebarCard}>
+      <summary className={styles.summaryToggle}>Change password</summary>
+      <form className={styles.form} onSubmit={(event) => void submit(event)}>
+        <div className={styles.field}>
+          <label htmlFor="pw-current">Current password</label>
+          <input autoComplete="current-password" id="pw-current" name="current" required type="password" />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="pw-next">New password</label>
+          <input autoComplete="new-password" id="pw-next" minLength={10} name="next" required type="password" />
+        </div>
+        <button className={styles.secondaryButton} type="submit">Update</button>
+        {message && <p className={message.ok ? styles.successMessage : styles.formError}>{message.text}</p>}
+      </form>
+    </details>
+  );
+}
+
+export function ParticipantDashboard() {
+  const router = useRouter();
+  const { account, error: accountError } = useAccount("/dashboard");
+  const [matches, setMatches] = useState<MyMatch[] | null>(null);
+  const [bots, setBots] = useState<BotProfile[] | null>(null);
+  const [newToken, setNewToken] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const [nextMatches, nextBots] = await Promise.all([myMatches(), listBots()]);
+    setMatches(nextMatches);
+    setBots(nextBots);
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const current = await getMe();
-        if (!active) return;
-        setAccount(current);
-        if (current.role === "admin") {
-          router.replace("/admin");
-          return;
-        }
-        if (initialTournamentId) {
-          try {
-            const currentEntrant = await getEntrant(initialTournamentId);
-            if (active) setEntrant(currentEntrant);
-          } catch (requestError) {
-            if (!(requestError instanceof AccountApiError && requestError.status === 404)) {
-              throw requestError;
-            }
-          }
-          if (active) setLookupComplete(true);
-        }
-      } catch (requestError) {
-        if (!active) return;
-        if (requestError instanceof AccountApiError && requestError.status === 401) {
-          router.replace("/account");
-          return;
-        }
-        setError("The account service is unavailable. Check that the API is running.");
-      }
-    };
-    void load();
+    if (!account) return;
+    if (account.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      refresh().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load your matches."));
+    }, 0);
+    const interval = window.setInterval(() => void refresh().catch(() => undefined), 5_000);
     return () => {
-      active = false;
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
     };
-  }, [initialTournamentId, router]);
+  }, [account, refresh, router]);
 
-  const findTournament = async (event: FormEvent<HTMLFormElement>) => {
+  const addBot = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalized = tournamentId.trim();
-    if (!normalized) {
-      setError("Enter the tournament ID supplied by the organizer.");
-      return;
-    }
-    setBusy("lookup");
-    setError(null);
-    setNotice(null);
-    setBearerToken(null);
-    try {
-      const current = await getEntrant(normalized);
-      setEntrant(current);
-    } catch (requestError) {
-      if (requestError instanceof AccountApiError && requestError.status === 404) {
-        setEntrant(null);
-      } else {
-        setError(requestError instanceof Error ? requestError.message : "Tournament lookup failed.");
-      }
-    } finally {
-      setActiveTournamentId(normalized);
-      setLookupComplete(true);
-      router.replace(`/dashboard?tournament=${encodeURIComponent(normalized)}`);
-      setBusy(null);
-    }
-  };
-
-  const joinTournament = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const displayName = String(form.get("displayName") ?? "").trim();
-    if (!displayName) {
-      setError("Enter the name that should appear at the table.");
-      return;
-    }
-    setBusy("join");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setBusy(true);
     setError(null);
     try {
-      const registered = await registerEntrant(activeTournamentId, kind, displayName);
-      setEntrant(registered);
-      setNotice(`${kind === "human" ? "Human" : "Bot"} entry registered.`);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Registration failed.");
+      const created = await createBot(
+        String(data.get("name") ?? "").trim(),
+        String(data.get("ip") ?? "").trim(),
+        Number(data.get("port")),
+      );
+      setNewToken(created.bearer_token);
+      form.reset();
+      await refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not add the bot.");
     } finally {
-      setBusy(null);
-    }
-  };
-
-  const saveBotEndpoint = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const ip = String(form.get("ip") ?? "").trim();
-    const port = Number(form.get("port"));
-    setBusy("configure");
-    setError(null);
-    setNotice(null);
-    setBearerToken(null);
-    try {
-      const result = await configureBot(activeTournamentId, ip, port);
-      setEntrant(result.entrant);
-      setBearerToken(result.bearer_token);
-      setNotice("Endpoint saved. Copy the token before leaving this page.");
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Endpoint setup failed.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const runVerification = async () => {
-    setBusy("verify");
-    setError(null);
-    setNotice(null);
-    try {
-      const verified = await verifyBot(activeTournamentId);
-      setEntrant(verified);
-      setNotice("Bot verified and ready for seating.");
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Bot verification failed.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const copyToken = async () => {
-    if (!bearerToken) return;
-    setError(null);
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable");
-      await navigator.clipboard.writeText(bearerToken);
-      setNotice("Bearer token copied.");
-    } catch {
-      setError("Could not copy automatically. Select the token and copy it manually.");
-    }
-  };
-
-  const signOut = async () => {
-    setBusy("logout");
-    try {
-      await logoutAccount();
-    } finally {
-      router.replace("/account");
+      setBusy(false);
     }
   };
 
   if (!account) {
     return (
       <main className={styles.page} id="main-content">
-        <div className={styles.loading}><span>{error ?? "Loading Player Account"}</span></div>
+        <div className={styles.loading}><span>{accountError ?? "Loading your account"}</span></div>
       </main>
     );
   }
+
+  const live = matches?.filter((item) => item.status !== "completed" && item.status !== "cancelled") ?? [];
+  const past = matches?.filter((item) => item.status === "completed" || item.status === "cancelled") ?? [];
 
   return (
     <main className={styles.page} id="main-content">
@@ -191,7 +301,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
         <span className={styles.headerTitle}>Player Dashboard</span>
         <div className={styles.headerAccount}>
           <span>{account.email}</span>
-          <button className={styles.textButton} disabled={busy === "logout"} onClick={signOut} type="button">
+          <button className={styles.textButton} onClick={() => void logoutAccount().finally(() => router.replace("/account"))} type="button">
             Sign Out
           </button>
         </div>
@@ -200,210 +310,101 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
       <div className={styles.dashboard}>
         <section className={styles.dashboardIntro}>
           <div>
-            <p className={styles.eyebrow}>Participant Control Room</p>
-            <h1>Choose your<br /><em>side.</em></h1>
+            <p className={styles.eyebrow}>Your seat</p>
+            <h1>Play it.<br /><em>Or code it.</em></h1>
           </div>
           <p>
-            Join once as a human or bot. Human players return here to find their table;
-            bot builders configure and verify their endpoint before seating.
+            Enter a match code from the organizer to sit down yourself or seat one of your bots.
+            Bots you add here can be reused in every match.
           </p>
         </section>
 
         <div className={styles.workspace}>
           <aside className={styles.sidebar}>
             <section className={styles.sidebarCard}>
-              <h2>Find Tournament</h2>
-              <p>Use the exact ID shared by the organizer.</p>
-              <form className={styles.form} onSubmit={findTournament}>
-                <div className={styles.field}>
-                  <label htmlFor="participant-tournament">Tournament ID</label>
-                  <input
-                    autoComplete="off"
-                    id="participant-tournament"
-                    name="tournamentId"
-                    onChange={(event) => setTournamentId(event.target.value)}
-                    placeholder="e.g. club-event…"
-                    spellCheck={false}
-                    value={tournamentId}
-                  />
-                </div>
-                <button className={styles.secondaryButton} disabled={busy === "lookup"} type="submit">
-                  {busy === "lookup" ? "Checking…" : "Check Entry"}
-                </button>
-              </form>
+              <h2>Join a match</h2>
+              <p>Codes look like K7Q-4PM.</p>
+              <CodeEntry compact />
             </section>
             <section className={styles.sidebarCard}>
-              <h2>Interface Demo</h2>
-              <p>Explore the table controls without an account or live tournament.</p>
-              <div className={styles.panelActions}>
-                <Link className={styles.textButton} href="/play/demo">Open Demo Table ↗</Link>
+              <h2>Practice</h2>
+              <p>Play a full hand against three built-in bots. Nothing is saved.</p>
+              <div className={styles.panelActions} style={{ marginTop: 16 }}>
+                <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
             </section>
+            <PasswordCard />
           </aside>
 
-          <section aria-live="polite">
-            {!lookupComplete ? (
-              <div className={styles.emptyState}>
-                <p className={styles.sectionLabel}>No Tournament Selected</p>
-                <h2>Start with the event ID.</h2>
-                <p>Your account may hold one human or bot entry in each tournament.</p>
-              </div>
-            ) : entrant ? (
-              <div className={styles.panel}>
-                <div className={styles.panelHead}>
-                  <div>
-                    <p className={styles.sectionLabel}>{activeTournamentId}</p>
-                    <h2>{entrant.kind === "human" ? "Human Entry" : "Bot Entry"}</h2>
-                    <p className={styles.panelIntro}>Registration is attached to this account.</p>
-                  </div>
-                  <span className={styles.statusPill} data-status={entrant.bot_verified_at ? "verified" : "registered"}>
-                    {entrant.kind === "bot"
-                      ? entrant.bot_verified_at ? "Verified" : "Needs Verification"
-                      : "Registered"}
-                  </span>
+          <div className={styles.stack}>
+            <section className={styles.panel}>
+              <div className={styles.panelHead}>
+                <div>
+                  <p className={styles.sectionLabel}>Matches</p>
+                  <h2>Your matches</h2>
                 </div>
-
-                <div className={styles.entrantBody}>
-                  <div className={styles.entrantSummary}>
-                    <div>
-                      <span className={styles.sectionLabel}>Table Name</span>
-                      <h3>{entrant.display_name}</h3>
-                    </div>
-                    <span>{entrant.kind === "bot" ? "API Player" : "Browser Player"}</span>
-                  </div>
-
-                  {entrant.kind === "human" ? (
-                    <div className={styles.panelActions}>
-                      <Link className={styles.primaryButton} href={`/play/${encodeURIComponent(activeTournamentId)}`}>
-                        Open My Table →
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className={styles.botSetup}>
+              </div>
+              {matches === null ? (
+                <p className={styles.panelIntro}>Loading…</p>
+              ) : live.length === 0 && past.length === 0 ? (
+                <p className={styles.panelIntro}>You haven’t joined a match yet. Enter a code to get started.</p>
+              ) : (
+                <ul className={styles.matchList}>
+                  {[...live, ...past].map((item) => (
+                    <li key={item.match_id}>
                       <div>
-                        <h3>Bot Endpoint</h3>
-                        <p className={styles.panelIntro}>
-                          Enter the numeric LAN address and port where your bot is listening.
-                        </p>
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.my_entries.map((entry) => `${entry.display_name}${entry.kind === "bot" ? " (bot)" : ""}`).join(", ")}
+                          {" · "}{item.seats_taken}/{item.max_seats} seats
+                        </small>
                       </div>
-                      <form className={styles.form} onSubmit={saveBotEndpoint}>
-                        <div className={styles.inlineFields}>
-                          <div className={styles.field}>
-                            <label htmlFor="bot-ip">LAN IP Address</label>
-                            <input
-                              autoComplete="off"
-                              defaultValue={entrant.bot_ip ?? ""}
-                              id="bot-ip"
-                              inputMode="decimal"
-                              name="ip"
-                              placeholder="e.g. 192.168.1.42…"
-                              required
-                              spellCheck={false}
-                            />
-                          </div>
-                          <div className={styles.field}>
-                            <label htmlFor="bot-port">Port</label>
-                            <input
-                              defaultValue={entrant.bot_port ?? 8001}
-                              id="bot-port"
-                              inputMode="numeric"
-                              max={65535}
-                              min={1024}
-                              name="port"
-                              required
-                              type="number"
-                            />
-                          </div>
-                        </div>
-                        <button className={styles.secondaryButton} disabled={busy === "configure"} type="submit">
-                          {busy === "configure" ? "Saving…" : entrant.bot_ip ? "Replace Endpoint & Token" : "Save Endpoint"}
-                        </button>
-                      </form>
+                      <span className={styles.statusPill} data-status={item.status}>{MATCH_STATUS_LABELS[item.status]}</span>
+                      <Link className={item.status === "running" ? styles.primaryButton : styles.secondaryButton} href={`/match/${item.match_id}`}>
+                        {item.status === "lobby" ? "Lobby" : item.status === "completed" || item.status === "cancelled" ? "Results" : "Open Table"}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
-                      {bearerToken && (
-                        <div className={styles.tokenBox}>
-                          <span className={styles.tokenLabel}>Shown Once · Save This Token</span>
-                          <code translate="no">{bearerToken}</code>
-                          <div className={styles.tokenActions}>
-                            <button className={styles.copyButton} onClick={copyToken} type="button">Copy Token</button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className={styles.panelActions}>
-                        <button
-                          className={styles.primaryButton}
-                          disabled={!entrant.bot_ip || busy === "verify"}
-                          onClick={runVerification}
-                          type="button"
-                        >
-                          {busy === "verify" ? "Contacting Bot…" : "Verify Bot Connection"}
-                        </button>
-                        <Link className={styles.textButton} href="/bot-guide">Protocol Guide</Link>
-                      </div>
-                    </div>
-                  )}
-                  {notice && <p className={styles.successMessage}>{notice}</p>}
-                  {error && <p className={styles.formError}>{error}</p>}
+            <section className={styles.panel} id="bots">
+              <div className={styles.panelHead}>
+                <div>
+                  <p className={styles.sectionLabel}>Bots</p>
+                  <h2>My bots</h2>
+                  <p className={styles.panelIntro}>
+                    Run your bot on your laptop, then register its LAN address here.{" "}
+                    <Link href="/bot-guide">Read the protocol guide</Link>.
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className={styles.panel}>
-                <div className={styles.panelHead}>
-                  <div>
-                    <p className={styles.sectionLabel}>{activeTournamentId}</p>
-                    <h2>Register Your Entry</h2>
-                    <p className={styles.panelIntro}>This choice is fixed for this tournament.</p>
-                  </div>
-                  <span className={styles.statusPill} data-status="draft">Not Registered</span>
-                </div>
-                <form className={styles.form} onSubmit={joinTournament}>
-                  <fieldset>
-                    <legend className={styles.kindLegend}>Entrant Type</legend>
-                    <div className={styles.kindChoices}>
-                      <label className={styles.kindChoice}>
-                        <input
-                          checked={kind === "human"}
-                          name="kind"
-                          onChange={() => setKind("human")}
-                          type="radio"
-                          value="human"
-                        />
-                        <strong>Human</strong>
-                        <span>Play every legal action in the browser.</span>
-                      </label>
-                      <label className={styles.kindChoice}>
-                        <input
-                          checked={kind === "bot"}
-                          name="kind"
-                          onChange={() => setKind("bot")}
-                          type="radio"
-                          value="bot"
-                        />
-                        <strong>Bot</strong>
-                        <span>Connect your strategy through the bot API.</span>
-                      </label>
-                    </div>
-                  </fieldset>
+              {newToken && <div className={styles.entrantBody}><TokenReveal onDismiss={() => setNewToken(null)} token={newToken} /></div>}
+              <form className={styles.form} onSubmit={(event) => void addBot(event)}>
+                <div className={styles.inlineFields}>
                   <div className={styles.field}>
-                    <label htmlFor="display-name">Table Display Name</label>
-                    <input
-                      autoComplete="nickname"
-                      id="display-name"
-                      maxLength={80}
-                      name="displayName"
-                      placeholder={kind === "human" ? "e.g. Maya…" : "e.g. RiverRunner…"}
-                      required
-                    />
+                    <label htmlFor="bot-name">Bot name</label>
+                    <input id="bot-name" maxLength={80} name="name" placeholder="e.g. RiverRunner" required />
                   </div>
-                  {error && <p className={styles.formError}>{error}</p>}
-                  <button className={styles.primaryButton} disabled={busy === "join"} type="submit">
-                    {busy === "join" ? "Registering…" : `Register as ${kind === "human" ? "Human" : "Bot"}`}
-                  </button>
-                </form>
+                  <div className={styles.field}>
+                    <label htmlFor="bot-ip">LAN IP address</label>
+                    <input id="bot-ip" inputMode="decimal" name="ip" placeholder="e.g. 192.168.1.42" required spellCheck={false} />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="bot-port">Port</label>
+                    <input defaultValue={8001} id="bot-port" max={65535} min={1024} name="port" required type="number" />
+                  </div>
+                </div>
+                <p className={styles.fieldHint}>Use your laptop’s address on the event Wi-Fi, not localhost. You’ll get a one-time token for the bot.</p>
+                {error && <p className={styles.formError} role="alert">{error}</p>}
+                <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Adding…" : "Add Bot"}</button>
+              </form>
+              <div className={styles.botList}>
+                {bots?.map((bot) => <BotCard bot={bot} key={bot.id} onChange={refresh} />)}
               </div>
-            )}
-          </section>
+            </section>
+          </div>
         </div>
       </div>
     </main>

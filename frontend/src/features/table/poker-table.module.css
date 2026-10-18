@@ -1495,3 +1495,135 @@
   .timerTrack span,
   .topTimerTrack span { transition: none; }
 }
+
+.statusBanner {
+  margin: 0;
+  padding: 10px 28px;
+  border-bottom: 1px solid rgb(23 35 30 / 18%);
+  background: rgb(22 75 57 / 8%);
+  color: var(--table-green-dark);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.statusBanner[data-tone="warning"] {
+  background: rgb(189 73 59 / 10%);
+  color: #8a2f25;
+}
+
+.finishOverlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(244 237 223 / 86%);
+  animation: result-enter 320ms ease-out both;
+}
+
+.finishOverlay > div {
+  display: grid;
+  width: min(440px, 100%);
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid rgb(23 35 30 / 24%);
+  background: #fffaf1;
+  box-shadow: 0 18px 48px rgb(9 35 27 / 18%);
+}
+
+.finishOverlay span {
+  color: var(--table-red);
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.finishOverlay h2 {
+  margin: 0;
+  font: 400 clamp(30px, 4vw, 44px) / 1 Georgia, serif;
+  letter-spacing: -0.03em;
+}
+
+.finishOverlay p {
+  margin: 0;
+  color: #657069;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.finishOverlay ol {
+  display: grid;
+  gap: 0;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finishOverlay li {
+  display: grid;
+  align-items: baseline;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 12%);
+  font-size: 13px;
+}
+
+.finishOverlay li[data-me="true"] {
+  font-weight: 700;
+}
+
+.finishOverlay li b {
+  font: 400 18px/1 Georgia, serif;
+}
+
+.finishOverlay li small {
+  color: #657069;
+  font-size: 11px;
+}
+
+.finishOverlay a {
+  justify-self: start;
+  margin-top: 8px;
+  padding: 13px 16px;
+  background: var(--table-green);
+  color: white;
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.shortcutToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: #657069;
+  cursor: pointer;
+  font: 10px/1.4 monospace;
+}
+
+.shortcutToggle input {
+  accent-color: var(--table-green);
+}
+
+@media (max-width: 620px) {
+  .statusBanner { padding: 9px 16px; font-size: 12px; }
+  .shortcutToggle { display: none; }
+}
+
+.gateEmbedded {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
+  padding: 32px 18px;
+  border: 1px solid rgb(23 35 30 / 18%);
+  background: #f4eddf;
+  color: #17231e;
+}
+
+.gateEmbedded .gateCard {
+  box-shadow: none;
+}

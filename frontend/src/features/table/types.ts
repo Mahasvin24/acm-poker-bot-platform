@@ -12,6 +12,7 @@ export interface PlayerDecision {
   decision_id: string;
   table_version: number;
   deadline_at: string;
+  duration_ms: number;
   legal_actions: LegalAction[];
 }
 
@@ -53,12 +54,14 @@ export interface PlayerSeat {
   folded: boolean;
   all_in: boolean;
   eliminated: boolean;
+  away?: boolean;
   hole_cards: string[];
 }
 
 export interface PlayerAction {
   sequence: number;
   seat: number;
+  street?: string | null;
   action: ActionType;
   amount_to: number | null;
   automatic: boolean;
@@ -70,15 +73,51 @@ export interface SidePot {
   eligible_seats: number[];
 }
 
+export interface Standing {
+  entry_id: string;
+  display_name: string;
+  kind: EntryKind;
+  position: number;
+  eliminated_hand_number: number | null;
+  final_stack: number;
+}
+
+export interface Viewer {
+  entry_id: string;
+  display_name: string;
+  status: "seated" | "eliminated" | "winner" | "finished";
+  finish_position: number | null;
+}
+
+export interface MatchContext {
+  name: string;
+  level_number: number;
+  level_remaining_seconds: number | null;
+  next_small_blind: number | null;
+  next_big_blind: number | null;
+  players_remaining: number;
+  max_seats: number;
+  end_requested: boolean;
+  standings: Standing[];
+}
+
+export interface LastHand {
+  hand_number: number;
+  community_cards: string[];
+  result: HandResult;
+  names: Record<string, string>;
+}
+
 export interface PlayerTableState {
-  tournament_id: string;
-  tournament_status: string;
+  match_id: string;
+  match_status: string;
   table_status: string;
   table_id: string;
   hand_id: string;
   hand_number: number;
   table_version: number;
-  viewer_seat: number;
+  viewer_seat: number | null;
+  viewer?: Viewer | null;
   acting_seat: number | null;
   street: string;
   button_seat: number;
@@ -94,6 +133,9 @@ export interface PlayerTableState {
   decision: PlayerDecision | null;
   turn?: PublicTurn | null;
   hand_result?: HandResult | null;
+  next_action_at?: string | null;
+  match?: MatchContext | null;
+  last_hand?: LastHand | null;
 }
 
 export interface ActionSubmission {
