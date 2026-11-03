@@ -8,7 +8,6 @@ import type { ActionType } from "../table/types";
 import {
   DemoApiError,
   endDemoMatch,
-  forceDemoResult,
   getDemoMatch,
   startDemoMatch,
   submitDemoAction,
@@ -120,8 +119,6 @@ export function DemoMatch() {
           <summary>Test controls</summary>
           <div>
             <button disabled={busy} onClick={() => void run(startDemoMatch, "A fresh match is live.", true)}>Restart</button>
-            <button disabled={busy} onClick={() => void run(() => forceDemoResult("human_win"), "Forced a human win.")}>Force win</button>
-            <button disabled={busy} onClick={() => void run(() => forceDemoResult("bot_win"), "Forced a human loss.")}>Force loss</button>
             <button disabled={busy} onClick={() => void run(endDemoMatch, "Match erased.", true)}>Exit game</button>
           </div>
         </details>
@@ -155,7 +152,7 @@ export function DemoMatch() {
         <div><p>One human × three test bots</p><h1>One table.<br /><em>No trace.</em></h1></div>
         <p className={styles.explainer}>
           A real four-player hand powered by the production poker engine. This single in-memory
-          match creates no account, tournament, entrant, event, or action records.
+          match creates no account, match, entrant, event, or action records.
         </p>
       </section>
 
@@ -164,10 +161,6 @@ export function DemoMatch() {
           {match.status === "idle" ? "Start game" : "Restart game"}
         </button>
         <button disabled={busy || match.status === "idle"} onClick={() => void run(endDemoMatch, "Match erased.", true)}>End game</button>
-        <span className={styles.controlDivider} />
-        <span>Cheat states</span>
-        <button disabled={busy || match.status === "idle"} onClick={() => void run(() => forceDemoResult("human_win"), "Forced a human win.")}>Force win</button>
-        <button disabled={busy || match.status === "idle"} onClick={() => void run(() => forceDemoResult("bot_win"), "Forced a human loss.")}>Force loss</button>
       </section>
 
       {loading ? (
@@ -182,7 +175,7 @@ export function DemoMatch() {
       ) : null}
 
       <footer className={styles.footer}>
-        <span>IN-MEMORY ONLY</span><span>ONE CONCURRENT MATCH</span><span>30 SECOND HUMAN CLOCK</span><span>3 × 4 SECOND TEST BOTS</span>
+        <span>IN-MEMORY ONLY</span><span>PRIVATE TO THIS BROWSER</span><span>30 SECOND HUMAN CLOCK</span><span>3 × 4 SECOND TEST BOTS</span>
       </footer>
     </main>
   );

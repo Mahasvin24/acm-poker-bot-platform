@@ -33,7 +33,7 @@ def main() -> None:
 
 
 async def _bootstrap_admin(email: str, password: str) -> None:
-    settings = Settings()
+    settings = Settings()  # type: ignore[call-arg]
     engine, sessions, _tables = create_database_components(settings.database_url)
     try:
         account = await bootstrap_admin(

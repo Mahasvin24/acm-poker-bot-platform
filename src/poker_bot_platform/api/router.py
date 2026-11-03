@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Protocol, cast
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 
 from poker_bot_platform.api.models import (
     AccountResponse,
@@ -18,7 +18,8 @@ from poker_bot_platform.api.models import (
     PlayerTableStateResponse,
     RegisterRequest,
 )
-from poker_bot_platform.api.security import SameOriginGuard
+from poker_bot_platform.api.rate_limit import RateLimitExceeded, SlidingWindowLimiter
+from poker_bot_platform.api.security import SameOriginGuard, client_key, too_many_attempts
 from poker_bot_platform.auth.models import Account, Entrant
 from poker_bot_platform.auth.repository import AuthConflictError, AuthNotFoundError
 from poker_bot_platform.auth.service import (
@@ -99,6 +100,8 @@ def create_api_router(
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
     same_origin = SameOriginGuard(allowed_origin)
+    login_clients = SlidingWindowLimiter(max_attempts=30, window_seconds=60)
+    login_failures = SlidingWindowLimiter(max_attempts=5, window_seconds=300)
 
     async def current_account(
         session_token: Annotated[str | None, Cookie(alias=cookie_name)] = None,
@@ -131,14 +134,24 @@ def create_api_router(
         return AccountResponse.from_account(account)
 
     @router.post("/auth/login", response_model=AccountResponse, dependencies=mutation_guard)
-    async def login(body: LoginRequest, response: Response) -> AccountResponse:
+    async def login(body: LoginRequest, request: Request, response: Response) -> AccountResponse:
+        client = client_key(request)
+        email_key = body.email.strip().casefold()
+        try:
+            login_clients.check(client)
+            login_failures.check(email_key)
+        except RateLimitExceeded as exc:
+            raise too_many_attempts(exc) from exc
+        login_clients.record(client)
         try:
             issued = await auth.login(body.email, body.password)
         except (ValueError, InvalidCredentialsError) as exc:
+            login_failures.record(email_key)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="invalid email or password",
             ) from exc
+        login_failures.reset(email_key)
         max_age = max(0, int(auth.session_lifetime.total_seconds()))
         response.set_cookie(
             cookie_name,

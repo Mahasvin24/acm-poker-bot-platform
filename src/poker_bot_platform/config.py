@@ -5,6 +5,13 @@ from ipaddress import IPv4Network, IPv6Network, ip_network
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PLACEHOLDER_SECRETS = frozenset(
+    {
+        "development-only-change-before-event",
+        "replace-with-at-least-32-random-characters",
+    }
+)
+
 
 class Settings(BaseSettings):
     """Runtime settings. V1 is intentionally a single-process application."""
@@ -12,16 +19,24 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="POKER_", env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://poker:poker@localhost:5432/poker"
-    secret_key: SecretStr = Field(
-        default=SecretStr("development-only-change-before-event"),
-        min_length=32,
-    )
+    secret_key: SecretStr = Field(min_length=32)
     participant_subnet: IPv4Network | IPv6Network = ip_network("192.168.0.0/16")
     blocked_ips: tuple[str, ...] = ()
     allowed_origin: str = "http://localhost:3000"
     cookie_secure: bool = False
     log_level: str = "INFO"
     worker_count: int = 1
+
+    @field_validator("secret_key")
+    @classmethod
+    def reject_placeholder_secret(cls, value: SecretStr) -> SecretStr:
+        secret = value.get_secret_value()
+        if secret in PLACEHOLDER_SECRETS or len(set(secret)) < 8:
+            raise ValueError(
+                "POKER_SECRET_KEY must be a unique random value; "
+                "generate one with `openssl rand -hex 32`"
+            )
+        return value
 
     @field_validator("participant_subnet", mode="before")
     @classmethod

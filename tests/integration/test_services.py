@@ -100,7 +100,7 @@ def test_application_factory_mounts_headless_api_without_connecting_to_database(
     application = create_app(
         Settings(
             database_url="postgresql+asyncpg://unused:unused@localhost:5432/unused",
-            secret_key="x" * 32,
+            secret_key="3f9c1a7e5b2d8046c9e1f7a3b5d20e84",
             participant_subnet="192.168.1.0/24",
         )
     )

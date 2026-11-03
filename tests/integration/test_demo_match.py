@@ -111,21 +111,6 @@ async def test_demo_match_runs_without_durable_dependencies(
     assert progressed.table is not None
     assert progressed.table.table_version > started.table.table_version
 
-    completed = await demo.force("human_win")
-    assert completed.status == "completed"
-    assert completed.result == "human_win"
-    assert completed.table is not None
-    assert completed.table.completed
-    assert completed.table.decision is None
-    assert completed.table.turn is None
-    assert completed.table.hand_result is not None
-    assert completed.table.hand_result.reason == "forced"
-    assert completed.table.hand_result.synthetic
-    completed_human = next(seat for seat in completed.table.seats if seat.kind.value == "human")
-    assert completed_human.stack == 80_000
-    assert all(seat.stack == 0 for seat in completed.table.seats if seat.kind.value == "bot")
-    assert completed.table.side_pots == ()
-
     ended = await demo.end()
     assert ended.status == "idle"
     assert ended.table is None
@@ -136,7 +121,6 @@ async def test_starting_again_replaces_the_single_ephemeral_match() -> None:
     first = await demo.start()
     assert first.table is not None
 
-    await demo.force("bot_win")
     restarted = await demo.start()
 
     assert restarted.status == "active"
@@ -183,12 +167,21 @@ async def test_demo_match_can_play_through_to_a_natural_result() -> None:
     assert state.table.hand_result is not None
     assert state.table.hand_result.reason in {"fold", "showdown"}
     if state.table.hand_result.reason == "showdown":
+        viewer = state.table.viewer_seat
+        revealed = {hand.seat for hand in state.table.hand_result.revealed_hands}
         live_seats = {
             seat.seat
             for seat in state.table.seats
             if not seat.folded and seat.hole_cards
         }
-        assert {hand.seat for hand in state.table.hand_result.revealed_hands} == live_seats
+        shown_opponents = {
+            seat.seat
+            for seat in state.table.seats
+            if seat.seat != viewer and seat.hole_cards
+        }
+        # Mucked hands stay private, so only PokerKit-shown hands are revealed.
+        assert revealed <= live_seats
+        assert shown_opponents <= revealed
         assert all(hand.best_five for hand in state.table.hand_result.revealed_hands)
 
     # Terminal state is durable for the life of the ephemeral match. Polling after

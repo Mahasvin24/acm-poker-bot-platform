@@ -36,11 +36,10 @@ export interface RevealedHand {
 }
 
 export interface HandResult {
-  reason: "showdown" | "fold" | "forced";
+  reason: "showdown" | "fold";
   awards: HandAward[];
   winner_seats: number[];
   revealed_hands: RevealedHand[];
-  synthetic: boolean;
 }
 
 export interface PlayerSeat {
