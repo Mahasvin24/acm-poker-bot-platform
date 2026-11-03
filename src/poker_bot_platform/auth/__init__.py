@@ -1,6 +1,6 @@
-"""Local accounts, sessions, and tournament entrant registration."""
+"""Local accounts, sessions, and reusable participant bot profiles."""
 
-from poker_bot_platform.auth.models import Account, Entrant, SessionRecord
+from poker_bot_platform.auth.models import Account, BotProfile, SessionRecord
 from poker_bot_platform.auth.repository import (
     AuthConflictError,
     AuthNotFoundError,
@@ -9,8 +9,8 @@ from poker_bot_platform.auth.repository import (
 )
 from poker_bot_platform.auth.service import (
     AuthService,
-    BotRegistrationResult,
-    EntrantService,
+    BotProfileService,
+    BotTokenResult,
     PasswordManager,
     bootstrap_admin,
 )
@@ -22,9 +22,9 @@ __all__ = [
     "AuthNotFoundError",
     "AuthRepository",
     "AuthService",
-    "BotRegistrationResult",
-    "Entrant",
-    "EntrantService",
+    "BotProfile",
+    "BotProfileService",
+    "BotTokenResult",
     "InMemoryAuthRepository",
     "PasswordManager",
     "SessionRecord",

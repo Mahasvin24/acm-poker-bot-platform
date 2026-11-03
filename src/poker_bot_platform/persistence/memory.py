@@ -9,14 +9,12 @@ from poker_bot_platform.domain import (
     HandSnapshot,
     PendingDecision,
     TableStatus,
-    TournamentStatus,
 )
 from poker_bot_platform.persistence.repository import (
     CommitResult,
     DecisionConflictError,
     HandStartCommitResult,
     PersistedTableState,
-    PersistedTournamentState,
     PersistenceError,
     StatusConflictError,
     TableNotFoundError,
@@ -31,77 +29,16 @@ class _MemoryTable:
     pending: PendingDecision | None = None
 
 
-@dataclass(slots=True)
-class _MemoryTournament:
-    status: TournamentStatus
-    config: dict[str, object]
-    version: int = 0
-
-
 class InMemoryTableRepository:
     """Atomic repository double used by coordinator and crash-point tests."""
 
     def __init__(self) -> None:
-        self._tournaments: dict[str, _MemoryTournament] = {}
         self._tables: dict[str, _MemoryTable] = {}
         self._actions: dict[tuple[str, str], ActionRecord] = {}
         self._events: list[tuple[str, int, DomainEvent]] = []
         self._audit: list[dict[str, object]] = []
         self._lock = asyncio.Lock()
         self.fail_next: str | None = None
-
-    async def create_tournament(
-        self,
-        tournament_id: str,
-        config: dict[str, object],
-        *,
-        status: TournamentStatus = TournamentStatus.DRAFT,
-    ) -> PersistedTournamentState:
-        async with self._lock:
-            self._maybe_fail("create_tournament")
-            if tournament_id in self._tournaments:
-                raise DecisionConflictError(f"tournament {tournament_id!r} already exists")
-            tournament = _MemoryTournament(status=status, config=config.copy())
-            self._tournaments[tournament_id] = tournament
-            return self._tournament_state(tournament_id, tournament)
-
-    async def load_tournament(self, tournament_id: str) -> PersistedTournamentState:
-        async with self._lock:
-            self._maybe_fail("load_tournament")
-            tournament = self._tournaments.get(tournament_id)
-            if tournament is None:
-                raise TableNotFoundError(f"tournament {tournament_id!r}")
-            return self._tournament_state(tournament_id, tournament)
-
-    async def update_tournament(
-        self,
-        tournament_id: str,
-        *,
-        expected_version: int,
-        expected_status: TournamentStatus,
-        status: TournamentStatus | None = None,
-        config: dict[str, object] | None = None,
-    ) -> PersistedTournamentState:
-        async with self._lock:
-            self._maybe_fail("update_tournament")
-            tournament = self._tournaments.get(tournament_id)
-            if tournament is None:
-                raise TableNotFoundError(f"tournament {tournament_id!r}")
-            if tournament.version != expected_version:
-                raise VersionConflictError(
-                    f"expected version {expected_version}, found {tournament.version}"
-                )
-            if tournament.status is not expected_status:
-                raise StatusConflictError(
-                    f"expected status {expected_status.value}, found {tournament.status.value}"
-                )
-            if status is None and config is None:
-                raise ValueError("tournament update requires a status or config change")
-            tournament.status = status or tournament.status
-            if config is not None:
-                tournament.config = config.copy()
-            tournament.version += 1
-            return self._tournament_state(tournament_id, tournament)
 
     def inject_failure(self, operation: str) -> None:
         self.fail_next = operation
@@ -120,8 +57,6 @@ class InMemoryTableRepository:
     ) -> PersistedTableState:
         async with self._lock:
             self._maybe_fail("create_table")
-            if snapshot.tournament_id not in self._tournaments:
-                raise TableNotFoundError(f"tournament {snapshot.tournament_id!r}")
             if snapshot.table_id in self._tables:
                 raise DecisionConflictError(f"table {snapshot.table_id!r} already exists")
             self._tables[snapshot.table_id] = _MemoryTable(snapshot=snapshot, status=status)
@@ -174,7 +109,7 @@ class InMemoryTableRepository:
         *,
         expected_version: int,
         expected_status: TableStatus,
-        tournament_id: str,
+        match_id: str,
         detail: str,
     ) -> TableStatus:
         async with self._lock:
@@ -198,7 +133,7 @@ class InMemoryTableRepository:
                     "actor_id": "system",
                     "command": "quarantine_table",
                     "outcome": "failure",
-                    "tournament_id": tournament_id,
+                    "match_id": match_id,
                     "payload": {
                         "table_id": table_id,
                         "failure_reason": "engine_invariant",
@@ -303,7 +238,7 @@ class InMemoryTableRepository:
         actor_id: str,
         command: str,
         outcome: str,
-        tournament_id: str | None = None,
+        match_id: str | None = None,
         payload: dict[str, object] | None = None,
         detail: str | None = None,
     ) -> None:
@@ -314,7 +249,7 @@ class InMemoryTableRepository:
                     "actor_id": actor_id,
                     "command": command,
                     "outcome": outcome,
-                    "tournament_id": tournament_id,
+                    "match_id": match_id,
                     "payload": payload or {},
                     "detail": detail,
                 }
@@ -333,17 +268,6 @@ class InMemoryTableRepository:
         return tuple(self._audit)
 
     @staticmethod
-    def _tournament_state(
-        tournament_id: str, tournament: _MemoryTournament
-    ) -> PersistedTournamentState:
-        return PersistedTournamentState(
-            tournament_id=tournament_id,
-            status=tournament.status,
-            config=tournament.config.copy(),
-            version=tournament.version,
-        )
-
-    @staticmethod
     def _validate_next_hand(
         table: _MemoryTable, expected_version: int, snapshot: HandSnapshot
     ) -> None:
@@ -360,8 +284,8 @@ class InMemoryTableRepository:
             )
         if snapshot.table_version != expected_version + 1:
             raise VersionConflictError("next hand must advance exactly one version")
-        if snapshot.tournament_id != previous.tournament_id:
-            raise DecisionConflictError("next hand changed tournament identity")
+        if snapshot.match_id != previous.match_id:
+            raise DecisionConflictError("next hand changed match identity")
         if snapshot.hand_id == previous.hand_id or snapshot.hand_number != previous.hand_number + 1:
             raise DecisionConflictError("next hand identity or number is invalid")
         if snapshot.action_history:

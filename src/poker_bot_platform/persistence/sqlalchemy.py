@@ -13,7 +13,6 @@ from poker_bot_platform.domain import (
     HandSnapshot,
     PendingDecision,
     TableStatus,
-    TournamentStatus,
 )
 from poker_bot_platform.persistence.models import (
     ActionRow,
@@ -22,14 +21,12 @@ from poker_bot_platform.persistence.models import (
     PendingDecisionRow,
     TableRow,
     TableSnapshotRow,
-    TournamentRow,
 )
 from poker_bot_platform.persistence.repository import (
     CommitResult,
     DecisionConflictError,
     HandStartCommitResult,
     PersistedTableState,
-    PersistedTournamentState,
     PersistenceError,
     StatusConflictError,
     TableNotFoundError,
@@ -54,76 +51,6 @@ class SqlAlchemyTableRepository:
         except SQLAlchemyError as exc:
             raise PersistenceError("database operation failed") from exc
 
-    async def create_tournament(
-        self,
-        tournament_id: str,
-        config: dict[str, object],
-        *,
-        status: TournamentStatus = TournamentStatus.DRAFT,
-    ) -> PersistedTournamentState:
-        try:
-            async with self._transaction() as session:
-                session.add(
-                    TournamentRow(
-                        id=tournament_id,
-                        status=status.value,
-                        config=dict(config),
-                        version=0,
-                    )
-                )
-        except PersistenceError as exc:
-            if isinstance(exc.__cause__, IntegrityError):
-                raise DecisionConflictError(f"tournament {tournament_id!r} already exists") from exc
-            raise
-        return PersistedTournamentState(
-            tournament_id=tournament_id,
-            status=status,
-            config=dict(config),
-            version=0,
-        )
-
-    async def load_tournament(self, tournament_id: str) -> PersistedTournamentState:
-        async with self._transaction() as session:
-            row = await session.scalar(
-                select(TournamentRow).where(TournamentRow.id == tournament_id).with_for_update()
-            )
-            if row is None:
-                raise TableNotFoundError(f"tournament {tournament_id!r}")
-            return self._tournament_from_row(row)
-
-    async def update_tournament(
-        self,
-        tournament_id: str,
-        *,
-        expected_version: int,
-        expected_status: TournamentStatus,
-        status: TournamentStatus | None = None,
-        config: dict[str, object] | None = None,
-    ) -> PersistedTournamentState:
-        if status is None and config is None:
-            raise ValueError("tournament update requires a status or config change")
-        async with self._transaction() as session:
-            row = await session.scalar(
-                select(TournamentRow).where(TournamentRow.id == tournament_id).with_for_update()
-            )
-            if row is None:
-                raise TableNotFoundError(f"tournament {tournament_id!r}")
-            if row.version != expected_version:
-                raise VersionConflictError(
-                    f"expected version {expected_version}, found {row.version}"
-                )
-            if row.status != expected_status.value:
-                raise StatusConflictError(
-                    f"expected status {expected_status.value}, found {row.status}"
-                )
-            if status is not None:
-                row.status = status.value
-            if config is not None:
-                row.config = dict(config)
-            row.version += 1
-            await session.flush()
-            return self._tournament_from_row(row)
-
     async def create_table(
         self,
         snapshot: HandSnapshot,
@@ -136,7 +63,7 @@ class SqlAlchemyTableRepository:
                 session.add(
                     TableRow(
                         id=snapshot.table_id,
-                        tournament_id=snapshot.tournament_id,
+                        match_id=snapshot.match_id,
                         status=status.value,
                         version=snapshot.table_version,
                         current_hand_id=snapshot.hand_id,
@@ -218,7 +145,7 @@ class SqlAlchemyTableRepository:
         *,
         expected_version: int,
         expected_status: TableStatus,
-        tournament_id: str,
+        match_id: str,
         detail: str,
     ) -> TableStatus:
         async with self._transaction() as session:
@@ -240,7 +167,7 @@ class SqlAlchemyTableRepository:
             table.status = TableStatus.QUARANTINED.value
             session.add(
                 AuditLogRow(
-                    tournament_id=tournament_id,
+                    match_id=match_id,
                     actor_id="system",
                     command="quarantine_table",
                     outcome="failure",
@@ -404,13 +331,14 @@ class SqlAlchemyTableRepository:
                 raise DecisionConflictError("snapshot does not contain the committed action")
 
             action_row = ActionRow(
-                tournament_id=snapshot.tournament_id,
+                match_id=snapshot.match_id,
                 table_id=snapshot.table_id,
                 hand_id=snapshot.hand_id,
                 table_version=snapshot.table_version,
                 sequence=action.sequence,
                 decision_id=action.decision_id,
                 seat=action.seat,
+                street=action.street.value if action.street else None,
                 action=action.action.value,
                 amount_to=action.amount_to,
                 automatic=action.automatic,
@@ -439,14 +367,14 @@ class SqlAlchemyTableRepository:
         actor_id: str,
         command: str,
         outcome: str,
-        tournament_id: str | None = None,
+        match_id: str | None = None,
         payload: dict[str, object] | None = None,
         detail: str | None = None,
     ) -> None:
         async with self._transaction() as session:
             session.add(
                 AuditLogRow(
-                    tournament_id=tournament_id,
+                    match_id=match_id,
                     actor_id=actor_id,
                     command=command,
                     payload=payload or {},
@@ -470,15 +398,6 @@ class SqlAlchemyTableRepository:
         )
 
     @staticmethod
-    def _tournament_from_row(row: TournamentRow) -> PersistedTournamentState:
-        return PersistedTournamentState(
-            tournament_id=row.id,
-            status=TournamentStatus(row.status),
-            config=dict(row.config),
-            version=row.version,
-        )
-
-    @staticmethod
     def _validate_next_hand(
         table: TableRow,
         previous: HandSnapshot,
@@ -498,8 +417,8 @@ class SqlAlchemyTableRepository:
             )
         if snapshot.table_version != expected_version + 1:
             raise VersionConflictError("next hand must advance exactly one version")
-        if snapshot.tournament_id != previous.tournament_id:
-            raise DecisionConflictError("next hand changed tournament identity")
+        if snapshot.match_id != previous.match_id:
+            raise DecisionConflictError("next hand changed match identity")
         if snapshot.hand_id == previous.hand_id or snapshot.hand_number != previous.hand_number + 1:
             raise DecisionConflictError("next hand identity or number is invalid")
         if snapshot.action_history:
@@ -512,6 +431,7 @@ class SqlAlchemyTableRepository:
                 "sequence": row.sequence,
                 "decision_id": row.decision_id,
                 "seat": row.seat,
+                "street": row.street,
                 "action": row.action,
                 "amount_to": row.amount_to,
                 "automatic": row.automatic,
@@ -529,7 +449,7 @@ class SqlAlchemyTableRepository:
         for ordinal, event in enumerate(events, start=1):
             session.add(
                 DomainEventRow(
-                    tournament_id=snapshot.tournament_id,
+                    match_id=snapshot.match_id,
                     table_id=snapshot.table_id,
                     hand_id=snapshot.hand_id,
                     table_version=snapshot.table_version,

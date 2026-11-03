@@ -1,51 +1,26 @@
 from __future__ import annotations
 
-import os
-import subprocess
 import uuid
-from collections.abc import Iterator
 from datetime import timedelta
 
 import pytest
-from sqlalchemy.engine import make_url
 
 from poker_bot_platform.domain import (
     ActionType,
+    MatchStatus,
     PendingDecision,
     PlayerAction,
     TableStatus,
-    TournamentStatus,
 )
 from poker_bot_platform.engine import FakePokerEngine
-from poker_bot_platform.persistence import DecisionConflictError, create_database
+from poker_bot_platform.match import AuditEntry, SqlAlchemyMatchStore
+from poker_bot_platform.persistence import DecisionConflictError, create_database_components
 
+from ..postgres import lobby_state, migrated_database, requires_postgres
 from .conftest import NOW, start_request
 
-_DATABASE_URL = os.environ.get("POKER_TEST_DATABASE_URL")
-_IS_SAFE_TEST_DATABASE = bool(
-    _DATABASE_URL and (make_url(_DATABASE_URL).database or "").endswith("_test")
-)
-pytestmark = pytest.mark.skipif(
-    not _IS_SAFE_TEST_DATABASE,
-    reason="set POKER_TEST_DATABASE_URL to a dedicated database ending in _test",
-)
-
-
-@pytest.fixture(scope="module")
-def migrated_database() -> Iterator[str]:
-    assert _DATABASE_URL is not None
-    environment = {**os.environ, "POKER_DATABASE_URL": _DATABASE_URL}
-    subprocess.run(
-        ["python3", "-m", "alembic", "upgrade", "head"],
-        check=True,
-        env=environment,
-    )
-    yield _DATABASE_URL
-    subprocess.run(
-        ["python3", "-m", "alembic", "downgrade", "base"],
-        check=True,
-        env=environment,
-    )
+pytestmark = requires_postgres
+__all__ = ["migrated_database"]
 
 
 @pytest.mark.asyncio
@@ -53,26 +28,26 @@ async def test_postgres_json_round_trip_partial_index_and_atomic_commit(
     migrated_database: str,
 ) -> None:
     suffix = uuid.uuid4().hex
-    tournament_id = f"tournament-{suffix}"
+    match_id = f"match-{suffix}"
     table_id = f"table-{suffix}"
     hand_id = f"hand-{suffix}"
     engine = FakePokerEngine()
-    database, repository = create_database(migrated_database)
+    database, sessions, repository = create_database_components(migrated_database)
     try:
-        created_tournament = await repository.create_tournament(
-            tournament_id, {"starting_stack": 20_000}
+        store = SqlAlchemyMatchStore(sessions)
+        lobby = lobby_state(match_id, join_code=suffix[:6].upper())
+        await store.create(lobby, AuditEntry(actor_id="admin", command="create_match"))
+        running = lobby.model_copy(update={"status": MatchStatus.RUNNING, "revision": 1})
+        await store.save(
+            running,
+            expected_revision=0,
+            audit=AuditEntry(actor_id="admin", command="start_match"),
         )
-        assert created_tournament.version == 0
-        updated_tournament = await repository.update_tournament(
-            tournament_id,
-            expected_version=0,
-            expected_status=TournamentStatus.DRAFT,
-            status=TournamentStatus.REGISTRATION_OPEN,
-        )
-        assert updated_tournament.version == 1
+        assert await store.load(match_id) == running
+        assert match_id in await store.list_active_match_ids()
         request = start_request().model_copy(
             update={
-                "tournament_id": tournament_id,
+                "match_id": match_id,
                 "table_id": table_id,
                 "hand_id": hand_id,
             }

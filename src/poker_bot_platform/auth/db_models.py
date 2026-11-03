@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -51,40 +50,27 @@ class SessionRow(Base):
     __table_args__ = (Index("ix_account_sessions_expiry", "expires_at"),)
 
 
-class EntrantRow(Base):
-    __tablename__ = "tournament_entrants"
+class BotProfileRow(Base):
+    __tablename__ = "bot_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    tournament_id: Mapped[str] = mapped_column(
-        ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    kind: Mapped[str] = mapped_column(String(16), nullable=False)
-    display_name: Mapped[str] = mapped_column(String(80), nullable=False)
-    bot_ip: Mapped[str | None] = mapped_column(String(45))
-    bot_port: Mapped[int | None] = mapped_column(Integer)
-    bot_token_ciphertext: Mapped[str | None] = mapped_column(Text)
-    bot_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    bot_ip: Mapped[str] = mapped_column(String(45), nullable=False)
+    bot_port: Mapped[int] = mapped_column(Integer, nullable=False)
+    bot_token_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_verification_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "account_id",
-            "tournament_id",
-            name="uq_tournament_entrant_account",
-        ),
-        CheckConstraint("kind IN ('human', 'bot')", name="ck_tournament_entrants_kind"),
+        Index("uq_bot_profiles_account_name", "account_id", func.lower(name), unique=True),
         CheckConstraint(
-            "bot_port IS NULL OR bot_port BETWEEN 1024 AND 65535",
-            name="ck_tournament_entrants_bot_port",
-        ),
-        CheckConstraint(
-            "kind = 'bot' OR (bot_ip IS NULL AND bot_port IS NULL "
-            "AND bot_token_ciphertext IS NULL AND bot_verified_at IS NULL)",
-            name="ck_tournament_entrants_human_has_no_bot_fields",
+            "bot_port BETWEEN 1024 AND 65535",
+            name="ck_bot_profiles_port",
         ),
     )

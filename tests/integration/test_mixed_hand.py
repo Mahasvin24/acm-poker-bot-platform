@@ -31,11 +31,10 @@ def full_deck() -> tuple[str, ...]:
 
 
 async def start_heads_up_table(repository: InMemoryTableRepository) -> TableCoordinator:
-    await repository.create_tournament("tournament-1", {"starting_stack": 20_000})
     coordinator = TableCoordinator("table-1", PokerKitEngine(), repository)
     await coordinator.start_table(
         StartHandRequest(
-            tournament_id="tournament-1",
+            match_id="match-1",
             table_id="table-1",
             hand_id="hand-1",
             hand_number=1,

@@ -113,7 +113,12 @@ class BotGateway:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def health(self, endpoint: BotEndpoint) -> HealthResponse | None:
+    async def health(
+        self,
+        endpoint: BotEndpoint,
+        *,
+        timeout_seconds: float = TOTAL_TIMEOUT_SECONDS,
+    ) -> HealthResponse | None:
         try:
             return await self._request_json(
                 endpoint=endpoint,
@@ -122,7 +127,7 @@ class BotGateway:
                 bearer_token=None,
                 body=None,
                 response_model=HealthResponse,
-                timeout_seconds=TOTAL_TIMEOUT_SECONDS,
+                timeout_seconds=min(timeout_seconds, TOTAL_TIMEOUT_SECONDS),
             )
         except _GatewayFailure:
             return None
@@ -175,7 +180,7 @@ class BotGateway:
         if self._now() >= request.deadline_at.astimezone(UTC):
             return self._fallback(request, FailureReason.TIMEOUT)
         if (
-            response.tournament_id != request.tournament_id
+            response.match_id != request.match_id
             or response.table_id != request.table_id
             or response.hand_id != request.hand_id
             or response.decision_id != request.decision_id

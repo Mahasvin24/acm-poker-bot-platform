@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from poker_bot_platform.domain import EntryKind, Role
+from poker_bot_platform.domain import Role
 
 
 class AuthModel(BaseModel):
@@ -28,14 +28,15 @@ class SessionRecord(AuthModel):
     revoked_at: datetime | None = None
 
 
-class Entrant(AuthModel):
+class BotProfile(AuthModel):
+    """A participant-hosted bot owned by one account and reusable across matches."""
+
     id: str
     account_id: str
-    tournament_id: str
-    kind: EntryKind
-    display_name: str
-    bot_ip: str | None = None
-    bot_port: int | None = Field(default=None, ge=1024, le=65535)
-    bot_token_ciphertext: str | None = None
-    bot_verified_at: datetime | None = None
+    name: str = Field(min_length=1, max_length=80)
+    bot_ip: str
+    bot_port: int = Field(ge=1024, le=65535)
+    bot_token_ciphertext: str
+    verified_at: datetime | None = None
+    last_verification_error: str | None = None
     created_at: datetime

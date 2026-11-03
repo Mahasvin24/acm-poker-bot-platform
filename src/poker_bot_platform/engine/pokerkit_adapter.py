@@ -53,7 +53,7 @@ class PokerKitEngine:
     immutable player action history against the supplied deck order.
     """
 
-    adapter_version = f"pokerkit-{version('pokerkit')}-adapter-v2"
+    adapter_version = f"pokerkit-{version('pokerkit')}-adapter-v3"
 
     _AUTOMATIONS = (
         Automation.BET_COLLECTION,
@@ -121,6 +121,7 @@ class PokerKitEngine:
             sequence=len(snapshot.action_history) + 1,
             decision_id=action.decision_id,
             seat=action.seat,
+            street=before_street,
             action=action.action,
             amount_to=action.amount_to,
         )
@@ -357,7 +358,7 @@ class PokerKitEngine:
         }
         return HandSnapshot(
             adapter_version=self.adapter_version,
-            tournament_id=request.tournament_id,
+            match_id=request.match_id,
             table_id=request.table_id,
             hand_id=request.hand_id,
             hand_number=request.hand_number,
@@ -396,10 +397,7 @@ class PokerKitEngine:
                 if amount > 0:
                     seat = player_seats[index]
                     totals[seat] = totals.get(seat, 0) + amount
-        return [
-            {"seat": seat, "amount": amount}
-            for seat, amount in sorted(totals.items())
-        ]
+        return [{"seat": seat, "amount": amount} for seat, amount in sorted(totals.items())]
 
     @staticmethod
     def _public_hole_cards(

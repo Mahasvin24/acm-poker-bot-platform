@@ -2,33 +2,51 @@ import pytest
 from pydantic import ValidationError
 
 from poker_bot_platform.domain import (
+    BOT_ACTION_TIMEOUT_MS,
+    BOT_CONNECT_TIMEOUT_MS,
     ActionType,
     BlindLevel,
     LegalAction,
-    TournamentConfig,
-    default_blind_levels,
+    MatchConfig,
 )
 
 
-def test_default_tournament_contract() -> None:
-    config = TournamentConfig()
-    assert config.max_players == 36
-    assert config.table_size == 6
+def test_default_match_contract() -> None:
+    config = MatchConfig()
+    assert config.max_seats == 6
     assert config.starting_stack == 20_000
-    assert config.bot_action_timeout_ms == 3_000
-    assert config.bot_connect_timeout_ms == 500
-    assert config.break_every_levels == 4
-    assert config.break_duration_seconds == 300
-    assert config.level(21).big_blind == 25_000
+    assert (config.small_blind, config.big_blind) == (100, 200)
+    assert not config.escalates
+    assert BOT_ACTION_TIMEOUT_MS == 3_000
+    assert BOT_CONNECT_TIMEOUT_MS == 500
 
 
-def test_default_blind_schedule_starts_deep_and_progresses_smoothly() -> None:
-    levels = default_blind_levels()
-    assert len(levels) == 29
-    assert 20_000 / levels[0].big_blind == 100
+def test_fixed_blinds_never_change() -> None:
+    config = MatchConfig()
+    assert config.level(1) == config.level(12)
+    assert config.level(5).big_blind_ante == 0
+
+
+def test_escalating_blinds_scale_from_the_opening_level_and_progress_smoothly() -> None:
+    config = MatchConfig(small_blind=50, big_blind=100, blind_increase_minutes=10)
+    levels = [config.level(number) for number in range(1, 35)]
+    assert (levels[0].small_blind, levels[0].big_blind) == (50, 100)
     for previous, current in zip(levels[:-1], levels[1:], strict=True):
-        assert current.big_blind / previous.big_blind <= 1.5
-    assert all(0.5 <= level.small_blind / level.big_blind <= 2 / 3 for level in levels)
+        assert previous.big_blind < current.big_blind <= previous.big_blind * 2
+        assert current.small_blind < current.big_blind
+    assert config.level_seconds == 600
+
+
+def test_big_blind_ante_follows_the_big_blind_when_enabled() -> None:
+    config = MatchConfig(big_blind_ante=True, blind_increase_minutes=5)
+    assert config.level(3).big_blind_ante == config.level(3).big_blind
+
+
+def test_config_rejects_inverted_blinds_and_tiny_stacks() -> None:
+    with pytest.raises(ValidationError, match="small blind"):
+        MatchConfig(small_blind=200, big_blind=200)
+    with pytest.raises(ValidationError, match="two big blinds"):
+        MatchConfig(starting_stack=300)
 
 
 def test_legal_raise_contract() -> None:
@@ -36,6 +54,7 @@ def test_legal_raise_contract() -> None:
     assert action.min_amount_to == 400
 
 
-def test_big_blind_ante_is_fixed_to_big_blind() -> None:
+def test_big_blind_ante_is_zero_or_the_big_blind() -> None:
+    BlindLevel(small_blind=100, big_blind=200, big_blind_ante=0)
     with pytest.raises(ValidationError, match="big-blind ante"):
-        BlindLevel(small_blind=100, big_blind=200, big_blind_ante=0)
+        BlindLevel(small_blind=100, big_blind=200, big_blind_ante=100)

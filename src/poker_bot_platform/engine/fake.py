@@ -25,7 +25,7 @@ class FakePokerEngine:
         acting = active[0].seat
         snapshot = HandSnapshot(
             adapter_version=self.adapter_version,
-            tournament_id=request.tournament_id,
+            match_id=request.match_id,
             table_id=request.table_id,
             hand_id=request.hand_id,
             hand_number=request.hand_number,

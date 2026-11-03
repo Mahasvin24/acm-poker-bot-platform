@@ -16,7 +16,7 @@ def deterministic_reference_action(request: BotActionRequest) -> BotActionRespon
         action = ActionType.FOLD
     return BotActionResponse(
         protocol="poker-bot.v1",
-        tournament_id=request.tournament_id,
+        match_id=request.match_id,
         table_id=request.table_id,
         hand_id=request.hand_id,
         decision_id=request.decision_id,

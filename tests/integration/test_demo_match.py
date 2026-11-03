@@ -170,14 +170,10 @@ async def test_demo_match_can_play_through_to_a_natural_result() -> None:
         viewer = state.table.viewer_seat
         revealed = {hand.seat for hand in state.table.hand_result.revealed_hands}
         live_seats = {
-            seat.seat
-            for seat in state.table.seats
-            if not seat.folded and seat.hole_cards
+            seat.seat for seat in state.table.seats if not seat.folded and seat.hole_cards
         }
         shown_opponents = {
-            seat.seat
-            for seat in state.table.seats
-            if seat.seat != viewer and seat.hole_cards
+            seat.seat for seat in state.table.seats if seat.seat != viewer and seat.hole_cards
         }
         # Mucked hands stay private, so only PokerKit-shown hands are revealed.
         assert revealed <= live_seats

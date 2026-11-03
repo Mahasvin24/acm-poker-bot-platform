@@ -7,16 +7,21 @@ import pytest
 
 from poker_bot_platform.auth import (
     AuthConflictError,
+    AuthNotFoundError,
     AuthService,
-    EntrantService,
+    BotProfileService,
     InMemoryAuthRepository,
     PasswordManager,
     bootstrap_admin,
 )
-from poker_bot_platform.auth.service import InvalidCredentialsError, InvalidSessionError
+from poker_bot_platform.auth.service import (
+    BotVerificationError,
+    InvalidCredentialsError,
+    InvalidSessionError,
+)
 from poker_bot_platform.bots import VerificationOutcome
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
-from poker_bot_platform.domain import EntryKind, Role
+from poker_bot_platform.domain import FailureReason, Role
 
 NOW = datetime(2026, 10, 1, 12, tzinfo=UTC)
 
@@ -96,62 +101,113 @@ async def test_bootstrap_is_explicit_and_does_not_grant_admin_by_email_pattern()
     assert await bootstrap_admin(repository, "OWNER@example.com", "ignored-password") == admin
 
 
-@pytest.mark.asyncio
-async def test_one_entrant_per_account_and_bot_token_is_encrypted_and_verified() -> None:
-    repository = InMemoryAuthRepository()
-    account = await AuthService(repository).register(
-        "bot@example.com",
-        "long-enough-password",
-    )
-    verifier = SuccessfulVerifier()
-    token_store = EncryptedTokenStore.from_deployment_secret("s" * 32)
-    service = EntrantService(
+class FailingVerifier:
+    async def verify(self, *_args: object) -> VerificationOutcome:
+        return VerificationOutcome(verified=False, failure_reason=FailureReason.HTTP_STATUS)
+
+
+def bot_service(
+    repository: InMemoryAuthRepository,
+    verifier: object | None = None,
+    token_store: EncryptedTokenStore | None = None,
+) -> BotProfileService:
+    return BotProfileService(
         repository,
-        token_store=token_store,
+        token_store=token_store or EncryptedTokenStore.from_deployment_secret("s" * 32),
         participant_subnet=ip_network("192.168.0.0/16"),
         blocked_ips=("192.168.1.1",),
-        verifier=verifier,
+        verifier=verifier,  # type: ignore[arg-type]
         clock=lambda: NOW,
     )
-    entrant = await service.register(
-        account.id,
-        "tournament-1",
-        EntryKind.BOT,
-        "Example Bot",
-    )
-    with pytest.raises(AuthConflictError):
-        await service.register(account.id, "tournament-1", EntryKind.HUMAN, "Duplicate")
-
-    configured = await service.configure_bot(
-        account.id,
-        "tournament-1",
-        "192.168.1.25",
-        8001,
-    )
-    assert configured.entrant.id == entrant.id
-    assert configured.bearer_token not in (configured.entrant.bot_token_ciphertext or "")
-    assert (
-        token_store.decrypt(configured.entrant.bot_token_ciphertext or "")
-        == configured.bearer_token
-    )
-
-    verified = await service.verify_bot(account.id, "tournament-1")
-    assert verified.bot_verified_at == NOW
-    assert verifier.presented_token == configured.bearer_token
 
 
 @pytest.mark.asyncio
-async def test_human_cannot_configure_bot_endpoint() -> None:
+async def test_bot_profiles_encrypt_tokens_verify_and_are_reusable() -> None:
     repository = InMemoryAuthRepository()
-    account = await AuthService(repository).register(
-        "human@example.com",
-        "long-enough-password",
-    )
-    service = EntrantService(
-        repository,
-        token_store=EncryptedTokenStore.from_deployment_secret("s" * 32),
-        participant_subnet=ip_network("192.168.0.0/16"),
-    )
-    await service.register(account.id, "tournament-1", EntryKind.HUMAN, "Human")
+    account = await AuthService(repository).register("bot@example.com", "long-enough-password")
+    verifier = SuccessfulVerifier()
+    token_store = EncryptedTokenStore.from_deployment_secret("s" * 32)
+    service = bot_service(repository, verifier, token_store)
+
+    created = await service.create(account.id, "  River   Runner ", "192.168.1.25", 8001)
+    assert created.profile.name == "River Runner"
+    assert created.bearer_token not in created.profile.bot_token_ciphertext
+    assert token_store.decrypt(created.profile.bot_token_ciphertext) == created.bearer_token
+    second = await service.create(account.id, "Second Bot", "192.168.1.26", 8002)
+    assert [item.id for item in await service.list(account.id)] == [
+        created.profile.id,
+        second.profile.id,
+    ]
+
     with pytest.raises(AuthConflictError):
-        await service.configure_bot(account.id, "tournament-1", "192.168.1.25", 8001)
+        await service.create(account.id, "river runner", "192.168.1.27", 8003)
+
+    verified = await service.verify(account.id, created.profile.id)
+    assert verified.verified_at == NOW
+    assert verifier.presented_token == created.bearer_token
+
+    moved = await service.update(account.id, created.profile.id, ip="192.168.1.30")
+    assert moved.verified_at is None
+    renamed = await service.update(account.id, created.profile.id, name="Renamed")
+    assert renamed.bot_ip == "192.168.1.30"
+
+    rotated = await service.rotate_token(account.id, created.profile.id)
+    assert rotated.bearer_token != created.bearer_token
+    assert token_store.decrypt(rotated.profile.bot_token_ciphertext) == rotated.bearer_token
+
+
+@pytest.mark.asyncio
+async def test_bot_endpoint_validation_and_verification_errors_are_plain_language() -> None:
+    repository = InMemoryAuthRepository()
+    account = await AuthService(repository).register("bot@example.com", "long-enough-password")
+    service = bot_service(repository, FailingVerifier())
+
+    with pytest.raises(ValueError, match="event network"):
+        await service.create(account.id, "Elsewhere", "10.0.0.5", 8001)
+    with pytest.raises(ValueError, match="infrastructure"):
+        await service.create(account.id, "Router", "192.168.1.1", 8001)
+
+    created = await service.create(account.id, "Bot", "192.168.1.25", 8001)
+    with pytest.raises(BotVerificationError, match="bearer token"):
+        await service.verify(account.id, created.profile.id)
+    stored = await repository.get_bot_profile(created.profile.id)
+    assert stored is not None
+    assert stored.verified_at is None
+    assert stored.last_verification_error is not None
+
+
+@pytest.mark.asyncio
+async def test_bots_are_private_to_their_owner() -> None:
+    repository = InMemoryAuthRepository()
+    auth = AuthService(repository)
+    owner = await auth.register("owner@example.com", "long-enough-password")
+    other = await auth.register("other@example.com", "long-enough-password")
+    service = bot_service(repository, SuccessfulVerifier())
+    created = await service.create(owner.id, "Bot", "192.168.1.25", 8001)
+
+    with pytest.raises(AuthNotFoundError):
+        await service.verify(other.id, created.profile.id)
+    with pytest.raises(AuthNotFoundError):
+        await service.delete(other.id, created.profile.id)
+    await service.delete(owner.id, created.profile.id)
+    assert await service.list(owner.id) == ()
+
+
+@pytest.mark.asyncio
+async def test_password_change_and_admin_reset_revoke_sessions() -> None:
+    repository = InMemoryAuthRepository()
+    auth = AuthService(repository, clock=lambda: NOW)
+    account = await auth.register("person@example.com", "long-enough-password")
+    issued = await auth.login("person@example.com", "long-enough-password")
+
+    with pytest.raises(InvalidCredentialsError):
+        await auth.change_password(account, "wrong-password", "brand-new-password")
+    changed = await auth.change_password(account, "long-enough-password", "brand-new-password")
+    await auth.login("person@example.com", "brand-new-password")
+
+    temporary = await auth.reset_password(changed.id)
+    with pytest.raises(InvalidSessionError):
+        await auth.resolve_session(issued.token)
+    with pytest.raises(InvalidCredentialsError):
+        await auth.login("person@example.com", "brand-new-password")
+    await auth.login("person@example.com", temporary)

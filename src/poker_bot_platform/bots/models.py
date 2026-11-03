@@ -134,7 +134,7 @@ class BotLegalAction(WireModel):
 
 class BotActionRequest(WireModel):
     protocol: Literal["poker-bot.v1"]
-    tournament_id: WireIdentifier
+    match_id: WireIdentifier
     table_id: WireIdentifier
     hand_id: WireIdentifier
     decision_id: WireIdentifier
@@ -173,7 +173,7 @@ class BotActionRequest(WireModel):
 
 class BotActionResponse(WireModel):
     protocol: Literal["poker-bot.v1"]
-    tournament_id: WireIdentifier
+    match_id: WireIdentifier
     table_id: WireIdentifier
     hand_id: WireIdentifier
     decision_id: WireIdentifier
