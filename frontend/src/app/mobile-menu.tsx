@@ -57,8 +57,8 @@ export function MobileMenu() {
           <a href="#faq" onClick={closeMenu}>
             FAQ
           </a>
-          <Link href="/dashboard" onClick={closeMenu}>
-            Play
+          <Link href="/join" onClick={closeMenu}>
+            Join a Match
           </Link>
           <Link href="/account" onClick={closeMenu}>
             Sign in / Register

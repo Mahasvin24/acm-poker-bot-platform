@@ -674,6 +674,369 @@
   content: "…";
 }
 
+.statusPill[data-status="closed"],
+.statusPill[data-status="cancelled"] {
+  color: var(--portal-muted);
+}
+
+.statusPill[data-status="paused"],
+.statusPill[data-status="lobby"] {
+  color: #8a5a12;
+}
+
+.statusPill[data-status="completed"] {
+  color: var(--portal-ink);
+}
+
+.narrow {
+  width: min(720px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 64px 0 100px;
+}
+
+.stack {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.codeInput {
+  font: 700 22px/1 monospace !important;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--portal-sand);
+}
+
+.waiting p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pulse {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--portal-green);
+  animation: lobby-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes lobby-pulse {
+  50% { opacity: 0.25; transform: scale(0.8); }
+}
+
+.roster,
+.matchList,
+.accountList,
+.standings {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roster li,
+.matchList li {
+  display: grid;
+  align-items: center;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 14px;
+  min-height: 56px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 14%);
+}
+
+.roster li small {
+  color: var(--portal-muted);
+  font-size: 11px;
+}
+
+.openSeat span {
+  grid-column: 1 / -1;
+  color: var(--portal-muted);
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kindTag {
+  display: inline-block;
+  padding: 4px 6px;
+  border: 1px solid currentcolor;
+  color: var(--portal-green);
+  font: 700 8px/1 monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kindTag[data-kind="bot"] {
+  color: #6a3fa0;
+}
+
+.matchList li {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.matchList li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.matchList strong {
+  font: 400 20px/1.1 Georgia, serif;
+}
+
+.matchList small,
+.accountList span {
+  overflow: hidden;
+  color: var(--portal-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 12%);
+}
+
+.summaryToggle {
+  cursor: pointer;
+  font: 400 22px/1.1 Georgia, serif;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.checkRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--portal-green);
+}
+
+.botList {
+  display: grid;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+.botCard {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgb(23 35 30 / 20%);
+  background: #fffaf1;
+}
+
+.botCardHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.botCardHead h3 {
+  margin: 0 0 6px;
+  font: 400 26px/1 Georgia, serif;
+}
+
+.botCardHead code {
+  color: var(--portal-muted);
+  font: 12px/1 monospace;
+}
+
+.diagnostics {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--portal-sand);
+  font-size: 12px;
+}
+
+.diagnostics > p {
+  margin: 0;
+}
+
+.diagnostics ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagnostics li {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  gap: 4px 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 12%);
+}
+
+.diagnostics li[data-failed="true"] strong {
+  color: #9d352b;
+}
+
+.diagnostics li span,
+.diagnostics li small {
+  color: var(--portal-muted);
+}
+
+.diagnostics li p {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: #9d352b;
+  line-height: 1.45;
+}
+
+.consoleHead {
+  display: grid;
+  align-items: end;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 40px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid rgb(23 35 30 / 22%);
+}
+
+.consoleTitle {
+  margin: 0;
+  font: 400 clamp(46px, 6vw, 84px) / 0.9 Georgia, serif;
+  letter-spacing: -0.05em;
+}
+
+.codeCard {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  background: var(--portal-green);
+  color: #f8f1e5;
+}
+
+.codeCard > span {
+  color: #afc6bb;
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.codeCard > strong {
+  font: 700 clamp(40px, 5vw, 58px) / 1 monospace;
+  letter-spacing: 0.12em;
+}
+
+.codeCard .copyButton,
+.codeCard .textButton {
+  border-color: rgb(248 241 229 / 40%);
+  color: #f8f1e5;
+}
+
+.codeCard .fieldHint {
+  color: #c3d1ca;
+}
+
+.commandBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 22%);
+}
+
+.consoleGrid {
+  display: grid;
+  gap: 28px;
+  padding-top: 28px;
+}
+
+.rosterTable {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rosterTable th {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgb(23 35 30 / 30%);
+  color: var(--portal-muted);
+  font: 700 9px/1 monospace;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.rosterTable td {
+  padding: 12px 8px;
+  border-bottom: 1px solid rgb(23 35 30 / 12%);
+  vertical-align: middle;
+}
+
+.rosterTable td small {
+  display: block;
+  margin-top: 4px;
+  color: var(--portal-muted);
+  font: 11px/1 monospace;
+}
+
+.health {
+  font-size: 12px;
+}
+
+.health[data-tone="ok"] {
+  color: var(--portal-green);
+}
+
+.health[data-tone="warn"] {
+  color: #9d352b;
+  font-weight: 700;
+}
+
+.health[data-tone="muted"] {
+  color: var(--portal-muted);
+}
+
+.subheading {
+  margin: 30px 0 10px;
+  font: 400 24px/1 Georgia, serif;
+}
+
+.standings li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 12%);
+}
+
+.standings small {
+  margin-left: auto;
+  color: var(--portal-muted);
+  font-size: 11px;
+}
+
+.spectator {
+  display: grid;
+  gap: 12px;
+  padding-top: 36px;
+}
+
 @media (max-width: 900px) {
   .authLayout { grid-template-columns: 1fr; }
   .authIntro { min-height: 500px; }
@@ -706,6 +1069,12 @@
   .entrantSummary { grid-template-columns: 1fr; }
   .entrantSummary > span { justify-self: start; }
   .inviteControls { grid-template-columns: 1fr; }
+  .consoleHead { grid-template-columns: 1fr; gap: 24px; }
+  .matchList li { grid-template-columns: 1fr; }
+  .roster li { grid-template-columns: auto 1fr auto; }
+  .rosterTable th:nth-child(2),
+  .rosterTable td:nth-child(2) { display: none; }
+  .narrow { padding-top: 40px; }
   .primaryButton,
   .secondaryButton,
   .dangerButton,
@@ -715,4 +1084,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .authIntro::after { display: none; }
+  .pulse { animation: none; }
 }

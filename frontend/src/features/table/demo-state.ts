@@ -2,8 +2,8 @@ import type { PlayerTableState } from "./types";
 
 export function createDemoTableState(): PlayerTableState {
   return {
-    tournament_id: "demo",
-    tournament_status: "running",
+    match_id: "demo",
+    match_status: "running",
     table_status: "running",
     table_id: "table-03",
     hand_id: "table-03-hand-18",
@@ -142,6 +142,17 @@ export function createDemoTableState(): PlayerTableState {
       },
     ],
     completed: false,
+    match: {
+      name: "Interface preview",
+      level_number: 3,
+      level_remaining_seconds: 412,
+      next_small_blind: 200,
+      next_big_blind: 400,
+      players_remaining: 6,
+      max_seats: 6,
+      end_requested: false,
+      standings: [],
+    },
     turn: {
       seat: 4,
       kind: "human",
@@ -152,6 +163,7 @@ export function createDemoTableState(): PlayerTableState {
       decision_id: "demo-decision-48",
       table_version: 47,
       deadline_at: new Date(Date.now() + 30_000).toISOString(),
+      duration_ms: 30_000,
       legal_actions: [
         { action: "fold", amount: null, min_amount_to: null, max_amount_to: null },
         { action: "call", amount: 600, min_amount_to: null, max_amount_to: null },

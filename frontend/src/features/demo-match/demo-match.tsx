@@ -145,7 +145,7 @@ export function DemoMatch() {
       <header className={styles.header}>
         <Link href="/">ACM / POKER</Link>
         <span>EPHEMERAL TEST TABLE</span>
-        <Link href="/play">Exit to Play</Link>
+        <Link href="/join">Join a real match</Link>
       </header>
 
       <section className={styles.intro}>

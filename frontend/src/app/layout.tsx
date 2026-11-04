@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ACM Poker Bot Tournament",
+  title: "ACM Poker: Humans vs. Bots",
   description:
-    "A live, play-money poker tournament where human players and student-built bots compete at the same table.",
+    "Play-money poker matches where human players and student-built bots compete at the same table.",
   icons: {
     icon: "/acm-logo.png",
   },
