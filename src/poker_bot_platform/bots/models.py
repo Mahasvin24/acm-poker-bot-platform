@@ -15,6 +15,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic.config import JsonDict
 
 from poker_bot_platform.domain.models import (
     ActionType,
@@ -24,7 +25,8 @@ from poker_bot_platform.domain.models import (
     Street,
 )
 
-BOT_PROTOCOL_VERSION = "poker-bot.v1"
+Protocol = Literal["poker-bot.v2"]
+BOT_PROTOCOL_VERSION: Protocol = "poker-bot.v2"
 WireIdentifier = Annotated[StrictStr, StringConstraints(min_length=1, max_length=128)]
 
 
@@ -56,9 +58,23 @@ class PublicSeat(WireModel):
     eliminated: StrictBool
 
 
+_RAISE_NEEDS_AMOUNT: JsonDict = {
+    "allOf": [
+        {
+            "if": {"properties": {"action": {"const": "raise"}}, "required": ["action"]},
+            "then": {"required": ["amount_to"], "properties": {"amount_to": {"type": "integer"}}},
+            "else": {"properties": {"amount_to": {"type": "null"}}},
+        }
+    ]
+}
+
+
 class PublicAction(WireModel):
+    model_config = ConfigDict(json_schema_extra=_RAISE_NEEDS_AMOUNT)
+
     sequence: StrictInt = Field(ge=1)
     seat: StrictInt = Field(ge=1, le=6)
+    street: Street
     action: ActionType
     amount_to: StrictInt | None = Field(default=None, ge=0)
     automatic: StrictBool = False
@@ -106,6 +122,48 @@ class ActingPlayerState(WireModel):
 
 
 class BotLegalAction(WireModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "call"}}, "required": ["action"]},
+                    "then": {
+                        "required": ["amount"],
+                        "properties": {
+                            "amount": {"type": "integer"},
+                            "min_amount_to": {"type": "null"},
+                            "max_amount_to": {"type": "null"},
+                        },
+                    },
+                },
+                {
+                    "if": {"properties": {"action": {"const": "raise"}}, "required": ["action"]},
+                    "then": {
+                        "required": ["min_amount_to", "max_amount_to"],
+                        "properties": {
+                            "amount": {"type": "null"},
+                            "min_amount_to": {"type": "integer"},
+                            "max_amount_to": {"type": "integer"},
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "properties": {"action": {"enum": ["fold", "check"]}},
+                        "required": ["action"],
+                    },
+                    "then": {
+                        "properties": {
+                            "amount": {"type": "null"},
+                            "min_amount_to": {"type": "null"},
+                            "max_amount_to": {"type": "null"},
+                        }
+                    },
+                },
+            ]
+        }
+    )
+
     action: ActionType
     amount: StrictInt | None = Field(default=None, ge=0)
     min_amount_to: StrictInt | None = Field(default=None, ge=0)
@@ -132,8 +190,44 @@ class BotLegalAction(WireModel):
         return self
 
 
+class ShownHand(WireModel):
+    seat: StrictInt = Field(ge=1, le=6)
+    hole_cards: tuple[Card, ...]
+
+
+class PotAward(WireModel):
+    seat: StrictInt = Field(ge=1, le=6)
+    amount: StrictInt = Field(gt=0)
+
+
+class FinalStack(WireModel):
+    seat: StrictInt = Field(ge=1, le=6)
+    entrant_id: WireIdentifier
+    stack: StrictInt = Field(ge=0)
+
+
+class PreviousHand(WireModel):
+    """The last completed hand at this table: only public showdown information."""
+
+    hand_id: WireIdentifier
+    hand_number: StrictInt = Field(ge=1)
+    community_cards: tuple[Card, ...] = ()
+    shown_hands: tuple[ShownHand, ...] = ()
+    awards: tuple[PotAward, ...] = ()
+    final_stacks: tuple[FinalStack, ...] = ()
+
+
+class MatchContext(WireModel):
+    hand_number: StrictInt = Field(ge=1)
+    level_number: StrictInt = Field(ge=1)
+    players_remaining: StrictInt = Field(ge=1, le=6)
+    seconds_until_next_level: StrictInt | None = Field(default=None, ge=0)
+    next_small_blind: StrictInt | None = Field(default=None, gt=0)
+    next_big_blind: StrictInt | None = Field(default=None, gt=0)
+
+
 class BotActionRequest(WireModel):
-    protocol: Literal["poker-bot.v1"]
+    protocol: Protocol
     match_id: WireIdentifier
     table_id: WireIdentifier
     hand_id: WireIdentifier
@@ -142,7 +236,18 @@ class BotActionRequest(WireModel):
     deadline_at: datetime
     table: PublicTableState
     player: ActingPlayerState
-    legal_actions: tuple[BotLegalAction, ...]
+    legal_actions: tuple[BotLegalAction, ...] = Field(
+        json_schema_extra={
+            "minItems": 1,
+            "contains": {
+                "type": "object",
+                "properties": {"action": {"enum": ["check", "fold"]}},
+                "required": ["action"],
+            },
+        }
+    )
+    match: MatchContext | None = None
+    previous_hand: PreviousHand | None = None
 
     @field_validator("deadline_at")
     @classmethod
@@ -172,7 +277,9 @@ class BotActionRequest(WireModel):
 
 
 class BotActionResponse(WireModel):
-    protocol: Literal["poker-bot.v1"]
+    model_config = ConfigDict(json_schema_extra=_RAISE_NEEDS_AMOUNT)
+
+    protocol: Protocol
     match_id: WireIdentifier
     table_id: WireIdentifier
     hand_id: WireIdentifier
@@ -191,15 +298,15 @@ class BotActionResponse(WireModel):
 
 
 class VerifyRequest(WireModel):
-    protocol: Literal["poker-bot.v1"]
+    protocol: Protocol
     challenge: Annotated[StrictStr, StringConstraints(min_length=32, max_length=256)]
 
 
 class VerifyResponse(WireModel):
-    protocol: Literal["poker-bot.v1"]
+    protocol: Protocol
     challenge: Annotated[StrictStr, StringConstraints(min_length=32, max_length=256)]
 
 
 class HealthResponse(WireModel):
-    protocol: Literal["poker-bot.v1"]
+    protocol: Protocol
     status: Literal["ready"]

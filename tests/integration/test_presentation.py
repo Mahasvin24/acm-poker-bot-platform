@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pokerkit import Deck
 
+from poker_bot_platform.bots.factory import previous_hand_from_snapshot
 from poker_bot_platform.domain import (
     ActionType,
     EntryKind,
@@ -72,3 +73,14 @@ def test_showdown_reveals_only_hands_pokerkit_showed() -> None:
     assert revealed == shown
     assert 1 not in revealed
     assert all("7c" not in hand.hole_cards for hand in result.revealed_hands)
+
+
+def test_bot_previous_hand_summary_excludes_mucked_cards() -> None:
+    board = ("3c", "Kd", "Qs", "9h", "4c", "4s", "5c", "Jc")
+    snapshot = check_down(("As", "7c", "Ah", "2d", *board), button_seat=1)
+    previous = previous_hand_from_snapshot(snapshot)
+    assert previous is not None
+    assert [hand.seat for hand in previous.shown_hands] == [2]
+    assert "7c" not in previous.model_dump_json()
+    assert sum(item.stack for item in previous.final_stacks) == 10_000
+    assert [award.seat for award in previous.awards] == [2]

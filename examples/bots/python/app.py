@@ -28,7 +28,7 @@ def authorize(authorization: str | None) -> None:
 
 @app.get("/v1/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(protocol="poker-bot.v1", status="ready")
+    return HealthResponse(protocol="poker-bot.v2", status="ready")
 
 
 @app.post("/v1/verify", response_model=VerifyResponse)
@@ -37,7 +37,7 @@ async def verify(
     authorization: str | None = Header(default=None),
 ) -> VerifyResponse:
     authorize(authorization)
-    return VerifyResponse(protocol="poker-bot.v1", challenge=request.challenge)
+    return VerifyResponse(protocol="poker-bot.v2", challenge=request.challenge)
 
 
 @app.post("/v1/action", response_model=BotActionResponse)

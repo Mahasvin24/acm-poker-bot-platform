@@ -273,3 +273,34 @@ async def test_match_plays_to_completion_with_standings_and_spectator_privacy() 
     assert [item.position for item in final.match.standings] == [1, 2]
     assert final.decision is None
     assert final.turn is None
+
+
+async def test_bot_requests_carry_v2_context_without_leaking_private_cards() -> None:
+    stack = await build_stack(NO_PACING)
+    match_id, ava = await human_vs_bots(stack)
+    while True:
+        view = await advance_to_human_decision(stack, match_id, ava)
+        if view.hand_number >= 3:
+            break
+        await stack.runtime.submit_human_action(ava, match_id, passive_action(view))
+
+    requests = stack.network.action_requests
+    assert requests
+    assert all(request["protocol"] == "poker-bot.v2" for request in requests)
+    for request in requests:
+        match = request["match"]
+        assert isinstance(match, dict)
+        assert match["players_remaining"] == 3
+        table = request["table"]
+        assert isinstance(table, dict)
+        assert all(entry["street"] for entry in table["action_history"])
+
+    later = [request for request in requests if request["previous_hand"] is not None]
+    assert later
+    for request in later:
+        previous = request["previous_hand"]
+        assert isinstance(previous, dict)
+        assert previous["hand_number"] < request["match"]["hand_number"]  # type: ignore[index]
+        assert sum(item["stack"] for item in previous["final_stacks"]) == 60_000
+        for hand in previous["shown_hands"]:
+            assert len(hand["hole_cards"]) == 2

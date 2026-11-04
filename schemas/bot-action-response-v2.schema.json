@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "ActionType": {
+      "enum": [
+        "fold",
+        "check",
+        "call",
+        "raise"
+      ],
+      "title": "ActionType",
+      "type": "string"
+    }
+  },
+  "$id": "https://acm.example/schemas/bot-action-response-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "amount_to": {
+            "type": "null"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "const": "raise"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "properties": {
+          "amount_to": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "amount_to"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/ActionType"
+    },
+    "amount_to": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Amount To"
+    },
+    "decision_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "hand_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Hand Id",
+      "type": "string"
+    },
+    "match_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Match Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "poker-bot.v2",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "table_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Table Id",
+      "type": "string"
+    },
+    "table_version": {
+      "minimum": 0,
+      "title": "Table Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "protocol",
+    "match_id",
+    "table_id",
+    "hand_id",
+    "decision_id",
+    "table_version",
+    "action"
+  ],
+  "title": "Poker Bot Action Response v2",
+  "type": "object"
+}

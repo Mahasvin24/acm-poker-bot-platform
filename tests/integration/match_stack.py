@@ -46,6 +46,7 @@ class FakeBotNetwork:
     broken: set[str] = field(default_factory=set)
     delay_seconds: float = 0.0
     calls: Counter[tuple[str, str]] = field(default_factory=Counter)
+    action_requests: list[dict[str, object]] = field(default_factory=list)
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host
@@ -55,14 +56,15 @@ class FakeBotNetwork:
         if self.delay_seconds:
             await asyncio.sleep(self.delay_seconds)
         if request.url.path == "/v1/health":
-            return httpx.Response(200, json={"protocol": "poker-bot.v1", "status": "ready"})
+            return httpx.Response(200, json={"protocol": "poker-bot.v2", "status": "ready"})
         if request.headers.get("authorization") != f"Bearer {self.tokens.get(host)}":
             return httpx.Response(401, json={"detail": "bad token"})
         if request.url.path == "/v1/verify":
             body = json.loads(request.content)
             return httpx.Response(
-                200, json={"protocol": "poker-bot.v1", "challenge": body["challenge"]}
+                200, json={"protocol": "poker-bot.v2", "challenge": body["challenge"]}
             )
+        self.action_requests.append(json.loads(request.content))
         bot_request = BotActionRequest.model_validate_json(request.content)
         action = deterministic_reference_action(bot_request)
         return httpx.Response(
