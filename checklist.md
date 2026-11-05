@@ -27,6 +27,37 @@ replaced by code-joined matches. They are verified against the new flow in the r
 - **Untested:** 1.2.8, 3.3.3, 3.3.11, 4.1.8, 4.3.1, 4.3.2, 5.2.3, 5.3.6, 5.4.6, 6.1, 6.2, 6.5,
   6.6, 6.7, 7.1, 7.3
 
+## Re-grade after improvements (branch `cursor/platform-audit-matches`)
+
+Evidence: 136 backend tests pass (plus both Postgres tests against a throwaway `_test`
+database), `tsc`, `eslint`, and `next build` are clean, both example bots pass conformance, two
+full browser walkthroughs (happy path and failure drill), and `scripts/smoke_match.py`.
+
+- **Pass:** 1.1.1–1.1.7, 1.2.1–1.2.6, 1.2.8, 2.1.1–2.1.3, 2.1.5, 2.1.6, 2.2.1–2.2.7,
+  3.1.1–3.1.7, 3.1.9, 3.2.1–3.2.6, 3.3.1–3.3.8, 4.1.1–4.1.7, 4.2.1–4.2.4, 4.3.1, 4.3.2,
+  5.1.1–5.1.3, 5.2.1, 5.2.2, 5.2.4, 5.2.5, 5.3.1–5.3.5, 5.4.1–5.4.5, 6.1, 6.4, 6.5, 6.8, 7.3
+- **Partial:**
+  - 1.2.7: builders have the conformance CLI and `/demo`, but no self-serve match for their own bot against house bots.
+  - 2.1.4: kick works in the lobby only, and there's no one-click rematch.
+  - 3.1.8: the property test still covers fold-outs only.
+  - 3.3.9: keyboard shortcuts are implemented but not exercised in a browser.
+  - 3.3.10: there's a previous-hand summary, not a step-by-step replay.
+  - 3.3.12: a full accessibility audit hasn't been run.
+  - 5.2.3: reconnecting relies on polling server state; there's no network-drop drill.
+  - 5.3.6: unexpected 500s use FastAPI's default body.
+  - 5.5.2: Postgres tests ran locally, but there's no CI.
+  - 5.5.3: the admin roster shows health, but there's no structured logging.
+  - 6.2, 6.3: polling at 400 ms and 1 s was kept rather than moving to SSE.
+  - 6.7: the build passes, but Lighthouse hasn't been run.
+  - 7.1: the docs were updated but not followed from a clean checkout.
+  - 7.2: there's an API-level smoke script and integration tests, but no automated browser E2E.
+- **Fail:** 5.5.1 (the eight-hour soak and the event-router rehearsal still need to happen on site)
+- **Untested:**
+  - 3.3.11: phone and tablet widths weren't checked in a browser.
+  - 4.1.8: the worst-case request size wasn't measured.
+  - 5.4.6: there's been no log review for secrets during a drill.
+  - 6.6: browser console warnings weren't captured.
+
 ---
 
 ## 1. Account creation: users and bots

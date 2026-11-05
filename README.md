@@ -1,20 +1,20 @@
 # ACM Poker Bot Platform
 
-A server-authoritative tournament platform for a play-money human-versus-bot no-limit
-Texas Hold'em club event.
+A server-authoritative platform for play-money no-limit Texas Hold'em matches where humans
+and student-built bots share a table.
 
-The repository contains a FastAPI/PostgreSQL tournament backend and a Next.js frontend. The
-web experience covers account creation, tournament administration, participant registration,
-bot endpoint setup and verification, and a server-authoritative human gameplay table. 3D
-rendering remains intentionally deferred.
+An organizer creates a match and shares a six-character join code. Humans join in the browser;
+bot builders register reusable bots once and seat them with the same code. The FastAPI backend
+runs every hand through PokerKit, persists each action to PostgreSQL before advancing, paces play
+so humans can follow, and resolves any bot or human failure with a recorded check or fold.
 
 ## Setup
 
 ### Environment
 
 Copy `.env.example` to `.env`, generate a secret with `openssl rand -hex 32`, and replace
-`POKER_SECRET_KEY`. The defaults connect to the Compose PostgreSQL service and allow the local
-frontend at `http://localhost:3000`.
+`POKER_SECRET_KEY`; the server refuses to start with the placeholder. The defaults connect to the
+Compose PostgreSQL service and allow the local frontend at `http://localhost:3000`.
 
 ### Packages (prerequisites)
 
@@ -36,10 +36,9 @@ cd frontend
 npm run dev
 ```
 
-The frontend runs at <http://localhost:3000>. Use `/account` to sign in, `/admin` to run an
-event, `/dashboard` to join one as a human or bot, `/play/demo` for the standalone table, and
-`/demo-human-verus-bot` for an ephemeral four-player real-engine match with three deliberately
-paced test bots.
+The frontend runs at <http://localhost:3000>. Players start at `/join`; organizers use `/admin`;
+bot builders manage bots on `/dashboard`. `/demo` plays a hand against three built-in bots with
+no account.
 
 ### Backend
 
@@ -57,25 +56,24 @@ combine Uvicorn's `--reload` and `--workers` options.
 
 ### How to run a sample bot's API endpoint
 
-After registering a bot and copying its one-time token, start either example on port `8001`:
+Start either example on port `8001`, add it under **My Bots** with this machine's LAN IP (not
+`localhost`), paste the one-time token into `BOT_TOKEN`, restart the bot, and press **Verify**:
 
 ```bash
 source .venv/bin/activate
 cd examples/bots/python
-BOT_TOKEN='token-from-registration' uvicorn app:app --host 0.0.0.0 --port 8001
+BOT_TOKEN='token-from-my-bots' uvicorn app:app --host 0.0.0.0 --port 8001
 ```
 
 Or, with Node.js 20+ and no extra packages:
 
 ```bash
 cd examples/bots/javascript
-BOT_TOKEN='token-from-registration' PORT=8001 node server.mjs
+BOT_TOKEN='token-from-my-bots' PORT=8001 node server.mjs
 ```
 
-Register the machine's reachable LAN IP—not `localhost`—with port `8001` in the participant
-dashboard.
-
 See [`docs/setup.md`](docs/setup.md) for the complete local setup and checks,
-[`docs/architecture-plan.md`](docs/architecture-plan.md) for the frozen design,
-[`docs/event-runbook.md`](docs/event-runbook.md) for rehearsal/deployment, and
-[`examples/bots/README.md`](examples/bots/README.md) for the public bot protocol.
+[`docs/architecture-plan.md`](docs/architecture-plan.md) for the design,
+[`docs/event-runbook.md`](docs/event-runbook.md) for rehearsal and deployment,
+[`examples/bots/README.md`](examples/bots/README.md) for the public bot protocol, and
+[`checklist.md`](checklist.md) for the platform audit.
