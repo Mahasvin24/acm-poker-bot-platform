@@ -4,8 +4,18 @@ import uuid
 from datetime import UTC, datetime
 from typing import Protocol
 
-from poker_bot_platform.auth.models import Account, BotProfile, SessionRecord
+from poker_bot_platform.auth.models import (
+    Account,
+    BotProfile,
+    CareerSummary,
+    LeaderboardEntry,
+    MatchResultSummary,
+    PasswordResetRequest,
+    SessionRecord,
+)
+from poker_bot_platform.auth.career import match_result_rows
 from poker_bot_platform.domain import Role
+from poker_bot_platform.match.models import MatchState
 
 
 class AuthRepositoryError(RuntimeError):
@@ -60,6 +70,18 @@ class AuthRepository(Protocol):
         error: str | None,
     ) -> BotProfile: ...
     async def delete_bot_profile(self, profile_id: str) -> None: ...
+    async def update_account_profile(
+        self, account_id: str, *, display_name: str | None
+    ) -> Account: ...
+    async def change_account_email(self, account_id: str, email: str) -> Account: ...
+    async def delete_account(self, account_id: str, deleted_at: datetime) -> Account: ...
+    async def upsert_password_reset_request(self, account_id: str) -> None: ...
+    async def list_password_reset_requests(self) -> tuple[PasswordResetRequest, ...]: ...
+    async def fulfill_password_reset_requests(self, account_id: str, fulfilled_at: datetime) -> None: ...
+    async def career_summary(self, account_id: str) -> CareerSummary: ...
+    async def match_results_for_account(self, account_id: str) -> tuple[MatchResultSummary, ...]: ...
+    async def leaderboard(self, *, limit: int = 50) -> tuple[LeaderboardEntry, ...]: ...
+    async def record_match_completion(self, state: MatchState) -> None: ...
 
 
 class InMemoryAuthRepository:
@@ -67,6 +89,8 @@ class InMemoryAuthRepository:
         self.accounts: dict[str, Account] = {}
         self.sessions: dict[str, SessionRecord] = {}
         self.bot_profiles: dict[str, BotProfile] = {}
+        self.reset_requests: dict[str, PasswordResetRequest] = {}
+        self.match_results: list[MatchResultSummary] = []
 
     async def create_account(self, email: str, password_hash: str, role: Role) -> Account:
         if await self.get_account_by_email(email) is not None:
@@ -82,7 +106,10 @@ class InMemoryAuthRepository:
         return account
 
     async def get_account_by_email(self, email: str) -> Account | None:
-        return next((item for item in self.accounts.values() if item.email == email), None)
+        return next(
+            (item for item in self.accounts.values() if item.email == email and item.deleted_at is None),
+            None,
+        )
 
     async def get_account(self, account_id: str) -> Account | None:
         return self.accounts.get(account_id)
@@ -222,6 +249,96 @@ class InMemoryAuthRepository:
     async def delete_bot_profile(self, profile_id: str) -> None:
         if self.bot_profiles.pop(profile_id, None) is None:
             raise AuthNotFoundError("bot not found")
+
+    async def update_account_profile(
+        self, account_id: str, *, display_name: str | None
+    ) -> Account:
+        account = self.accounts.get(account_id)
+        if account is None or account.deleted_at is not None:
+            raise AuthNotFoundError("account not found")
+        updated = account.model_copy(update={"display_name": display_name})
+        self.accounts[account_id] = updated
+        return updated
+
+    async def change_account_email(self, account_id: str, email: str) -> Account:
+        if await self.get_account_by_email(email) is not None:
+            raise AuthConflictError("that email is already registered")
+        account = self.accounts.get(account_id)
+        if account is None or account.deleted_at is not None:
+            raise AuthNotFoundError("account not found")
+        updated = account.model_copy(update={"email": email})
+        self.accounts[account_id] = updated
+        return updated
+
+    async def delete_account(self, account_id: str, deleted_at: datetime) -> Account:
+        account = self.accounts.get(account_id)
+        if account is None or account.deleted_at is not None:
+            raise AuthNotFoundError("account not found")
+        updated = account.model_copy(update={"deleted_at": deleted_at})
+        self.accounts[account_id] = updated
+        return updated
+
+    async def upsert_password_reset_request(self, account_id: str) -> None:
+        account = self.accounts.get(account_id)
+        if account is None or account.deleted_at is not None:
+            return
+        self.reset_requests[account_id] = PasswordResetRequest(
+            account_id=account_id,
+            email=account.email,
+            requested_at=_utc_now(),
+        )
+
+    async def list_password_reset_requests(self) -> tuple[PasswordResetRequest, ...]:
+        return tuple(
+            sorted(self.reset_requests.values(), key=lambda item: item.requested_at, reverse=True)
+        )
+
+    async def fulfill_password_reset_requests(self, account_id: str, fulfilled_at: datetime) -> None:
+        self.reset_requests.pop(account_id, None)
+
+    async def record_match_completion(self, state: MatchState) -> None:
+        existing = {(item.match_id, item.entry_id) for item in self.match_results}
+        for row in match_result_rows(state):
+            if (row.match_id, row.entry_id) in existing:
+                continue
+            self.match_results.append(row)
+
+    async def career_summary(self, account_id: str) -> CareerSummary:
+        mine = [item for item in self.match_results if item.account_id == account_id]
+        return CareerSummary(
+            career_chip_total=sum(item.chip_delta for item in mine),
+            matches_finished=len({item.match_id for item in mine}),
+        )
+
+    async def match_results_for_account(self, account_id: str) -> tuple[MatchResultSummary, ...]:
+        return tuple(
+            item
+            for item in sorted(self.match_results, key=lambda row: row.match_id, reverse=True)
+            if item.account_id == account_id
+        )
+
+    async def leaderboard(self, *, limit: int = 50) -> tuple[LeaderboardEntry, ...]:
+        totals: dict[str, tuple[int, set[str]]] = {}
+        for item in self.match_results:
+            chips, matches = totals.get(item.account_id, (0, set()))
+            matches.add(item.match_id)
+            totals[item.account_id] = (chips + item.chip_delta, matches)
+        rows: list[LeaderboardEntry] = []
+        for account_id, (chips, match_ids) in totals.items():
+            account = self.accounts.get(account_id)
+            if account is None or account.deleted_at is not None:
+                continue
+            rows.append(
+                LeaderboardEntry(
+                    account_id=account_id,
+                    email=account.email,
+                    display_name=account.display_name,
+                    career_chip_total=chips,
+                    matches_finished=len(match_ids),
+                )
+            )
+        rows.sort(key=lambda item: (-item.career_chip_total, item.email))
+        return tuple(rows[:limit])
 
 
 def _utc_now() -> datetime:

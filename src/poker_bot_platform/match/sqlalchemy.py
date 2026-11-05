@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -9,7 +11,11 @@ from poker_bot_platform.match.models import (
     OPEN_MATCH_STATUSES,
     AuditEntry,
     MatchState,
+    MatchStatus,
 )
+
+if TYPE_CHECKING:
+    from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.match.store import (
     JoinCodeConflict,
     MatchNotFoundError,
@@ -22,8 +28,13 @@ from poker_bot_platform.persistence.models import AuditLogRow, MatchRow
 class SqlAlchemyMatchStore:
     """Stores match state and its audit entry in the same transaction."""
 
-    def __init__(self, sessions: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        sessions: async_sessionmaker[AsyncSession],
+        career: AuthRepository | None = None,
+    ) -> None:
         self._sessions = sessions
+        self._career = career
 
     async def create(self, state: MatchState, audit: AuditEntry) -> None:
         try:
@@ -64,11 +75,18 @@ class SqlAlchemyMatchStore:
                     )
                 if state.revision != expected_revision + 1:
                     raise MatchVersionConflict("saved state must advance one revision")
+                previous_status = row.status
                 row.state = state.model_dump(mode="json")
                 row.status = state.status.value
                 row.join_code = state.join_code
                 row.version = state.revision
                 self._append_audit(session, state.match_id, audit)
+                if (
+                    self._career is not None
+                    and state.status is MatchStatus.COMPLETED
+                    and previous_status != MatchStatus.COMPLETED.value
+                ):
+                    await self._career.record_match_completion_in_session(session, state)
         except MatchStoreError:
             raise
         except IntegrityError as exc:

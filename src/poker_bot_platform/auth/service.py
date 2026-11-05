@@ -11,7 +11,13 @@ from typing import Protocol
 
 from pwdlib import PasswordHash
 
-from poker_bot_platform.auth.models import Account, BotProfile
+from poker_bot_platform.auth.models import (
+    Account,
+    BotProfile,
+    CareerSummary,
+    LeaderboardEntry,
+    PasswordResetRequest,
+)
 from poker_bot_platform.auth.repository import (
     AuthConflictError,
     AuthNotFoundError,
@@ -99,6 +105,9 @@ class AuthService:
         if account is None:
             self.passwords.consume_dummy_verify(password)
             raise InvalidCredentialsError("invalid email or password")
+        if account.deleted_at is not None:
+            self.passwords.consume_dummy_verify(password)
+            raise InvalidCredentialsError("invalid email or password")
         if not self.passwords.verify(password, account.password_hash):
             raise InvalidCredentialsError("invalid email or password")
         now = self._now()
@@ -119,7 +128,7 @@ class AuthService:
         if session is None or session.revoked_at is not None or session.expires_at <= now:
             raise InvalidSessionError("session is invalid or expired")
         account = await self.repository.get_account(session.account_id)
-        if account is None:
+        if account is None or account.deleted_at is not None:
             raise InvalidSessionError("session account no longer exists")
         return account
 
@@ -143,9 +152,51 @@ class AuthService:
         """Set a temporary password, sign the account out everywhere, and return it once."""
 
         temporary = secrets.token_urlsafe(12)
+        now = self._now()
         await self.repository.set_password_hash(account_id, self.passwords.hash(temporary))
-        await self.repository.revoke_account_sessions(account_id, self._now())
+        await self.repository.revoke_account_sessions(account_id, now)
+        await self.repository.fulfill_password_reset_requests(account_id, now)
         return temporary
+
+    async def request_password_reset(self, email: str) -> None:
+        normalized = normalize_email(email)
+        account = await self.repository.get_account_by_email(normalized)
+        if account is None:
+            return
+        await self.repository.upsert_password_reset_request(account.id)
+
+    async def update_profile(self, account: Account, display_name: str | None) -> Account:
+        if display_name is None:
+            clean = None
+        elif not display_name.strip():
+            clean = None
+        else:
+            clean = _clean_name(display_name)
+        return await self.repository.update_account_profile(account.id, display_name=clean)
+
+    async def change_email(self, account: Account, current_password: str, new_email: str) -> Account:
+        if not self.passwords.verify(current_password, account.password_hash):
+            raise InvalidCredentialsError("current password is incorrect")
+        normalized = normalize_email(new_email)
+        return await self.repository.change_account_email(account.id, normalized)
+
+    async def delete_account(self, account: Account, current_password: str) -> None:
+        if account.role is Role.ADMIN:
+            raise AuthConflictError("admin accounts cannot be deleted from the dashboard")
+        if not self.passwords.verify(current_password, account.password_hash):
+            raise InvalidCredentialsError("current password is incorrect")
+        now = self._now()
+        await self.repository.delete_account(account.id, now)
+        await self.repository.revoke_account_sessions(account.id, now)
+
+    async def career_summary(self, account: Account) -> CareerSummary:
+        return await self.repository.career_summary(account.id)
+
+    async def leaderboard(self, *, limit: int = 50) -> tuple[LeaderboardEntry, ...]:
+        return await self.repository.leaderboard(limit=limit)
+
+    async def password_reset_requests(self) -> tuple[PasswordResetRequest, ...]:
+        return await self.repository.list_password_reset_requests()
 
     def _now(self) -> datetime:
         value = self._clock()

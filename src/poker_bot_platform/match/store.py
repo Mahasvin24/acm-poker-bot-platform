@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from poker_bot_platform.auth.repository import AuthRepository
 
 from poker_bot_platform.match.models import (
     ACTIVE_MATCH_STATUSES,
     OPEN_MATCH_STATUSES,
     AuditEntry,
     MatchState,
+    MatchStatus,
 )
-
 
 class MatchStoreError(RuntimeError):
     pass
@@ -50,11 +53,12 @@ class MatchStore(Protocol):
 class InMemoryMatchStore:
     """Atomic match-state store for tests and local simulations."""
 
-    def __init__(self) -> None:
+    def __init__(self, career: AuthRepository | None = None) -> None:
         self._states: dict[str, MatchState] = {}
         self._audit: dict[str, list[AuditEntry]] = {}
         self._lock = asyncio.Lock()
         self.fail_next_save = False
+        self._career = career
 
     async def create(self, state: MatchState, audit: AuditEntry) -> None:
         async with self._lock:
@@ -85,8 +89,15 @@ class InMemoryMatchStore:
             if state.revision != expected_revision + 1:
                 raise MatchVersionConflict("saved state must advance exactly one revision")
             self._require_unique_code(state)
+            previous = current.status
             self._states[state.match_id] = state
             self._audit[state.match_id].append(audit)
+            if (
+                self._career is not None
+                and state.status is MatchStatus.COMPLETED
+                and previous is not MatchStatus.COMPLETED
+            ):
+                await self._career.record_match_completion(state)
 
     async def load(self, match_id: str) -> MatchState:
         async with self._lock:

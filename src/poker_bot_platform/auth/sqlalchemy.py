@@ -5,12 +5,28 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from poker_bot_platform.auth.db_models import AccountRow, BotProfileRow, SessionRow
-from poker_bot_platform.auth.models import Account, BotProfile, SessionRecord
+from poker_bot_platform.auth.career import match_result_rows
+from poker_bot_platform.auth.db_models import (
+    AccountRow,
+    BotProfileRow,
+    MatchAccountResultRow,
+    PasswordResetRequestRow,
+    SessionRow,
+)
+from poker_bot_platform.auth.models import (
+    Account,
+    BotProfile,
+    CareerSummary,
+    LeaderboardEntry,
+    MatchResultSummary,
+    PasswordResetRequest,
+    SessionRecord,
+)
+from poker_bot_platform.match.models import MatchState
 from poker_bot_platform.auth.repository import (
     AuthConflictError,
     AuthNotFoundError,
@@ -60,7 +76,12 @@ class SqlAlchemyAuthRepository:
 
     async def get_account_by_email(self, email: str) -> Account | None:
         async with self._read() as session:
-            row = await session.scalar(select(AccountRow).where(AccountRow.email == email))
+            row = await session.scalar(
+                select(AccountRow).where(
+                    AccountRow.email == email,
+                    AccountRow.deleted_at.is_(None),
+                )
+            )
             return self._account(row) if row else None
 
     async def get_account(self, account_id: str) -> Account | None:
@@ -222,6 +243,189 @@ class SqlAlchemyAuthRepository:
             row = await self._locked_profile(session, profile_id)
             await session.delete(row)
 
+    async def update_account_profile(
+        self, account_id: str, *, display_name: str | None
+    ) -> Account:
+        identifier = _uuid_or_none(account_id)
+        async with self._transaction() as session:
+            row = await session.get(AccountRow, identifier) if identifier else None
+            if row is None or row.deleted_at is not None:
+                raise AuthNotFoundError("account not found")
+            row.display_name = display_name
+            await session.flush()
+            return self._account(row)
+
+    async def change_account_email(self, account_id: str, email: str) -> Account:
+        identifier = _uuid_or_none(account_id)
+        async with self._transaction() as session:
+            row = await session.get(AccountRow, identifier) if identifier else None
+            if row is None or row.deleted_at is not None:
+                raise AuthNotFoundError("account not found")
+            taken = await session.scalar(
+                select(AccountRow.id).where(
+                    AccountRow.email == email,
+                    AccountRow.id != identifier,
+                )
+            )
+            if taken is not None:
+                raise AuthConflictError("that email is already registered")
+            row.email = email
+            await session.flush()
+            return self._account(row)
+
+    async def delete_account(self, account_id: str, deleted_at: datetime) -> Account:
+        identifier = _uuid_or_none(account_id)
+        async with self._transaction() as session:
+            row = await session.get(AccountRow, identifier) if identifier else None
+            if row is None or row.deleted_at is not None:
+                raise AuthNotFoundError("account not found")
+            row.deleted_at = deleted_at
+            await session.execute(
+                update(SessionRow)
+                .where(SessionRow.account_id == identifier, SessionRow.revoked_at.is_(None))
+                .values(revoked_at=deleted_at)
+            )
+            await session.flush()
+            return self._account(row)
+
+    async def upsert_password_reset_request(self, account_id: str) -> None:
+        identifier = _uuid_or_none(account_id)
+        if identifier is None:
+            return
+        async with self._transaction() as session:
+            row = await session.get(AccountRow, identifier)
+            if row is None or row.deleted_at is not None:
+                return
+            existing = await session.scalar(
+                select(PasswordResetRequestRow)
+                .where(
+                    PasswordResetRequestRow.account_id == identifier,
+                    PasswordResetRequestRow.fulfilled_at.is_(None),
+                )
+                .with_for_update()
+            )
+            if existing is None:
+                session.add(PasswordResetRequestRow(account_id=identifier))
+
+    async def list_password_reset_requests(self) -> tuple[PasswordResetRequest, ...]:
+        async with self._read() as session:
+            result = await session.execute(
+                select(PasswordResetRequestRow, AccountRow.email)
+                .join(AccountRow, AccountRow.id == PasswordResetRequestRow.account_id)
+                .where(PasswordResetRequestRow.fulfilled_at.is_(None))
+                .order_by(PasswordResetRequestRow.created_at.desc())
+            )
+            return tuple(
+                PasswordResetRequest(
+                    account_id=str(row.account_id),
+                    email=email,
+                    requested_at=row.created_at,
+                )
+                for row, email in result.all()
+            )
+
+    async def fulfill_password_reset_requests(self, account_id: str, fulfilled_at: datetime) -> None:
+        identifier = _uuid_or_none(account_id)
+        if identifier is None:
+            return
+        async with self._transaction() as session:
+            await session.execute(
+                update(PasswordResetRequestRow)
+                .where(
+                    PasswordResetRequestRow.account_id == identifier,
+                    PasswordResetRequestRow.fulfilled_at.is_(None),
+                )
+                .values(fulfilled_at=fulfilled_at)
+            )
+
+    async def record_match_completion(self, state: MatchState) -> None:
+        async with self._transaction() as session:
+            await self.record_match_completion_in_session(session, state)
+
+    async def record_match_completion_in_session(
+        self, session: AsyncSession, state: MatchState
+    ) -> None:
+        for row in match_result_rows(state):
+            exists = await session.scalar(
+                select(MatchAccountResultRow.id).where(
+                    MatchAccountResultRow.match_id == row.match_id,
+                    MatchAccountResultRow.entry_id == row.entry_id,
+                )
+            )
+            if exists is not None:
+                continue
+            session.add(
+                MatchAccountResultRow(
+                    match_id=row.match_id,
+                    account_id=uuid.UUID(row.account_id),
+                    entry_id=row.entry_id,
+                    match_name=row.match_name,
+                    display_name=row.display_name,
+                    kind=row.kind.value,
+                    position=row.position,
+                    starting_stack=state.config.starting_stack,
+                    final_stack=row.final_stack,
+                    chip_delta=row.chip_delta,
+                )
+            )
+
+    async def career_summary(self, account_id: str) -> CareerSummary:
+        identifier = _uuid_or_none(account_id)
+        if identifier is None:
+            return CareerSummary()
+        async with self._read() as session:
+            totals = await session.execute(
+                select(
+                    func.coalesce(func.sum(MatchAccountResultRow.chip_delta), 0),
+                    func.count(func.distinct(MatchAccountResultRow.match_id)),
+                ).where(MatchAccountResultRow.account_id == identifier)
+            )
+            chips, matches = totals.one()
+            return CareerSummary(
+                career_chip_total=int(chips or 0),
+                matches_finished=int(matches or 0),
+            )
+
+    async def match_results_for_account(self, account_id: str) -> tuple[MatchResultSummary, ...]:
+        identifier = _uuid_or_none(account_id)
+        if identifier is None:
+            return ()
+        async with self._read() as session:
+            rows = await session.scalars(
+                select(MatchAccountResultRow)
+                .where(MatchAccountResultRow.account_id == identifier)
+                .order_by(MatchAccountResultRow.recorded_at.desc())
+            )
+            return tuple(self._match_result(row) for row in rows)
+
+    async def leaderboard(self, *, limit: int = 50) -> tuple[LeaderboardEntry, ...]:
+        async with self._read() as session:
+            totals = await session.execute(
+                select(
+                    MatchAccountResultRow.account_id,
+                    func.coalesce(func.sum(MatchAccountResultRow.chip_delta), 0),
+                    func.count(func.distinct(MatchAccountResultRow.match_id)),
+                )
+                .group_by(MatchAccountResultRow.account_id)
+                .order_by(func.sum(MatchAccountResultRow.chip_delta).desc())
+                .limit(limit)
+            )
+            entries: list[LeaderboardEntry] = []
+            for account_uuid, chips, matches in totals.all():
+                account = await session.get(AccountRow, account_uuid)
+                if account is None or account.deleted_at is not None:
+                    continue
+                entries.append(
+                    LeaderboardEntry(
+                        account_id=str(account_uuid),
+                        email=account.email,
+                        display_name=account.display_name,
+                        career_chip_total=int(chips or 0),
+                        matches_finished=int(matches or 0),
+                    )
+                )
+            return tuple(entries)
+
     @staticmethod
     async def _locked_profile(session: AsyncSession, profile_id: str) -> BotProfileRow:
         identifier = _uuid_or_none(profile_id)
@@ -241,7 +445,25 @@ class SqlAlchemyAuthRepository:
             email=row.email,
             password_hash=row.password_hash,
             role=Role(row.role),
+            display_name=row.display_name,
+            deleted_at=row.deleted_at,
             created_at=row.created_at,
+        )
+
+    @staticmethod
+    def _match_result(row: MatchAccountResultRow) -> MatchResultSummary:
+        from poker_bot_platform.domain import EntryKind
+
+        return MatchResultSummary(
+            account_id=str(row.account_id),
+            entry_id=row.entry_id,
+            match_id=row.match_id,
+            match_name=row.match_name,
+            position=row.position,
+            final_stack=row.final_stack,
+            chip_delta=row.chip_delta,
+            display_name=row.display_name,
+            kind=EntryKind(row.kind),
         )
 
     @staticmethod

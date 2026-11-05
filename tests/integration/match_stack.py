@@ -130,7 +130,7 @@ async def build_stack(pacing: PacingConfig | None = None) -> MatchStack:
         verifier=gateway,
         clock=clock,
     )
-    registry = MatchRegistry(InMemoryMatchStore(), clock=clock)
+    registry = MatchRegistry(InMemoryMatchStore(auth_repository), clock=clock)
     tables = InMemoryTableRepository()
     runtime = MatchRuntime(
         registry,

@@ -34,7 +34,7 @@ async def test_postgres_json_round_trip_partial_index_and_atomic_commit(
     engine = FakePokerEngine()
     database, sessions, repository = create_database_components(migrated_database)
     try:
-        store = SqlAlchemyMatchStore(sessions)
+        store = SqlAlchemyMatchStore(sessions, None)
         lobby = lobby_state(match_id, join_code=suffix[:6].upper())
         await store.create(lobby, AuditEntry(actor_id="admin", command="create_match"))
         running = lobby.model_copy(update={"status": MatchStatus.RUNNING, "revision": 1})
