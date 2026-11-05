@@ -647,7 +647,9 @@ class MatchRuntime:
         )
         next_action_at = (
             runtime.next_action_at
-            if runtime.next_action_at is not None and runtime.next_action_at > self._now()
+            if runtime.next_action_at is not None
+            and runtime.next_action_at > self._now()
+            and state.status in _DRIVING_STATUSES
             else None
         )
         return PlayerTableStateResponse(

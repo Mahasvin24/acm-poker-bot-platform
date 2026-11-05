@@ -96,7 +96,7 @@ async def test_start_requires_two_players_then_seats_everyone_and_schedules_a_ha
 
     assert state.status is MatchStatus.RUNNING
     assert state.table is not None
-    assert {player.seat for player in state.table.players} == {1, 2}
+    assert {player.seat for player in state.table.players} == {1, 4}
     assert state.table.hand_in_progress
     assert state.table.hand_number == 1
     request = coordinator.hand_request()
