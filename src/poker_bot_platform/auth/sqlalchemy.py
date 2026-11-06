@@ -26,13 +26,13 @@ from poker_bot_platform.auth.models import (
     PasswordResetRequest,
     SessionRecord,
 )
-from poker_bot_platform.match.models import MatchState
 from poker_bot_platform.auth.repository import (
     AuthConflictError,
     AuthNotFoundError,
     AuthRepositoryError,
 )
-from poker_bot_platform.domain import Role
+from poker_bot_platform.domain import EntryKind, Role
+from poker_bot_platform.match.models import MatchState
 
 
 def _uuid_or_none(value: str) -> uuid.UUID | None:
@@ -66,9 +66,15 @@ class SqlAlchemyAuthRepository:
         except SQLAlchemyError as exc:
             raise AuthRepositoryError("account database operation failed") from exc
 
-    async def create_account(self, email: str, password_hash: str, role: Role) -> Account:
+    async def create_account(
+        self, email: str, password_hash: str, role: Role,
+        participant_kind: EntryKind | None = None,
+    ) -> Account:
         async with self._transaction() as session:
-            row = AccountRow(email=email, password_hash=password_hash, role=role.value)
+            row = AccountRow(
+                email=email, password_hash=password_hash, role=role.value,
+                participant_kind=participant_kind.value if participant_kind else None,
+            )
             session.add(row)
             await session.flush()
             await session.refresh(row)
@@ -445,6 +451,7 @@ class SqlAlchemyAuthRepository:
             email=row.email,
             password_hash=row.password_hash,
             role=Role(row.role),
+            participant_kind=EntryKind(row.participant_kind) if row.participant_kind else None,
             display_name=row.display_name,
             deleted_at=row.deleted_at,
             created_at=row.created_at,

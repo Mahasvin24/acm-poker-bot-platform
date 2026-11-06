@@ -8,18 +8,17 @@ from poker_bot_platform.api.models import (
     AdminAccountResponse,
     AdminMatchResponse,
     AdminMatchSummaryResponse,
-    ChangeEmailRequest,
-    DeleteAccountRequest,
-    ForgotPasswordRequest,
-    LeaderboardEntryResponse,
-    UpdateProfileRequest,
     BotDiagnosticsResponse,
     BotProfileRequest,
     BotProfileResponse,
     BotProfileUpdateRequest,
     BotTokenResponse,
+    ChangeEmailRequest,
     ChangePasswordRequest,
+    DeleteAccountRequest,
+    ForgotPasswordRequest,
     JoinMatchRequest,
+    LeaderboardEntryResponse,
     LoginRequest,
     MatchCreateRequest,
     MatchPreviewResponse,
@@ -29,6 +28,7 @@ from poker_bot_platform.api.models import (
     PlayerActionRequest,
     PlayerTableStateResponse,
     RegisterRequest,
+    UpdateProfileRequest,
 )
 from poker_bot_platform.api.rate_limit import RateLimitExceeded, SlidingWindowLimiter
 from poker_bot_platform.api.security import SameOriginGuard, client_key, too_many_attempts
@@ -41,7 +41,7 @@ from poker_bot_platform.auth.service import (
     InvalidCredentialsError,
     InvalidSessionError,
 )
-from poker_bot_platform.domain import Role
+from poker_bot_platform.domain import EntryKind, Role
 from poker_bot_platform.integration.matches import MatchCommandError, MatchNotFound, MatchService
 from poker_bot_platform.integration.runtime import (
     GameplayAccessError,
@@ -143,7 +143,7 @@ def create_api_router(
     )
     async def register(body: RegisterRequest) -> AccountResponse:
         try:
-            account = await auth.register(body.email, body.password)
+            account = await auth.register(body.email, body.password, body.participant_kind)
         except AuthConflictError as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -372,6 +372,10 @@ def create_api_router(
         response: Response,
         account: CurrentAccount,
     ) -> BotTokenResponse:
+        if account.participant_kind is EntryKind.HUMAN:
+            raise HTTPException(
+                status_code=403, detail="human accounts play directly in the browser"
+            )
         result = await _translate(bots.create(account.id, body.name, body.ip, body.port))
         response.headers["Cache-Control"] = "no-store"
         return BotTokenResponse(

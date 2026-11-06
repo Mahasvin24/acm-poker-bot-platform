@@ -183,6 +183,10 @@ class MatchService:
         display_name: str | None,
         bot_profile_id: str | None,
     ) -> MatchViewResponse:
+        if account.participant_kind is not None and kind is not account.participant_kind:
+            raise MatchCommandError(
+                f"this account joins matches as {account.participant_kind.value}"
+            )
         coordinator = await self._by_code(code)
         profile: BotProfile | None = None
         if kind is EntryKind.BOT:

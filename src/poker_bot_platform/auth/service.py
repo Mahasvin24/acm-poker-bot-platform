@@ -31,7 +31,7 @@ from poker_bot_platform.bots.tokens import (
     generate_bearer_token,
     generate_verification_challenge,
 )
-from poker_bot_platform.domain import Role
+from poker_bot_platform.domain import EntryKind, Role
 
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -91,12 +91,15 @@ class AuthService:
         self.session_lifetime = session_lifetime
         self._clock = clock or (lambda: datetime.now(UTC))
 
-    async def register(self, email: str, password: str) -> Account:
+    async def register(
+        self, email: str, password: str, participant_kind: EntryKind | None = None
+    ) -> Account:
         normalized = normalize_email(email)
         return await self.repository.create_account(
             normalized,
             self.passwords.hash(password),
             Role.USER,
+            participant_kind,
         )
 
     async def login(self, email: str, password: str) -> IssuedSession:

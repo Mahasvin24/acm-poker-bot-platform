@@ -16,6 +16,7 @@ class Account(AuthModel):
     email: str
     password_hash: str
     role: Role = Role.USER
+    participant_kind: EntryKind | None = None
     display_name: str | None = None
     deleted_at: datetime | None = None
     created_at: datetime

@@ -26,13 +26,19 @@ class AccountRow(Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
+    participant_kind: Mapped[str | None] = mapped_column(String(16))
     display_name: Mapped[str | None] = mapped_column(String(80))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (CheckConstraint("role IN ('user', 'admin')", name="ck_accounts_role"),)
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'admin')", name="ck_accounts_role"),
+        CheckConstraint(
+            "participant_kind IN ('human', 'bot')", name="ck_accounts_participant_kind"
+        ),
+    )
 
 
 class PasswordResetRequestRow(Base):

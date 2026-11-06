@@ -55,10 +55,15 @@ async def admin(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
 
 
 @asynccontextmanager
-async def signed_in(app: FastAPI, email: str) -> AsyncIterator[httpx.AsyncClient]:
+async def signed_in(
+    app: FastAPI, email: str, kind: str = "human"
+) -> AsyncIterator[httpx.AsyncClient]:
     async with client_for(app) as client:
         credentials = {"email": email, "password": "long-enough-password"}
-        assert (await client.post("/api/v1/auth/register", json=credentials)).status_code == 201
+        registered = await client.post(
+            "/api/v1/auth/register", json={**credentials, "participant_kind": kind}
+        )
+        assert registered.status_code == 201
         assert (await client.post("/api/v1/auth/login", json=credentials)).status_code == 200
         yield client
 
@@ -74,7 +79,11 @@ async def test_mutations_require_same_origin_and_login_is_rate_limited(app: Fast
         assert response.status_code == 403
 
     async with client_for(app) as client:
-        duplicate = {"email": "admin@example.com", "password": "long-enough-password"}
+        duplicate = {
+            "email": "admin@example.com",
+            "password": "long-enough-password",
+            "participant_kind": "human",
+        }
         conflict = await client.post("/api/v1/auth/register", json=duplicate)
         assert conflict.status_code == 409
         assert "sign in" in conflict.json()["detail"]
@@ -98,7 +107,7 @@ async def test_mutations_require_same_origin_and_login_is_rate_limited(app: Fast
 
 
 async def test_bot_profiles_show_the_token_once_and_verify(app: FastAPI, stack: MatchStack) -> None:
-    async with signed_in(app, "owner@example.com") as owner:
+    async with signed_in(app, "owner@example.com", "bot") as owner:
         created = await owner.post(
             "/api/v1/bots", json={"name": "Atlas", "ip": "10.20.0.11", "port": 8001}
         )
@@ -175,7 +184,7 @@ async def test_admin_creates_match_and_players_join_by_code(
         mine = await ava.get("/api/v1/me/matches")
         assert [item["match_id"] for item in mine.json()] == [match["match_id"]]
 
-    async with signed_in(app, "owner@example.com") as owner:
+    async with signed_in(app, "owner@example.com", "bot") as owner:
         created_bot = (
             await owner.post(
                 "/api/v1/bots", json={"name": "Atlas", "ip": "10.20.0.11", "port": 8001}
@@ -297,3 +306,80 @@ async def test_admin_can_reset_a_forgotten_password(app: FastAPI, admin: httpx.A
             json={"current_password": temporary, "new_password": "a-fresh-long-password"},
         )
         assert changed.status_code == 200
+
+
+@pytest.mark.parametrize("kind", ["human", "bot"])
+async def test_signup_kind_is_required_and_survives_login(app: FastAPI, kind: str) -> None:
+    async with client_for(app) as client:
+        credentials = {"email": f"{kind}@example.com", "password": "long-enough-password"}
+        missing = await client.post("/api/v1/auth/register", json=credentials)
+        assert missing.status_code == 422
+        invalid = await client.post(
+            "/api/v1/auth/register", json={**credentials, "participant_kind": "admin"}
+        )
+        assert invalid.status_code == 422
+        created = await client.post(
+            "/api/v1/auth/register", json={**credentials, "participant_kind": kind}
+        )
+        assert created.status_code == 201
+        assert created.json()["participant_kind"] == kind
+        logged_in = await client.post("/api/v1/auth/login", json=credentials)
+        assert logged_in.json()["participant_kind"] == kind
+        assert (await client.get("/api/v1/auth/me")).json()["participant_kind"] == kind
+
+
+async def test_account_kind_controls_bot_creation_and_match_entry(
+    app: FastAPI, stack: MatchStack
+) -> None:
+    _, code = await stack.create_match()
+    async with signed_in(app, "human-kind@example.com") as human:
+        created = await human.post(
+            "/api/v1/bots", json={"name": "Nope", "ip": "10.20.0.11", "port": 8001}
+        )
+        assert created.status_code == 403
+        wrong_kind = await human.post(
+            "/api/v1/matches/join", json={"code": code, "kind": "bot", "bot_profile_id": "fake"}
+        )
+        assert wrong_kind.status_code == 409
+        assert "as human" in wrong_kind.json()["detail"]
+    async with signed_in(app, "bot-kind@example.com", "bot") as bot:
+        wrong_kind = await bot.post(
+            "/api/v1/matches/join", json={"code": code, "kind": "human", "display_name": "Nope"}
+        )
+        assert wrong_kind.status_code == 409
+        assert "as bot" in wrong_kind.json()["detail"]
+
+
+async def test_bot_settings_survive_edit_and_new_session_without_changing_token(
+    app: FastAPI, stack: MatchStack
+) -> None:
+    async with signed_in(app, "persistent@example.com", "bot") as client:
+        created = (await client.post(
+            "/api/v1/bots", json={"name": "Atlas", "ip": "10.20.0.11", "port": 8001}
+        )).json()
+        bot_id = created["bot"]["id"]
+        token = created["bearer_token"]
+        stack.network.tokens["10.20.0.11"] = token
+        assert (await client.post(f"/api/v1/bots/{bot_id}/verify")).status_code == 200
+        renamed = await client.patch(f"/api/v1/bots/{bot_id}", json={"name": "River"})
+        assert renamed.json()["verified_at"] is not None
+        updated = await client.patch(
+            f"/api/v1/bots/{bot_id}", json={"name": "River", "ip": "10.20.0.12", "port": 9000}
+        )
+        assert updated.status_code == 200
+        assert updated.json()["verified_at"] is None
+        assert token not in updated.text
+        cannot_edit_token = await client.patch(
+            f"/api/v1/bots/{bot_id}", json={"bearer_token": "replacement"}
+        )
+        assert cannot_edit_token.status_code == 422
+        await client.post("/api/v1/auth/logout")
+    async with client_for(app) as client:
+        await client.post("/api/v1/auth/login", json={
+            "email": "persistent@example.com", "password": "long-enough-password"
+        })
+        saved = (await client.get("/api/v1/bots")).json()[0]
+        assert (saved["name"], saved["ip"], saved["port"]) == ("River", "10.20.0.12", 9000)
+        assert token not in str(saved)
+        stack.network.tokens["10.20.0.12"] = token
+        assert (await client.post(f"/api/v1/bots/{bot_id}/verify")).status_code == 200

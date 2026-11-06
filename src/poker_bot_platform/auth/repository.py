@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Protocol
 
+from poker_bot_platform.auth.career import match_result_rows
 from poker_bot_platform.auth.models import (
     Account,
     BotProfile,
@@ -13,8 +14,7 @@ from poker_bot_platform.auth.models import (
     PasswordResetRequest,
     SessionRecord,
 )
-from poker_bot_platform.auth.career import match_result_rows
-from poker_bot_platform.domain import Role
+from poker_bot_platform.domain import EntryKind, Role
 from poker_bot_platform.match.models import MatchState
 
 
@@ -31,7 +31,10 @@ class AuthNotFoundError(AuthRepositoryError):
 
 
 class AuthRepository(Protocol):
-    async def create_account(self, email: str, password_hash: str, role: Role) -> Account: ...
+    async def create_account(
+        self, email: str, password_hash: str, role: Role,
+        participant_kind: EntryKind | None = None,
+    ) -> Account: ...
     async def get_account_by_email(self, email: str) -> Account | None: ...
     async def get_account(self, account_id: str) -> Account | None: ...
     async def list_accounts(self) -> tuple[Account, ...]: ...
@@ -92,7 +95,10 @@ class InMemoryAuthRepository:
         self.reset_requests: dict[str, PasswordResetRequest] = {}
         self.match_results: list[MatchResultSummary] = []
 
-    async def create_account(self, email: str, password_hash: str, role: Role) -> Account:
+    async def create_account(
+        self, email: str, password_hash: str, role: Role,
+        participant_kind: EntryKind | None = None,
+    ) -> Account:
         if await self.get_account_by_email(email) is not None:
             raise AuthConflictError("email is already registered")
         account = Account(
@@ -100,6 +106,7 @@ class InMemoryAuthRepository:
             email=email,
             password_hash=password_hash,
             role=role,
+            participant_kind=participant_kind,
             created_at=_utc_now(),
         )
         self.accounts[account.id] = account

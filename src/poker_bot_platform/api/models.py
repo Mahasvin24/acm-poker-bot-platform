@@ -43,6 +43,7 @@ class ApiModel(BaseModel):
 class RegisterRequest(ApiModel):
     email: EmailInput
     password: PasswordInput
+    participant_kind: EntryKind
 
 
 class LoginRequest(ApiModel):
@@ -76,6 +77,7 @@ class AccountResponse(ApiModel):
     id: str
     email: str
     role: Role
+    participant_kind: EntryKind | None = None
     display_name: str | None = None
     career_chip_total: int = 0
     matches_finished: int = 0
@@ -93,6 +95,7 @@ class AccountResponse(ApiModel):
             id=account.id,
             email=account.email,
             role=account.role,
+            participant_kind=account.participant_kind,
             display_name=account.display_name,
             career_chip_total=career_chip_total,
             matches_finished=matches_finished,
@@ -116,6 +119,7 @@ class AdminAccountResponse(AccountResponse):
             id=account.id,
             email=account.email,
             role=account.role,
+            participant_kind=account.participant_kind,
             display_name=account.display_name,
             career_chip_total=career_chip_total,
             matches_finished=matches_finished,
