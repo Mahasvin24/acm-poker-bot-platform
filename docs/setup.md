@@ -175,14 +175,17 @@ ruff format --check .
 python -m mypy
 ```
 
-Live PostgreSQL tests require a dedicated database whose name ends in `_test`:
+Live PostgreSQL tests use the same `POKER_DATABASE_URL` as the app (loaded from the repo root
+`.env`). They reset the `public` schema and re-run Alembic, then restore migrations again when they
+finish—fine for a pre-event database with no real users. Optional `POKER_TEST_DATABASE_URL`
+overrides that URL only for pytest.
 
 ```bash
-docker compose exec postgres createdb -U poker poker_test
-POKER_TEST_DATABASE_URL='postgresql+asyncpg://poker:poker@localhost:5432/poker_test' pytest
+docker compose up -d postgres
+pytest
 ```
 
-The `createdb` command is needed only once. Never point migration or isolation tests at the local
+Never point these tests at a production database you cannot wipe.
 application, event, or production database.
 
 Stop the API with `Ctrl-C`, then stop PostgreSQL with `docker compose down`. The database remains
