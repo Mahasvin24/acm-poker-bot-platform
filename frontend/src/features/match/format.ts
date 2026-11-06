@@ -6,6 +6,12 @@ export function formatChips(value: number): string {
   return chips.format(value);
 }
 
+export function formatChipDelta(value: number): string {
+  const prefix = value > 0 ? "+" : value < 0 ? "−" : "";
+  const amount = formatChips(Math.abs(value));
+  return value === 0 ? "even" : `${prefix}${amount} chips`;
+}
+
 export function formatConfig(config: MatchConfig): string {
   const blinds = `${formatChips(config.small_blind)}/${formatChips(config.big_blind)} blinds`;
   const escalation = config.blind_increase_minutes

@@ -6,16 +6,21 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { CodeEntry } from "../match/join-match";
 import { relativeTime } from "../match/format";
+import { formatChipDelta } from "../match/format";
 import {
+  changeEmail,
   changePassword,
   createBot,
+  deleteAccount,
   deleteBot,
   getBotDiagnostics,
+  getLeaderboard,
   listBots,
   logoutAccount,
   myMatches,
   rotateBotToken,
   updateBot,
+  updateProfile,
   verifyBot,
 } from "./api";
 import styles from "./account.module.css";
@@ -23,6 +28,7 @@ import {
   MATCH_STATUS_LABELS,
   type BotDiagnostics,
   type BotProfile,
+  type LeaderboardEntry,
   type MyMatch,
 } from "./types";
 import { useAccount } from "./use-account";
@@ -197,6 +203,85 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
   );
 }
 
+function ProfileCard({
+  account,
+  onChange,
+}: {
+  account: import("./types").Account;
+  onChange: () => Promise<void>;
+}) {
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const saveName = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get("display_name") ?? "").trim();
+    try {
+      await updateProfile(name || null);
+      await onChange();
+      setMessage({ ok: true, text: "Profile updated." });
+    } catch (reason) {
+      setMessage({ ok: false, text: reason instanceof Error ? reason.message : "Update failed." });
+    }
+  };
+  const saveEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    try {
+      await changeEmail(String(data.get("current")), String(data.get("email")).trim());
+      await onChange();
+      setMessage({ ok: true, text: "Email updated." });
+    } catch (reason) {
+      setMessage({ ok: false, text: reason instanceof Error ? reason.message : "Email change failed." });
+    }
+  };
+  const remove = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const password = String(new FormData(event.currentTarget).get("delete_password") ?? "");
+    if (!window.confirm("Delete your account permanently? This cannot be undone.")) return;
+    try {
+      await deleteAccount(password);
+      window.location.href = "/account";
+    } catch (reason) {
+      setMessage({ ok: false, text: reason instanceof Error ? reason.message : "Delete failed." });
+    }
+  };
+  return (
+    <details className={styles.sidebarCard} open>
+      <summary className={styles.summaryToggle}>Your account</summary>
+      <div className={styles.form}>
+        <p className={styles.fieldHint}>
+          Career total: {formatChipDelta(account.career_chip_total)} across {account.matches_finished} finished match{account.matches_finished === 1 ? "" : "es"}.
+        </p>
+        <form className={styles.form} onSubmit={(event) => void saveName(event)}>
+          <div className={styles.field}>
+            <label htmlFor="profile-name">Default table name</label>
+            <input defaultValue={account.display_name ?? ""} id="profile-name" maxLength={80} name="display_name" placeholder="Used when you join a match" />
+          </div>
+          <button className={styles.secondaryButton} type="submit">Save name</button>
+        </form>
+        <form className={styles.form} onSubmit={(event) => void saveEmail(event)}>
+          <div className={styles.field}>
+            <label htmlFor="profile-email-current">Current password</label>
+            <input id="profile-email-current" name="current" required type="password" />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="profile-email">New email</label>
+            <input defaultValue={account.email} id="profile-email" name="email" required type="email" />
+          </div>
+          <button className={styles.secondaryButton} type="submit">Change email</button>
+        </form>
+        <form className={styles.form} onSubmit={(event) => void remove(event)}>
+          <div className={styles.field}>
+            <label htmlFor="delete-password">Delete account</label>
+            <input id="delete-password" name="delete_password" placeholder="Confirm with password" required type="password" />
+          </div>
+          <button className={styles.textButton} type="submit">Delete my account</button>
+        </form>
+        {message && <p className={message.ok ? styles.successMessage : styles.formError}>{message.text}</p>}
+      </div>
+    </details>
+  );
+}
+
 function PasswordCard() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -232,17 +317,23 @@ function PasswordCard() {
 
 export function ParticipantDashboard() {
   const router = useRouter();
-  const { account, error: accountError } = useAccount("/dashboard");
+  const { account, error: accountError, reload: reloadAccount } = useAccount("/dashboard");
   const [matches, setMatches] = useState<MyMatch[] | null>(null);
   const [bots, setBots] = useState<BotProfile[] | null>(null);
   const [newToken, setNewToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
 
   const refresh = useCallback(async () => {
-    const [nextMatches, nextBots] = await Promise.all([myMatches(), listBots()]);
+    const [nextMatches, nextBots, board] = await Promise.all([
+      myMatches(),
+      listBots(),
+      getLeaderboard().catch(() => [] as LeaderboardEntry[]),
+    ]);
     setMatches(nextMatches);
     setBots(nextBots);
+    setLeaderboard(board);
   }, []);
 
   useEffect(() => {
@@ -333,7 +424,28 @@ export function ParticipantDashboard() {
                 <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
             </section>
+            <ProfileCard
+              account={account}
+              onChange={async () => {
+                await refresh();
+                await reloadAccount();
+              }}
+            />
             <PasswordCard />
+            {leaderboard && leaderboard.length > 0 && (
+              <section className={styles.sidebarCard}>
+                <h2>Event leaderboard</h2>
+                <ol className={styles.standings}>
+                  {leaderboard.slice(0, 8).map((item, index) => (
+                    <li key={item.account_id}>
+                      <b>{index + 1}</b>
+                      {item.display_name ?? item.email.split("@")[0]}
+                      <small>{formatChipDelta(item.career_chip_total)} · {item.matches_finished} matches</small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
           </aside>
 
           <div className={styles.stack}>
@@ -350,13 +462,18 @@ export function ParticipantDashboard() {
                 <p className={styles.panelIntro}>You haven’t joined a match yet. Enter a code to get started.</p>
               ) : (
                 <ul className={styles.matchList}>
-                  {[...live, ...past].map((item) => (
+                  {[...live, ...past].map((item) => {
+                    const result = item.my_entries.find((entry) => entry.chip_delta !== null);
+                    return (
                     <li key={item.match_id}>
                       <div>
                         <strong>{item.name}</strong>
                         <small>
                           {item.my_entries.map((entry) => `${entry.display_name}${entry.kind === "bot" ? " (bot)" : ""}`).join(", ")}
                           {" · "}{item.seats_taken}/{item.max_seats} seats
+                          {result?.finish_position != null && (
+                            <> · #{result.finish_position}{result.chip_delta != null ? ` · ${formatChipDelta(result.chip_delta)}` : ""}</>
+                          )}
                         </small>
                       </div>
                       <span className={styles.statusPill} data-status={item.status}>{MATCH_STATUS_LABELS[item.status]}</span>
@@ -364,7 +481,8 @@ export function ParticipantDashboard() {
                         {item.status === "lobby" ? "Lobby" : item.status === "completed" || item.status === "cancelled" ? "Results" : "Open Table"}
                       </Link>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </section>

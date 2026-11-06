@@ -178,6 +178,11 @@ export function AuthPage({ next }: AuthPageProps) {
               <button className={styles.primaryButton} disabled={pending} type="submit">
                 {pending ? "Working…" : mode === "login" ? "Sign In" : "Create Account"}
               </button>
+              {mode === "login" && (
+                <p className={styles.fieldHint}>
+                  <Link href="/account/forgot">Forgot your password?</Link>
+                </p>
+              )}
             </form>
           </div>
         </section>

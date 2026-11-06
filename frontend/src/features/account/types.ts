@@ -12,7 +12,22 @@ export interface Account {
   id: string;
   email: string;
   role: Role;
+  display_name: string | null;
+  career_chip_total: number;
+  matches_finished: number;
   created_at: string;
+}
+
+export interface AdminAccount extends Account {
+  password_reset_requested: boolean;
+}
+
+export interface LeaderboardEntry {
+  account_id: string;
+  email: string;
+  display_name: string | null;
+  career_chip_total: number;
+  matches_finished: number;
 }
 
 export interface PasswordReset {
@@ -92,6 +107,12 @@ export interface LobbyEntry {
   bot_ready: boolean | null;
 }
 
+export interface MyMatchEntry extends LobbyEntry {
+  finish_position: number | null;
+  final_stack: number | null;
+  chip_delta: number | null;
+}
+
 export interface MatchView {
   match_id: string;
   name: string;
@@ -112,7 +133,7 @@ export interface MyMatch {
   status: MatchStatus;
   seats_taken: number;
   max_seats: number;
-  my_entries: LobbyEntry[];
+  my_entries: MyMatchEntry[];
   created_at: string;
 }
 

@@ -1,6 +1,8 @@
 import type {
   Account,
+  AdminAccount,
   AdminMatch,
+  LeaderboardEntry,
   AdminMatchSummary,
   BotDiagnostics,
   BotProfile,
@@ -86,7 +88,20 @@ export const loginAccount = (email: string, password: string) =>
 export const logoutAccount = () => post<void>("/auth/logout");
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post<Account>("/auth/password", { current_password: currentPassword, new_password: newPassword });
-export const listAccounts = () => apiRequest<Account[]>("/admin/accounts");
+export const updateProfile = (displayName: string | null) =>
+  apiRequest<Account>("/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify({ display_name: displayName }),
+  });
+export const changeEmail = (currentPassword: string, newEmail: string) =>
+  post<Account>("/auth/email", { current_password: currentPassword, new_email: newEmail });
+export const deleteAccount = (currentPassword: string) =>
+  post<void>("/auth/delete-account", { current_password: currentPassword });
+export const requestPasswordReset = (email: string) =>
+  post<void>("/auth/forgot-password", { email });
+export const getLeaderboard = () => apiRequest<LeaderboardEntry[]>("/leaderboard");
+export const listAccounts = () => apiRequest<AdminAccount[]>("/admin/accounts");
+export const getAdminLeaderboard = () => apiRequest<LeaderboardEntry[]>("/admin/leaderboard");
 export const resetPassword = (accountId: string) =>
   post<PasswordReset>(`/admin/accounts/${encodeURIComponent(accountId)}/reset-password`);
 

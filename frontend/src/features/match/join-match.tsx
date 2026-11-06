@@ -77,7 +77,8 @@ export function JoinMatch({ code }: { code: string }) {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [kind, setKind] = useState<EntrantKind>("human");
   const [botId, setBotId] = useState<string>("");
-  const [displayName, setDisplayName] = useState("");
+  const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
+  const displayName = displayNameOverride ?? account?.display_name ?? "";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,7 +197,7 @@ export function JoinMatch({ code }: { code: string }) {
                     autoComplete="nickname"
                     id="join-name"
                     maxLength={80}
-                    onChange={(event) => setDisplayName(event.target.value)}
+                    onChange={(event) => setDisplayNameOverride(event.target.value)}
                     placeholder={kind === "human" ? "e.g. Maya" : readyBots.find((bot) => bot.id === botId)?.name ?? "Uses the bot's name"}
                     required={kind === "human"}
                     value={displayName}

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { formatChipDelta } from "../match/format";
 import {
   createMatch,
+  getAdminLeaderboard,
   listAccounts,
   listAdminMatches,
   logoutAccount,
@@ -15,14 +17,15 @@ import styles from "./account.module.css";
 import {
   DEFAULT_MATCH_CONFIG,
   MATCH_STATUS_LABELS,
-  type Account,
+  type AdminAccount,
   type AdminMatchSummary,
+  type LeaderboardEntry,
   type MatchConfig,
 } from "./types";
 import { useAccount } from "./use-account";
 
 function AccountsCard() {
-  const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [accounts, setAccounts] = useState<AdminAccount[] | null>(null);
   const [filter, setFilter] = useState("");
   const [reset, setReset] = useState<{ email: string; password: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +38,7 @@ function AccountsCard() {
     }
   };
 
-  const doReset = async (account: Account) => {
+  const doReset = async (account: AdminAccount) => {
     if (!window.confirm(`Reset the password for ${account.email}? They will be signed out everywhere.`)) return;
     try {
       const result = await resetPassword(account.id);
@@ -65,7 +68,10 @@ function AccountsCard() {
         <ul className={styles.accountList}>
           {shown.slice(0, 30).map((item) => (
             <li key={item.id}>
-              <span>{item.email}{item.role === "admin" ? " · admin" : ""}</span>
+              <span>
+                {item.email}{item.role === "admin" ? " · admin" : ""}
+                {item.password_reset_requested ? " · reset requested" : ""}
+              </span>
               {item.role !== "admin" && (
                 <button className={styles.textButton} onClick={() => void doReset(item)} type="button">Reset</button>
               )}
@@ -84,9 +90,15 @@ export function AdminDashboard() {
   const [escalate, setEscalate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
 
   const refresh = useCallback(async () => {
-    setMatches(await listAdminMatches());
+    const [nextMatches, board] = await Promise.all([
+      listAdminMatches(),
+      getAdminLeaderboard().catch(() => [] as LeaderboardEntry[]),
+    ]);
+    setMatches(nextMatches);
+    setLeaderboard(board);
   }, []);
 
   useEffect(() => {
@@ -211,6 +223,21 @@ export function AdminDashboard() {
               </form>
             </section>
             <AccountsCard />
+            {leaderboard && leaderboard.length > 0 && (
+              <section className={styles.sidebarCard}>
+                <h2>Event leaderboard</h2>
+                <p className={styles.fieldHint}>Ranked by total play-money chips won across finished matches.</p>
+                <ol className={styles.standings}>
+                  {leaderboard.slice(0, 10).map((item, index) => (
+                    <li key={item.account_id}>
+                      <b>{index + 1}</b>
+                      {item.display_name ?? item.email}
+                      <small>{formatChipDelta(item.career_chip_total)} · {item.matches_finished} matches</small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
           </aside>
 
           <section className={styles.panel}>
