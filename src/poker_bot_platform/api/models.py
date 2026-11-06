@@ -55,18 +55,71 @@ class ChangePasswordRequest(ApiModel):
     new_password: PasswordInput
 
 
+class UpdateProfileRequest(ApiModel):
+    display_name: NameInput | None = None
+
+
+class ChangeEmailRequest(ApiModel):
+    current_password: Annotated[StrictStr, StringConstraints(min_length=1, max_length=256)]
+    new_email: EmailInput
+
+
+class DeleteAccountRequest(ApiModel):
+    current_password: Annotated[StrictStr, StringConstraints(min_length=1, max_length=256)]
+
+
+class ForgotPasswordRequest(ApiModel):
+    email: EmailInput
+
+
 class AccountResponse(ApiModel):
     id: str
     email: str
     role: Role
+    display_name: str | None = None
+    career_chip_total: int = 0
+    matches_finished: int = 0
     created_at: datetime
 
     @classmethod
-    def from_account(cls, account: Account) -> AccountResponse:
+    def from_account(
+        cls,
+        account: Account,
+        *,
+        career_chip_total: int = 0,
+        matches_finished: int = 0,
+    ) -> AccountResponse:
         return cls(
             id=account.id,
             email=account.email,
             role=account.role,
+            display_name=account.display_name,
+            career_chip_total=career_chip_total,
+            matches_finished=matches_finished,
+            created_at=account.created_at,
+        )
+
+
+class AdminAccountResponse(AccountResponse):
+    password_reset_requested: bool = False
+
+    @classmethod
+    def from_account(
+        cls,
+        account: Account,
+        *,
+        career_chip_total: int = 0,
+        matches_finished: int = 0,
+        password_reset_requested: bool = False,
+    ) -> AdminAccountResponse:
+        return cls(
+            id=account.id,
+            email=account.email,
+            role=account.role,
+            display_name=account.display_name,
+            career_chip_total=career_chip_total,
+            matches_finished=matches_finished,
+            password_reset_requested=password_reset_requested,
             created_at=account.created_at,
         )
 
@@ -204,14 +257,28 @@ class MatchViewResponse(ApiModel):
     created_at: datetime
 
 
+class MyMatchEntryResponse(LobbyEntryResponse):
+    finish_position: int | None = None
+    final_stack: int | None = None
+    chip_delta: int | None = None
+
+
 class MyMatchResponse(ApiModel):
     match_id: str
     name: str
     status: MatchStatus
     seats_taken: int
     max_seats: int
-    my_entries: tuple[LobbyEntryResponse, ...]
+    my_entries: tuple[MyMatchEntryResponse, ...]
     created_at: datetime
+
+
+class LeaderboardEntryResponse(ApiModel):
+    account_id: str
+    email: str
+    display_name: str | None
+    career_chip_total: int
+    matches_finished: int
 
 
 class AdminEntryResponse(ApiModel):

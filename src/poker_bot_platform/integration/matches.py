@@ -13,9 +13,10 @@ from poker_bot_platform.api.models import (
     LobbyEntryResponse,
     MatchPreviewResponse,
     MatchViewResponse,
+    MyMatchEntryResponse,
     MyMatchResponse,
 )
-from poker_bot_platform.auth.models import Account, BotProfile
+from poker_bot_platform.auth.models import Account, BotProfile, MatchResultSummary
 from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.auth.service import BotProfileService
 from poker_bot_platform.bots import BotGateway
@@ -244,6 +245,8 @@ class MatchService:
 
     async def my_matches(self, account: Account) -> tuple[MyMatchResponse, ...]:
         states = await self._registry.list_states()
+        results = await self._accounts.match_results_for_account(account.id)
+        result_map = {(item.match_id, item.entry_id): item for item in results}
         mine = [
             state
             for state in states
@@ -258,27 +261,29 @@ class MatchService:
             MatchStatus.CANCELLED: 4,
         }
         mine.sort(key=lambda item: (order[item.status], -item.created_at.timestamp()))
-        return tuple(
-            MyMatchResponse(
-                match_id=state.match_id,
-                name=state.name,
-                status=state.status,
-                seats_taken=len(state.entries),
-                max_seats=state.config.max_seats,
-                my_entries=tuple(
-                    LobbyEntryResponse(
-                        entry_id=entry.entry_id,
-                        display_name=entry.display_name,
-                        kind=entry.kind,
-                        mine=True,
-                    )
-                    for entry in state.entries
-                    if entry.account_id == account.id
-                ),
-                created_at=state.created_at,
+        responses: list[MyMatchResponse] = []
+        for state in mine:
+            ready = await self._readiness(state, account.id)
+            responses.append(
+                MyMatchResponse(
+                    match_id=state.match_id,
+                    name=state.name,
+                    status=state.status,
+                    seats_taken=len(state.entries),
+                    max_seats=state.config.max_seats,
+                    my_entries=tuple(
+                        _my_match_entry(
+                            entry,
+                            result_map.get((state.match_id, entry.entry_id)),
+                            ready.get(entry.entry_id),
+                        )
+                        for entry in state.entries
+                        if entry.account_id == account.id
+                    ),
+                    created_at=state.created_at,
+                )
             )
-            for state in mine
-        )
+        return tuple(responses)
 
     # Helpers
 
@@ -411,3 +416,20 @@ class MatchService:
             created_at=state.created_at,
             revision=state.revision,
         )
+
+
+def _my_match_entry(
+    entry: MatchEntry,
+    result: MatchResultSummary | None,
+    bot_ready: bool | None,
+) -> MyMatchEntryResponse:
+    return MyMatchEntryResponse(
+        entry_id=entry.entry_id,
+        display_name=entry.display_name,
+        kind=entry.kind,
+        mine=True,
+        bot_ready=bot_ready,
+        finish_position=result.position if result else None,
+        final_stack=result.final_stack if result else None,
+        chip_delta=result.chip_delta if result else None,
+    )

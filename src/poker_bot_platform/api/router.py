@@ -5,8 +5,14 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, R
 
 from poker_bot_platform.api.models import (
     AccountResponse,
+    AdminAccountResponse,
     AdminMatchResponse,
     AdminMatchSummaryResponse,
+    ChangeEmailRequest,
+    DeleteAccountRequest,
+    ForgotPasswordRequest,
+    LeaderboardEntryResponse,
+    UpdateProfileRequest,
     BotDiagnosticsResponse,
     BotProfileRequest,
     BotProfileResponse,
@@ -106,6 +112,14 @@ def create_api_router(
     CurrentAccount = Annotated[Account, Depends(current_account)]
     CurrentAdmin = Annotated[Account, Depends(current_admin)]
 
+    async def account_response(account: Account) -> AccountResponse:
+        career = await auth.career_summary(account)
+        return AccountResponse.from_account(
+            account,
+            career_chip_total=career.career_chip_total,
+            matches_finished=career.matches_finished,
+        )
+
     async def code_attempt[T](account: Account, operation: Awaitable[T]) -> T:
         try:
             code_failures.check(account.id)
@@ -137,7 +151,7 @@ def create_api_router(
             ) from exc
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        return AccountResponse.from_account(account)
+        return await account_response(account)
 
     @router.post("/auth/login", response_model=AccountResponse, dependencies=mutation_guard)
     async def login(body: LoginRequest, request: Request, response: Response) -> AccountResponse:
@@ -170,7 +184,7 @@ def create_api_router(
             samesite="lax",
         )
         response.headers["Cache-Control"] = "no-store"
-        return AccountResponse.from_account(issued.account)
+        return await account_response(issued.account)
 
     @router.post(
         "/auth/logout",
@@ -193,7 +207,7 @@ def create_api_router(
 
     @router.get("/auth/me", response_model=AccountResponse)
     async def me(account: CurrentAccount) -> AccountResponse:
-        return AccountResponse.from_account(account)
+        return await account_response(account)
 
     @router.post(
         "/auth/password",
@@ -210,11 +224,118 @@ def create_api_router(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        return AccountResponse.from_account(updated)
+        return await account_response(updated)
 
-    @router.get("/admin/accounts", response_model=tuple[AccountResponse, ...])
-    async def list_accounts(_admin: CurrentAdmin) -> tuple[AccountResponse, ...]:
-        return tuple(AccountResponse.from_account(item) for item in await auth.list_accounts())
+    @router.patch(
+        "/auth/profile",
+        response_model=AccountResponse,
+        dependencies=mutation_guard,
+    )
+    async def update_profile(body: UpdateProfileRequest, account: CurrentAccount) -> AccountResponse:
+        try:
+            updated = await auth.update_profile(account, body.display_name)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        return await account_response(updated)
+
+    @router.post(
+        "/auth/email",
+        response_model=AccountResponse,
+        dependencies=mutation_guard,
+    )
+    async def change_email(body: ChangeEmailRequest, account: CurrentAccount) -> AccountResponse:
+        try:
+            updated = await auth.change_email(account, body.current_password, body.new_email)
+        except InvalidCredentialsError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        except (AuthConflictError, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        return await account_response(updated)
+
+    @router.post(
+        "/auth/delete-account",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=mutation_guard,
+    )
+    async def delete_account(
+        body: DeleteAccountRequest,
+        account: CurrentAccount,
+        response: Response,
+        session_token: Annotated[str | None, Cookie(alias=cookie_name)] = None,
+    ) -> None:
+        try:
+            await auth.delete_account(account, body.current_password)
+        except InvalidCredentialsError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        except AuthConflictError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        if session_token:
+            await auth.logout(session_token)
+        response.delete_cookie(
+            cookie_name,
+            path="/",
+            secure=cookie_secure,
+            httponly=True,
+            samesite="lax",
+        )
+
+    @router.post(
+        "/auth/forgot-password",
+        status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=mutation_guard,
+    )
+    async def forgot_password(body: ForgotPasswordRequest) -> None:
+        try:
+            await auth.request_password_reset(body.email)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    @router.get("/leaderboard", response_model=tuple[LeaderboardEntryResponse, ...])
+    async def leaderboard(_account: CurrentAccount) -> tuple[LeaderboardEntryResponse, ...]:
+        return tuple(
+            LeaderboardEntryResponse(
+                account_id=item.account_id,
+                email=item.email,
+                display_name=item.display_name,
+                career_chip_total=item.career_chip_total,
+                matches_finished=item.matches_finished,
+            )
+            for item in await auth.leaderboard()
+        )
+
+    @router.get("/admin/accounts", response_model=tuple[AdminAccountResponse, ...])
+    async def list_accounts(_admin: CurrentAdmin) -> tuple[AdminAccountResponse, ...]:
+        pending = {item.account_id for item in await auth.password_reset_requests()}
+        rows: list[AdminAccountResponse] = []
+        for item in await auth.list_accounts():
+            if item.deleted_at is not None:
+                continue
+            career = await auth.career_summary(item)
+            rows.append(
+                AdminAccountResponse.from_account(
+                    item,
+                    career_chip_total=career.career_chip_total,
+                    matches_finished=career.matches_finished,
+                    password_reset_requested=item.id in pending,
+                )
+            )
+        return tuple(rows)
+
+    @router.get(
+        "/admin/leaderboard",
+        response_model=tuple[LeaderboardEntryResponse, ...],
+    )
+    async def admin_leaderboard(_admin: CurrentAdmin) -> tuple[LeaderboardEntryResponse, ...]:
+        return tuple(
+            LeaderboardEntryResponse(
+                account_id=item.account_id,
+                email=item.email,
+                display_name=item.display_name,
+                career_chip_total=item.career_chip_total,
+                matches_finished=item.matches_finished,
+            )
+            for item in await auth.leaderboard()
+        )
 
     @router.post(
         "/admin/accounts/{account_id}/reset-password",
