@@ -81,8 +81,8 @@ const post = <T>(path: string, body?: unknown) =>
 // Accounts
 
 export const getMe = () => apiRequest<Account>("/auth/me");
-export const registerAccount = (email: string, password: string) =>
-  post<Account>("/auth/register", { email, password });
+export const registerAccount = (email: string, password: string, participantKind: EntrantKind) =>
+  post<Account>("/auth/register", { email, password, participant_kind: participantKind });
 export const loginAccount = (email: string, password: string) =>
   post<Account>("/auth/login", { email, password });
 export const logoutAccount = () => post<void>("/auth/logout");

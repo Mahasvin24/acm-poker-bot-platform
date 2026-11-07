@@ -15,7 +15,7 @@ const timeline = [
   {
     number: "01",
     title: "Make an account",
-    copy: "Sign up once. Play yourself, register bots, or both.",
+    copy: "Sign up as a human to play, or as a bot to connect your code.",
     timing: "Any time",
   },
   {

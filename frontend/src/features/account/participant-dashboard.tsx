@@ -62,11 +62,13 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [diagnostics, setDiagnostics] = useState<{ data: BotDiagnostics; loadedAt: number } | null>(null);
 
   const run = async (label: string, operation: () => Promise<void>) => {
     setBusy(label);
     setError(null);
+    setSaved(false);
     try {
       await operation();
       await onChange();
@@ -88,6 +90,7 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
         port: Number(form.get("port")),
       });
       setEditing(false);
+      setSaved(true);
     });
   };
 
@@ -118,8 +121,9 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
         <p className={styles.formError}>{bot.last_verification_error}</p>
       )}
       {token && <TokenReveal onDismiss={() => setToken(null)} token={token} />}
-      {editing && (
-        <form className={styles.form} onSubmit={saveEndpoint}>
+      {saved && <p className={styles.successMessage} role="status">Bot settings saved.</p>}
+      <form className={styles.form} onSubmit={saveEndpoint}>
+        <fieldset disabled={!editing || busy !== null}>
           <div className={styles.inlineFields}>
             <div className={styles.field}>
               <label htmlFor={`name-${bot.id}`}>Name</label>
@@ -134,13 +138,16 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
               <input defaultValue={bot.port} id={`port-${bot.id}`} max={65535} min={1024} name="port" required type="number" />
             </div>
           </div>
-          <p className={styles.fieldHint}>Changing the address requires verifying again. Your token stays the same.</p>
+        </fieldset>
+        <p className={styles.fieldHint}>Saved to your account. Changing the IP or port requires verifying again. Your token stays the same.</p>
+        {!token && <p className={styles.fieldHint}>Token saved securely · Shown only when issued. Use New Token if you lost your copy.</p>}
+        {editing && (
           <div className={styles.panelActions}>
             <button className={styles.secondaryButton} disabled={busy !== null} type="submit">Save</button>
-            <button className={styles.textButton} onClick={() => setEditing(false)} type="button">Cancel</button>
+            <button className={styles.textButton} onClick={(event) => { event.currentTarget.form?.reset(); setEditing(false); }} type="button">Cancel</button>
           </div>
-        </form>
-      )}
+        )}
+      </form>
       <div className={styles.panelActions}>
         <button
           className={styles.primaryButton}
@@ -150,7 +157,7 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
         >
           {busy === "verify" ? "Contacting bot…" : bot.verified_at ? "Verify Again" : "Verify Connection"}
         </button>
-        <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => setEditing((value) => !value)} type="button">Edit</button>
+        <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit settings</button>
         <button
           className={styles.secondaryButton}
           disabled={busy !== null}
@@ -320,7 +327,8 @@ export function ParticipantDashboard() {
   const { account, error: accountError, reload: reloadAccount } = useAccount("/dashboard");
   const [matches, setMatches] = useState<MyMatch[] | null>(null);
   const [bots, setBots] = useState<BotProfile[] | null>(null);
-  const [newToken, setNewToken] = useState<string | null>(null);
+  const [newToken, setNewToken] = useState<{ botId: string; value: string } | null>(null);
+  const [addingBot, setAddingBot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
@@ -364,7 +372,8 @@ export function ParticipantDashboard() {
         String(data.get("ip") ?? "").trim(),
         Number(data.get("port")),
       );
-      setNewToken(created.bearer_token);
+      setNewToken({ botId: created.bot.id, value: created.bearer_token });
+      setAddingBot(false);
       form.reset();
       await refresh();
     } catch (reason) {
@@ -389,7 +398,7 @@ export function ParticipantDashboard() {
     <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link className={styles.wordmark} href="/">ACM / POKER</Link>
-        <span className={styles.headerTitle}>Player Dashboard</span>
+        <span className={styles.headerTitle}>{account.participant_kind === "bot" ? "Bot Dashboard" : "Player Dashboard"}</span>
         <div className={styles.headerAccount}>
           <span>{account.email}</span>
           <button className={styles.textButton} onClick={() => void logoutAccount().finally(() => router.replace("/account"))} type="button">
@@ -402,11 +411,14 @@ export function ParticipantDashboard() {
         <section className={styles.dashboardIntro}>
           <div>
             <p className={styles.eyebrow}>Your seat</p>
-            <h1>Play it.<br /><em>Or code it.</em></h1>
+            <h1>{account.participant_kind === "bot" ? "Connect your bot." : account.participant_kind === "human" ? "Take your seat." : <>Play it.<br /><em>Or code it.</em></>}</h1>
           </div>
           <p>
-            Enter a match code from the organizer to sit down yourself or seat one of your bots.
-            Bots you add here can be reused in every match.
+            {account.participant_kind === "bot"
+              ? "Save your bot’s connection settings, copy its token, then verify the connection. Use your saved bot to join matches."
+              : account.participant_kind === "human"
+                ? "Enter a match code from the organizer to play in your browser."
+                : "Enter a match code to play yourself or seat a bot. Your saved bots can be reused in every match."}
           </p>
         </section>
 
@@ -487,19 +499,22 @@ export function ParticipantDashboard() {
               )}
             </section>
 
-            <section className={styles.panel} id="bots">
+            {account.participant_kind !== "human" && <section className={styles.panel} id="bots">
               <div className={styles.panelHead}>
                 <div>
                   <p className={styles.sectionLabel}>Bots</p>
                   <h2>My bots</h2>
                   <p className={styles.panelIntro}>
-                    Run your bot on your laptop, then register its LAN address here.{" "}
+                    Save your laptop’s LAN IP and your bot’s listening port. Then run the bot with its token and verify.{" "}
                     <Link href="/bot-guide">Read the protocol guide</Link>.
                   </p>
                 </div>
               </div>
-              {newToken && <div className={styles.entrantBody}><TokenReveal onDismiss={() => setNewToken(null)} token={newToken} /></div>}
-              <form className={styles.form} onSubmit={(event) => void addBot(event)}>
+              {bots === null ? <p className={styles.panelIntro}>Loading saved bots…</p> : <>
+              {bots.length > 0 && !addingBot && (
+                <button className={styles.secondaryButton} onClick={() => setAddingBot(true)} type="button">Add another bot</button>
+              )}
+              {(bots.length === 0 || addingBot) && <form className={styles.form} onSubmit={(event) => void addBot(event)}>
                 <div className={styles.inlineFields}>
                   <div className={styles.field}>
                     <label htmlFor="bot-name">Bot name</label>
@@ -515,13 +530,20 @@ export function ParticipantDashboard() {
                   </div>
                 </div>
                 <p className={styles.fieldHint}>Use your laptop’s address on the event Wi-Fi, not localhost. You’ll get a one-time token for the bot.</p>
-                {error && <p className={styles.formError} role="alert">{error}</p>}
-                <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Adding…" : "Add Bot"}</button>
-              </form>
+                <div className={styles.panelActions}>
+                  <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save bot & get token"}</button>
+                  {addingBot && <button className={styles.textButton} disabled={busy} onClick={() => setAddingBot(false)} type="button">Cancel</button>}
+                </div>
+              </form>}
+              {error && <p className={styles.formError} role="alert">{error}</p>}
               <div className={styles.botList}>
-                {bots?.map((bot) => <BotCard bot={bot} key={bot.id} onChange={refresh} />)}
+                {bots.map((bot) => <div key={bot.id}>
+                  {newToken?.botId === bot.id && <TokenReveal onDismiss={() => setNewToken(null)} token={newToken.value} />}
+                  <BotCard bot={bot} onChange={refresh} />
+                </div>)}
               </div>
-            </section>
+              </>}
+            </section>}
           </div>
         </div>
       </div>

@@ -75,7 +75,8 @@ export function JoinMatch({ code }: { code: string }) {
   const [preview, setPreview] = useState<MatchPreview | null>(null);
   const [bots, setBots] = useState<BotProfile[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const [kind, setKind] = useState<EntrantKind>("human");
+  const [kindOverride, setKind] = useState<EntrantKind | null>(null);
+  const kind = account?.participant_kind ?? kindOverride ?? "human";
   const [botId, setBotId] = useState<string>("");
   const [displayNameOverride, setDisplayNameOverride] = useState<string | null>(null);
   const displayName = displayNameOverride ?? account?.display_name ?? "";
@@ -162,7 +163,7 @@ export function JoinMatch({ code }: { code: string }) {
               </div>
             ) : (
               <form className={styles.form} onSubmit={join}>
-                <fieldset>
+                {!account?.participant_kind && <fieldset>
                   <legend className={styles.kindLegend}>Who is taking the seat?</legend>
                   <div className={styles.kindChoices}>
                     <label className={styles.kindChoice}>
@@ -176,7 +177,7 @@ export function JoinMatch({ code }: { code: string }) {
                       <span>{readyBots.length ? "Seat one of your verified bots." : "Verify a bot under My Bots first."}</span>
                     </label>
                   </div>
-                </fieldset>
+                </fieldset>}
                 {kind === "bot" && (
                   readyBots.length ? (
                     <div className={styles.field}>

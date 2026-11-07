@@ -12,6 +12,7 @@ export interface Account {
   id: string;
   email: string;
   role: Role;
+  participant_kind: EntrantKind | null;
   display_name: string | null;
   career_chip_total: number;
   matches_finished: number;

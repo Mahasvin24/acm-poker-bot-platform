@@ -1090,3 +1090,34 @@
   .authIntro::after { display: none; }
   .pulse { animation: none; }
 }
+
+/* Account setup keeps the existing palette with more room for the form. */
+.authIntro h1 {
+  margin-top: 0;
+  font-size: clamp(48px, 6vw, 88px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.authLayout .field label,
+.authLayout .kindLegend {
+  font: 600 13px/1.4 Arial, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.authLayout .modeTabs button {
+  font: 600 12px/1.4 Arial, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (max-width: 760px) {
+  .authIntro {
+    padding-block: 32px;
+  }
+
+  .authIntro > p:last-child {
+    margin-top: 24px;
+  }
+}

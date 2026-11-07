@@ -11,6 +11,7 @@ import {
   registerAccount,
 } from "./api";
 import styles from "./account.module.css";
+import type { EntrantKind } from "./types";
 
 type Mode = "login" | "register";
 
@@ -29,6 +30,7 @@ function destination(role: "user" | "admin", next: string): string {
 export function AuthPage({ next }: AuthPageProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
+  const [participantKind, setParticipantKind] = useState<EntrantKind>("human");
   const [checking, setChecking] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function AuthPage({ next }: AuthPageProps) {
     setPending(true);
     setError(null);
     try {
-      if (mode === "register") await registerAccount(email, password);
+      if (mode === "register") await registerAccount(email, password, participantKind);
       const account = await loginAccount(email, password);
       router.replace(destination(account.role, next));
     } catch (requestError) {
@@ -97,12 +99,11 @@ export function AuthPage({ next }: AuthPageProps) {
       <div className={styles.authLayout}>
         <section className={styles.authIntro}>
           <div>
-            <p className={styles.eyebrow}>One account · Either seat</p>
-            <h1>Bring instinct.<br /><em>Or code.</em></h1>
+            <h1>Human<br />or bot.</h1>
           </div>
           <p>
-            Create one account to play in the browser, register your bots, or both. Organizers
-            share a short join code for each match.
+            Sign up as a human to play in the browser, or as a bot to connect your code.
+            Organizers share a short join code for each match.
           </p>
         </section>
         <section className={styles.authPanel} aria-labelledby="account-heading">
@@ -133,9 +134,26 @@ export function AuthPage({ next }: AuthPageProps) {
                 ? safeNext(next)?.startsWith("/join")
                   ? "Sign in to finish joining the match."
                   : "Sign in to join a match, manage your bots, or return to a live table."
-                : "You will choose to play yourself or seat one of your bots when you join a match."}
+                : "Choose how you will play. Bot accounts save their connection settings on the dashboard."}
             </p>
             <form className={styles.form} onSubmit={submit}>
+              {mode === "register" && (
+                <fieldset disabled={pending}>
+                  <legend className={styles.kindLegend}>Sign up as</legend>
+                  <div className={styles.kindChoices}>
+                    <label className={styles.kindChoice}>
+                      <input checked={participantKind === "human"} name="participant_kind" onChange={() => setParticipantKind("human")} type="radio" value="human" />
+                      <strong>Human</strong>
+                      <span>Play your decisions in the browser.</span>
+                    </label>
+                    <label className={styles.kindChoice}>
+                      <input checked={participantKind === "bot"} name="participant_kind" onChange={() => setParticipantKind("bot")} type="radio" value="bot" />
+                      <strong>Bot</strong>
+                      <span>Connect a bot running on your laptop.</span>
+                    </label>
+                  </div>
+                </fieldset>
+              )}
               <div className={styles.field}>
                 <label htmlFor="account-email">Email</label>
                 <input
