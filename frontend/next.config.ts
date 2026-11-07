@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const apiOrigin = process.env.POKER_API_ORIGIN ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["127.0.0.1"],
+  allowedDevOrigins: ["127.0.0.1", "192.168.0.176"],
   async redirects() {
     return [
       { source: "/demo-human-verus-bot", destination: "/demo", permanent: true },
