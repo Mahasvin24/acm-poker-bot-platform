@@ -63,18 +63,25 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
   const [token, setToken] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const testing = busy === "verify";
+  const testFailure = testError ?? bot.last_verification_error;
+  const testPassed = Boolean(bot.verified_at) && !testFailure;
   const [diagnostics, setDiagnostics] = useState<{ data: BotDiagnostics; loadedAt: number } | null>(null);
 
   const run = async (label: string, operation: () => Promise<void>) => {
     setBusy(label);
     setError(null);
     setSaved(false);
+    setTestError(null);
     try {
       await operation();
       await onChange();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "That did not work.");
-      await onChange();
+      const message = reason instanceof Error ? reason.message : "That did not work.";
+      if (label === "verify") setTestError(message);
+      else setError(message);
+      await onChange().catch(() => undefined);
     } finally {
       setBusy(null);
     }
@@ -113,33 +120,36 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
           <h3>{bot.name}</h3>
           <code>{bot.ip}:{bot.port}</code>
         </div>
-        <span className={styles.statusPill} data-status={bot.verified_at ? "running" : "closed"}>
-          {bot.verified_at ? "Ready" : "Not verified"}
+        <span className={styles.statusPill} data-status={testPassed ? "running" : "closed"}>
+          {testing ? "Testing…" : testPassed ? "Test passed" : testFailure ? "Test failed" : "Test required"}
         </span>
       </div>
-      {bot.last_verification_error && !bot.verified_at && (
-        <p className={styles.formError}>{bot.last_verification_error}</p>
-      )}
+      <div className={styles.connectionStatus} aria-live="polite" aria-busy={testing} data-state={testing ? "pending" : testPassed ? "success" : testFailure ? "error" : "pending"}>
+        <strong>{testing ? "Checking health and token…" : testPassed ? "Connection test passed" : testFailure ? "Connection test failed" : "Finish setup, then test your bot"}</strong>
+        <p>{testing ? "Contacting your bot from the event server." : testPassed ? "The starter health check passed and your token was accepted. Your bot is ready to join a match." : testFailure ?? "Save all three fields, set BOT_TOKEN in your starter, and start the bot before testing."}</p>
+        {testPassed && bot.verified_at && !testing && <p>Last passed: <time dateTime={bot.verified_at}>{new Date(bot.verified_at).toLocaleString()}</time>. Test again after restarting your bot or changing networks.</p>}
+      </div>
       {token && <TokenReveal onDismiss={() => setToken(null)} token={token} />}
-      {saved && <p className={styles.successMessage} role="status">Bot settings saved.</p>}
+      {saved && <p className={styles.successMessage} role="status">Bot settings saved. Test the connection if you changed the IP or port.</p>}
       <form className={styles.form} onSubmit={saveEndpoint}>
+        <p className={styles.fieldHint}>All three fields are required: bot name, LAN IP address, and port.</p>
         <fieldset disabled={!editing || busy !== null}>
           <div className={styles.inlineFields}>
             <div className={styles.field}>
-              <label htmlFor={`name-${bot.id}`}>Name</label>
+              <label htmlFor={`name-${bot.id}`}>Bot name (required)</label>
               <input defaultValue={bot.name} id={`name-${bot.id}`} maxLength={80} name="name" required />
             </div>
             <div className={styles.field}>
-              <label htmlFor={`ip-${bot.id}`}>LAN IP</label>
+              <label htmlFor={`ip-${bot.id}`}>LAN IP address (required)</label>
               <input defaultValue={bot.ip} id={`ip-${bot.id}`} inputMode="decimal" name="ip" required spellCheck={false} />
             </div>
             <div className={styles.field}>
-              <label htmlFor={`port-${bot.id}`}>Port</label>
+              <label htmlFor={`port-${bot.id}`}>Port (required)</label>
               <input defaultValue={bot.port} id={`port-${bot.id}`} max={65535} min={1024} name="port" required type="number" />
             </div>
           </div>
         </fieldset>
-        <p className={styles.fieldHint}>Saved to your account. Changing the IP or port requires verifying again. Your token stays the same.</p>
+        <p className={styles.fieldHint}>Saved to your account. Changing the IP or port requires a new connection test. Your token stays the same.</p>
         {!token && <p className={styles.fieldHint}>Token saved securely · Shown only when issued. Use New Token if you lost your copy.</p>}
         {editing && (
           <div className={styles.panelActions}>
@@ -148,14 +158,18 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
           </div>
         )}
       </form>
+      <p className={styles.fieldHint}>
+        {editing ? "Save or cancel your edits to enable testing. " : ""}
+        Test connection checks GET /v1/health, then verifies your token with POST /v1/verify.
+      </p>
       <div className={styles.panelActions}>
         <button
           className={styles.primaryButton}
-          disabled={busy !== null}
+          disabled={busy !== null || editing}
           onClick={() => void run("verify", async () => { await verifyBot(bot.id); })}
           type="button"
         >
-          {busy === "verify" ? "Contacting bot…" : bot.verified_at ? "Verify Again" : "Verify Connection"}
+          {busy === "verify" ? "Testing connection…" : bot.verified_at ? "Test again" : "Test connection"}
         </button>
         <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit settings</button>
         <button
@@ -252,7 +266,7 @@ function ProfileCard({
     }
   };
   return (
-    <details className={styles.sidebarCard} open>
+    <details className={styles.sidebarCard} open={account.participant_kind !== "bot"}>
       <summary className={styles.summaryToggle}>Your account</summary>
       <div className={styles.form}>
         <p className={styles.fieldHint}>
@@ -395,7 +409,7 @@ export function ParticipantDashboard() {
   const past = matches?.filter((item) => item.status === "completed" || item.status === "cancelled") ?? [];
 
   return (
-    <main className={styles.page} id="main-content">
+    <main className={`${styles.page} ${account.participant_kind === "bot" ? styles.botDashboard : ""}`} id="main-content">
       <header className={styles.header}>
         <Link className={styles.wordmark} href="/">ACM / POKER</Link>
         <span className={styles.headerTitle}>{account.participant_kind === "bot" ? "Bot Dashboard" : "Player Dashboard"}</span>
@@ -410,12 +424,11 @@ export function ParticipantDashboard() {
       <div className={styles.dashboard}>
         <section className={styles.dashboardIntro}>
           <div>
-            <p className={styles.eyebrow}>Your seat</p>
             <h1>{account.participant_kind === "bot" ? "Connect your bot." : account.participant_kind === "human" ? "Take your seat." : <>Play it.<br /><em>Or code it.</em></>}</h1>
           </div>
           <p>
             {account.participant_kind === "bot"
-              ? "Save your bot’s connection settings, copy its token, then verify the connection. Use your saved bot to join matches."
+              ? "Configure your bot, pass a connection test, then join a match with the organizer’s code."
               : account.participant_kind === "human"
                 ? "Enter a match code from the organizer to play in your browser."
                 : "Enter a match code to play yourself or seat a bot. Your saved bots can be reused in every match."}
@@ -429,13 +442,13 @@ export function ParticipantDashboard() {
               <p>Codes look like K7Q-4PM.</p>
               <CodeEntry compact />
             </section>
-            <section className={styles.sidebarCard}>
+            {account.participant_kind !== "bot" && <section className={styles.sidebarCard}>
               <h2>Practice</h2>
               <p>Play a full hand against three built-in bots. Nothing is saved.</p>
               <div className={styles.panelActions} style={{ marginTop: 16 }}>
                 <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
-            </section>
+            </section>}
             <ProfileCard
               account={account}
               onChange={async () => {
@@ -461,6 +474,51 @@ export function ParticipantDashboard() {
           </aside>
 
           <div className={styles.stack}>
+            {account.participant_kind !== "human" && <section className={styles.panel} id="bots">
+              <div className={styles.panelHead}>
+                <div>
+                  <h2>Bot configuration</h2>
+                  <p className={styles.panelIntro}>
+                    All three fields are required. Save your settings to get a token, start your bot, then test the connection.{" "}
+                    <Link href="/bot-guide">Read the protocol guide</Link>.
+                  </p>
+                </div>
+              </div>
+              {bots === null ? <p className={styles.panelIntro}>Loading saved bots…</p> : <>
+              {bots.length > 0 && !addingBot && (
+                <button className={styles.secondaryButton} onClick={() => setAddingBot(true)} type="button">Add another bot</button>
+              )}
+              {(bots.length === 0 || addingBot) && <form className={styles.form} onSubmit={(event) => void addBot(event)}>
+                <div className={styles.inlineFields}>
+                  <div className={styles.field}>
+                    <label htmlFor="bot-name">Bot name (required)</label>
+                    <input id="bot-name" maxLength={80} name="name" placeholder="e.g. RiverRunner" required />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="bot-ip">LAN IP address (required)</label>
+                    <input id="bot-ip" inputMode="decimal" name="ip" placeholder="e.g. 192.168.1.42" required spellCheck={false} />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="bot-port">Port (required)</label>
+                    <input defaultValue={8001} id="bot-port" max={65535} min={1024} name="port" required type="number" />
+                  </div>
+                </div>
+                <p className={styles.fieldHint}>A successful connection test is required before joining a match. Use your laptop’s address on the event Wi-Fi, not localhost. Port 8001 matches both starters. Saving generates the BOT_TOKEN your starter needs.</p>
+                <div className={styles.panelActions}>
+                  <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save bot & get token"}</button>
+                  {addingBot && <button className={styles.textButton} disabled={busy} onClick={() => setAddingBot(false)} type="button">Cancel</button>}
+                </div>
+              </form>}
+              {error && <p className={styles.formError} role="alert">{error}</p>}
+              <div className={styles.botList}>
+                {bots.map((bot) => <div key={bot.id}>
+                  {newToken?.botId === bot.id && <TokenReveal onDismiss={() => setNewToken(null)} token={newToken.value} />}
+                  <BotCard bot={bot} onChange={refresh} />
+                </div>)}
+              </div>
+              </>}
+            </section>}
+
             <section className={styles.panel}>
               <div className={styles.panelHead}>
                 <div>
@@ -498,52 +556,6 @@ export function ParticipantDashboard() {
                 </ul>
               )}
             </section>
-
-            {account.participant_kind !== "human" && <section className={styles.panel} id="bots">
-              <div className={styles.panelHead}>
-                <div>
-                  <p className={styles.sectionLabel}>Bots</p>
-                  <h2>My bots</h2>
-                  <p className={styles.panelIntro}>
-                    Save your laptop’s LAN IP and your bot’s listening port. Then run the bot with its token and verify.{" "}
-                    <Link href="/bot-guide">Read the protocol guide</Link>.
-                  </p>
-                </div>
-              </div>
-              {bots === null ? <p className={styles.panelIntro}>Loading saved bots…</p> : <>
-              {bots.length > 0 && !addingBot && (
-                <button className={styles.secondaryButton} onClick={() => setAddingBot(true)} type="button">Add another bot</button>
-              )}
-              {(bots.length === 0 || addingBot) && <form className={styles.form} onSubmit={(event) => void addBot(event)}>
-                <div className={styles.inlineFields}>
-                  <div className={styles.field}>
-                    <label htmlFor="bot-name">Bot name</label>
-                    <input id="bot-name" maxLength={80} name="name" placeholder="e.g. RiverRunner" required />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="bot-ip">LAN IP address</label>
-                    <input id="bot-ip" inputMode="decimal" name="ip" placeholder="e.g. 192.168.1.42" required spellCheck={false} />
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor="bot-port">Port</label>
-                    <input defaultValue={8001} id="bot-port" max={65535} min={1024} name="port" required type="number" />
-                  </div>
-                </div>
-                <p className={styles.fieldHint}>Use your laptop’s address on the event Wi-Fi, not localhost. You’ll get a one-time token for the bot.</p>
-                <div className={styles.panelActions}>
-                  <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save bot & get token"}</button>
-                  {addingBot && <button className={styles.textButton} disabled={busy} onClick={() => setAddingBot(false)} type="button">Cancel</button>}
-                </div>
-              </form>}
-              {error && <p className={styles.formError} role="alert">{error}</p>}
-              <div className={styles.botList}>
-                {bots.map((bot) => <div key={bot.id}>
-                  {newToken?.botId === bot.id && <TokenReveal onDismiss={() => setNewToken(null)} token={newToken.value} />}
-                  <BotCard bot={bot} onChange={refresh} />
-                </div>)}
-              </div>
-              </>}
-            </section>}
           </div>
         </div>
       </div>

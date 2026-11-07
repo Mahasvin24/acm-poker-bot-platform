@@ -40,7 +40,7 @@ body {
   padding: 11px 14px;
   background: var(--ink);
   color: var(--paper);
-  font: 700 10px/1 monospace;
+  font: 700 11px/1 monospace;
   letter-spacing: 0.08em;
   text-decoration: none;
   text-transform: uppercase;
