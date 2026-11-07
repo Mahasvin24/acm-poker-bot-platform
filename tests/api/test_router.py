@@ -131,6 +131,19 @@ async def test_bot_profiles_show_the_token_once_and_verify(app: FastAPI, stack: 
         assert verified.json()["verified_at"] is not None
         assert verified.json()["last_verification_error"] is None
 
+        assert stack.network.calls[("10.20.0.11", "/v1/health")] == 2
+        verify_calls = stack.network.calls[("10.20.0.11", "/v1/verify")]
+        stack.network.broken.add("10.20.0.11")
+        failed_health = await owner.post(f"/api/v1/bots/{bot_id}/verify")
+        assert failed_health.status_code == 409
+        assert "Health check failed at /v1/health" in failed_health.json()["detail"]
+        assert stack.network.calls[("10.20.0.11", "/v1/verify")] == verify_calls
+        failed_profile = (await owner.get("/api/v1/bots")).json()[0]
+        assert failed_profile["verified_at"] is None
+        assert "Health check failed" in failed_profile["last_verification_error"]
+        stack.network.broken.clear()
+        assert (await owner.post(f"/api/v1/bots/{bot_id}/verify")).status_code == 200
+
         bad_ip = await owner.post(
             "/api/v1/bots", json={"name": "Local", "ip": "127.0.0.1", "port": 8001}
         )

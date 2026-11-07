@@ -25,6 +25,7 @@ from poker_bot_platform.auth.repository import (
 )
 from poker_bot_platform.bots import BotEndpoint, VerificationOutcome
 from poker_bot_platform.bots.messages import explain_failure
+from poker_bot_platform.bots.models import HealthResponse
 from poker_bot_platform.bots.network import validate_bot_endpoint
 from poker_bot_platform.bots.tokens import (
     EncryptedTokenStore,
@@ -209,6 +210,8 @@ class AuthService:
 
 
 class BotVerificationClient(Protocol):
+    async def health(self, endpoint: BotEndpoint) -> HealthResponse | None: ...
+
     async def verify(
         self,
         endpoint: BotEndpoint,
@@ -317,6 +320,19 @@ class BotProfileService:
             )
             raise BotVerificationError(str(exc)) from exc
         token = self.token_store.decrypt(profile.bot_token_ciphertext)
+        if await self.verifier.health(endpoint) is None:
+            message = (
+                "Health check failed at /v1/health. Start your bot, check its LAN IP and port, "
+                "and allow connections through your firewall. The response must use "
+                "protocol poker-bot.v2 and status ready."
+            )
+            await self.repository.record_bot_verification(
+                profile_id,
+                profile.bot_token_ciphertext,
+                verified_at=None,
+                error=message,
+            )
+            raise BotVerificationError(message)
         outcome = await self.verifier.verify(endpoint, token, generate_verification_challenge())
         if not outcome.verified:
             message = explain_failure(outcome.failure_reason)

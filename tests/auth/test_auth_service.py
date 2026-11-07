@@ -19,7 +19,7 @@ from poker_bot_platform.auth.service import (
     InvalidCredentialsError,
     InvalidSessionError,
 )
-from poker_bot_platform.bots import VerificationOutcome
+from poker_bot_platform.bots import HealthResponse, VerificationOutcome
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.domain import FailureReason, Role
 
@@ -29,6 +29,9 @@ NOW = datetime(2026, 10, 1, 12, tzinfo=UTC)
 class SuccessfulVerifier:
     def __init__(self) -> None:
         self.presented_token: str | None = None
+
+    async def health(self, endpoint: object) -> HealthResponse | None:
+        return HealthResponse(protocol="poker-bot.v2", status="ready")
 
     async def verify(
         self, endpoint: object, bearer_token: str, challenge: str
@@ -101,7 +104,7 @@ async def test_bootstrap_is_explicit_and_does_not_grant_admin_by_email_pattern()
     assert await bootstrap_admin(repository, "OWNER@example.com", "ignored-password") == admin
 
 
-class FailingVerifier:
+class FailingVerifier(SuccessfulVerifier):
     async def verify(self, *_args: object) -> VerificationOutcome:
         return VerificationOutcome(verified=False, failure_reason=FailureReason.HTTP_STATUS)
 
