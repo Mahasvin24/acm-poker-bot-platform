@@ -477,6 +477,7 @@ export function ParticipantDashboard() {
             {account.participant_kind !== "human" && <section className={styles.panel} id="bots">
               <div className={styles.panelHead}>
                 <div>
+                  <p className={styles.sectionLabel}>Bots</p>
                   <h2>Bot configuration</h2>
                   <p className={styles.panelIntro}>
                     All three fields are required. Save your settings to get a token, start your bot, then test the connection.{" "}
