@@ -162,11 +162,9 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
       <div className={styles.connectionStatus} aria-live="polite" aria-busy={testing} data-state={testing ? "pending" : testPassed ? "success" : testFailure ? "error" : "pending"}>
         <strong>{testing ? "Checking health and token…" : testPassed ? "Connection test passed" : testFailure ? "Connection test failed" : "Finish setup, then test your bot"}</strong>
         <p>{testing ? "Contacting your bot from the event server." : testPassed ? "Your bot is responding and the token works. You’re ready to join a match!" : testFailure ?? "Fill in your bot’s details, copy the token into your starter, and fire it up. Then give it a test."}</p>
-        {testPassed && bot.verified_at && !testing && <p>Last passed: <time dateTime={bot.verified_at}>{new Date(bot.verified_at).toLocaleString()}</time>. Test again after restarting your bot or changing networks.</p>}
+        {testPassed && bot.verified_at && !testing && <p>Last passed: <time dateTime={bot.verified_at}>{new Date(bot.verified_at).toLocaleString()}</time>.</p>}
       </div>
-      {saved && <p className={styles.successMessage} role="status">Bot settings saved. Test the connection if you changed the IP or port.</p>}
-      <form className={styles.form} onSubmit={saveEndpoint}>
-        <p className={styles.fieldHint}>All three fields are required: bot name, LAN IP address, and port.</p>
+      <form className={styles.form} id={`bot-settings-${bot.id}`} onSubmit={saveEndpoint}>
         <fieldset disabled={!editing || busy !== null}>
           <div className={styles.inlineFields}>
             <div className={styles.field}>
@@ -183,19 +181,12 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
             </div>
           </div>
         </fieldset>
-        <p className={styles.fieldHint}>Saved to your account. Changing the IP or port requires a new connection test. Your token stays the same.</p>
-        {editing && (
-          <div className={styles.panelActions}>
-            <button className={styles.secondaryButton} disabled={busy !== null} type="submit">Save</button>
-            <button className={styles.textButton} onClick={(event) => { event.currentTarget.form?.reset(); setEditing(false); }} type="button">Cancel</button>
-          </div>
-        )}
+        <p className={saved ? styles.successMessage : styles.fieldHint} role={saved ? "status" : undefined}>
+          {saved ? "Bot settings saved. Test again if you changed the IP or port." : editing ? "Save or cancel your changes before testing. Your token stays the same." : "Changing the IP or port needs another test. Your token stays the same."}
+        </p>
+
       </form>
       <TokenField key={token ?? bot.id} botId={bot.id} initialToken={token} />
-      <p className={styles.fieldHint}>
-        {editing ? "Save or cancel your edits to enable testing. " : ""}
-        Test connection checks GET /v1/health, then verifies your token with POST /v1/verify.
-      </p>
       <div className={styles.panelActions}>
         <button
           className={styles.primaryButton}
@@ -205,7 +196,10 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
         >
           {busy === "verify" ? "Testing connection…" : bot.verified_at ? "Test again" : "Test connection"}
         </button>
-        <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit settings</button>
+        {editing ? <>
+          <button className={styles.secondaryButton} disabled={busy !== null} form={`bot-settings-${bot.id}`} type="submit">Save settings</button>
+          <button className={styles.textButton} disabled={busy !== null} form={`bot-settings-${bot.id}`} onClick={(event) => { event.currentTarget.form?.reset(); setEditing(false); }} type="button">Cancel</button>
+        </> : <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit settings</button>}
         <button
           className={styles.secondaryButton}
           disabled={busy !== null}

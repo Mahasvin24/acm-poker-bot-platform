@@ -932,6 +932,103 @@
   white-space: nowrap;
 }
 
+/* A compact settings page, using the site's existing type, surfaces and rules. */
+.botDashboard .header {
+  min-height: 56px;
+}
+
+.botDashboard .dashboard {
+  padding-top: 16px;
+  padding-bottom: 32px;
+}
+
+.botDashboard .dashboardIntro {
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding-bottom: 20px;
+}
+
+.botDashboard .dashboardIntro h1 {
+  margin: 0;
+  font-size: clamp(32px, 3.4vw, 46px);
+  line-height: 1.05;
+}
+
+.botDashboard .dashboardIntro > p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.botDashboard .workspace {
+  grid-template-columns: minmax(240px, 0.35fr) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 24px;
+}
+
+.botDashboard .panel {
+  padding: 20px;
+}
+
+.botDashboard .panelHead {
+  padding-bottom: 14px;
+}
+
+.botDashboard .panelHead h2 {
+  font-size: 30px;
+}
+
+.botDashboard .sectionLabel {
+  margin-bottom: 8px;
+}
+
+.botDashboard .panelIntro {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.botDashboard .botList {
+  margin-top: 14px;
+}
+
+.botDashboard .botCard {
+  padding: 16px;
+  gap: 12px;
+}
+
+.botDashboard .form {
+  margin-top: 14px;
+  gap: 12px;
+}
+
+.botDashboard .botCard .form {
+  margin-top: 0;
+}
+
+.botDashboard .inlineFields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(90px, 0.45fr);
+}
+
+.botDashboard .field input,
+.botDashboard .primaryButton,
+.botDashboard .secondaryButton {
+  min-height: 40px;
+}
+
+.botDashboard .connectionStatus {
+  padding: 12px;
+}
+
+.botDashboard .connectionStatus p {
+  margin-top: 4px;
+}
+
+@media (max-width: 620px) {
+  .botDashboard .dashboardIntro { grid-template-columns: 1fr; gap: 12px; }
+  .botDashboard .inlineFields { grid-template-columns: 1fr; }
+  .botDashboard .panel { padding: 16px; }
+}
+
 /* Keep setup ahead of account utilities when the shared layout stacks. */
 @media (max-width: 900px) {
   .botDashboard .workspace { display: flex; flex-direction: column; }
