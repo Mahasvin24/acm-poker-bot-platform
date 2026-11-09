@@ -5,21 +5,17 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { CodeEntry } from "../match/join-match";
-import { relativeTime } from "../match/format";
 import { formatChipDelta } from "../match/format";
 import {
   changeEmail,
   changePassword,
   createBot,
   deleteAccount,
-  deleteBot,
-  getBotDiagnostics,
   getBotToken,
   getLeaderboard,
   listBots,
   logoutAccount,
   myMatches,
-  rotateBotToken,
   updateBot,
   updateProfile,
   verifyBot,
@@ -27,7 +23,6 @@ import {
 import styles from "./account.module.css";
 import {
   MATCH_STATUS_LABELS,
-  type BotDiagnostics,
   type BotProfile,
   type LeaderboardEntry,
   type MyMatch,
@@ -58,15 +53,6 @@ function TokenField({ botId, initialToken }: { botId: string; initialToken: stri
     }
   };
 
-  const copy = async () => {
-    if (!token) return;
-    try {
-      await navigator.clipboard.writeText(token);
-      setMessage("Copied! Paste it into your starter as BOT_TOKEN.");
-    } catch {
-      setMessage("Select the token in the field and copy it.");
-    }
-  };
 
   return (
     <div className={styles.field}>
@@ -84,7 +70,6 @@ function TokenField({ botId, initialToken }: { botId: string; initialToken: stri
         <button aria-controls={`token-${botId}`} aria-pressed={visible} className={styles.secondaryButton} disabled={loading} onClick={() => void toggle()} type="button">
           {loading ? "Loading…" : visible ? "Hide" : "Show"}
         </button>
-        {visible && <button className={styles.textButton} onClick={() => void copy()} type="button">Copy</button>}
       </div>
       <p className={styles.fieldHint} id={`token-help-${botId}`}>Paste this into your starter as BOT_TOKEN, then start your bot.</p>
       {message && <p className={styles.fieldHint} role="status">{message}</p>}
@@ -95,14 +80,12 @@ function TokenField({ botId, initialToken }: { botId: string; initialToken: stri
 function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToken: string | null; onChange: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(initialToken);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
   const testing = busy === "verify";
   const testFailure = testError ?? bot.last_verification_error;
   const testPassed = Boolean(bot.verified_at) && !testFailure;
-  const [diagnostics, setDiagnostics] = useState<{ data: BotDiagnostics; loadedAt: number } | null>(null);
 
   const run = async (label: string, operation: () => Promise<void>) => {
     setBusy(label);
@@ -136,17 +119,6 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
     });
   };
 
-  const loadDiagnostics = async () => {
-    if (diagnostics) {
-      setDiagnostics(null);
-      return;
-    }
-    try {
-      setDiagnostics({ data: await getBotDiagnostics(bot.id), loadedAt: Date.now() });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Diagnostics are unavailable.");
-    }
-  };
 
   return (
     <article className={styles.botCard}>
@@ -182,72 +154,36 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
           </div>
         </fieldset>
         <p className={saved ? styles.successMessage : styles.fieldHint} role={saved ? "status" : undefined}>
-          {saved ? "Bot settings saved. Test again if you changed the IP or port." : editing ? "Save or cancel your changes before testing. Your token stays the same." : "Changing the IP or port needs another test. Your token stays the same."}
+          {saved ? "Bot settings saved. Test again if you changed the IP or port." : editing ? "Save your changes before testing. Your token stays the same." : "Changing the IP or port needs another test. Your token stays the same."}
         </p>
 
       </form>
-      <TokenField key={token ?? bot.id} botId={bot.id} initialToken={token} />
+      <TokenField botId={bot.id} initialToken={initialToken} />
       <div className={styles.panelActions}>
+        <button className={styles.secondaryButton} disabled={busy !== null || editing} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit</button>
+        <button className={styles.secondaryButton} disabled={busy !== null || !editing} form={`bot-settings-${bot.id}`} type="submit">{busy === "save" ? "Saving…" : "Save"}</button>
         <button
           className={styles.primaryButton}
           disabled={busy !== null || editing}
           onClick={() => void run("verify", async () => { await verifyBot(bot.id); })}
           type="button"
         >
-          {busy === "verify" ? "Testing connection…" : bot.verified_at ? "Test again" : "Test connection"}
+          {testing ? "Testing…" : "Test"}
         </button>
-        {editing ? <>
-          <button className={styles.secondaryButton} disabled={busy !== null} form={`bot-settings-${bot.id}`} type="submit">Save settings</button>
-          <button className={styles.textButton} disabled={busy !== null} form={`bot-settings-${bot.id}`} onClick={(event) => { event.currentTarget.form?.reset(); setEditing(false); }} type="button">Cancel</button>
-        </> : <button className={styles.secondaryButton} disabled={busy !== null} onClick={() => { setEditing(true); setSaved(false); }} type="button">Edit settings</button>}
-        <button
+        <a
           className={styles.secondaryButton}
-          disabled={busy !== null}
-          onClick={() => void run("rotate", async () => { setToken((await rotateBotToken(bot.id)).bearer_token); })}
-          type="button"
-        >
-          New Token
-        </button>
-        <button className={styles.secondaryButton} onClick={() => void loadDiagnostics()} type="button">
-          {diagnostics ? "Hide Diagnostics" : "Diagnostics"}
-        </button>
-        <button
-          className={styles.textButton}
-          disabled={busy !== null}
-          onClick={() => {
-            if (window.confirm(`Delete ${bot.name}? Seats it already holds keep playing with automatic actions.`)) {
-              void run("delete", async () => { await deleteBot(bot.id); });
-            }
+          href={`/dashboard/bots/${encodeURIComponent(bot.id)}/diagnostics`}
+          target={`bot-diagnostics-${bot.id}`}
+          onClick={(event) => {
+            const popup = window.open(event.currentTarget.href, `bot-diagnostics-${bot.id}`, "popup,width=820,height=640");
+            if (popup) event.preventDefault();
           }}
-          type="button"
         >
-          Delete
-        </button>
+          Diagnostics
+        </a>
       </div>
       {error && <p className={styles.formError} role="alert">{error}</p>}
-      {diagnostics && (
-        <div className={styles.diagnostics}>
-          <p>
-            {diagnostics.data.decisions} decisions this session ·{" "}
-            {Object.values(diagnostics.data.failures).reduce((total, count) => total + count, 0)} automatic fallbacks
-            {diagnostics.data.consecutive_failures >= 3 ? " · health-check mode (bot looks unreachable)" : ""}
-          </p>
-          {diagnostics.data.recent.length === 0 ? (
-            <p>No decisions yet. They appear here once your bot plays a hand.</p>
-          ) : (
-            <ol>
-              {diagnostics.data.recent.slice(0, 12).map((item) => (
-                <li data-failed={item.failure_reason ? "true" : undefined} key={`${item.hand_id}-${item.at}`}>
-                  <span>{relativeTime(item.at, diagnostics.loadedAt)}</span>
-                  <strong>{item.failure_reason ? `${item.action} (automatic)` : `${item.action}${item.amount_to ? ` to ${item.amount_to}` : ""}`}</strong>
-                  <small>{item.latency_ms} ms</small>
-                  {item.explanation && <p>{item.explanation}</p>}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
+
     </article>
   );
 }
@@ -531,7 +467,7 @@ export function ParticipantDashboard() {
                 </div>
                 <p className={styles.fieldHint}>A successful connection test is required before joining a match. Use your laptop’s address on the event Wi-Fi, not localhost. Port 8001 matches both starters. Saving generates the BOT_TOKEN your starter needs.</p>
                 <div className={styles.panelActions}>
-                  <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save bot & get token"}</button>
+                  <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save"}</button>
                 </div>
               </form>}
               {error && <p className={styles.formError} role="alert">{error}</p>}
