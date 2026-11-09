@@ -142,6 +142,16 @@ class TournamentCoordinator:
             return await self._save(candidate, actor_id, "register_entrant")
 
     async def verify_bot(self, entrant_id: str, *, actor_id: str) -> TournamentState:
+        return await self._set_bot_verification(entrant_id, verified=True, actor_id=actor_id)
+
+    async def invalidate_bot_verification(
+        self, entrant_id: str, *, actor_id: str
+    ) -> TournamentState:
+        return await self._set_bot_verification(entrant_id, verified=False, actor_id=actor_id)
+
+    async def _set_bot_verification(
+        self, entrant_id: str, *, verified: bool, actor_id: str
+    ) -> TournamentState:
         async with self._lock:
             self._require_status(TournamentStatus.REGISTRATION_OPEN)
             found = False
@@ -150,13 +160,14 @@ class TournamentCoordinator:
                 if entrant.entrant_id == entrant_id:
                     if entrant.kind is not EntryKind.BOT:
                         raise TournamentError("entrant is not a bot")
-                    entrant = entrant.model_copy(update={"bot_verified": True})
+                    entrant = entrant.model_copy(update={"bot_verified": verified})
                     found = True
                 entrants.append(entrant)
             if not found:
                 raise TournamentError("entrant does not exist")
             candidate = self._state.model_copy(update={"entrants": tuple(entrants)})
-            return await self._save(candidate, actor_id, "verify_bot")
+            command = "verify_bot" if verified else "invalidate_bot_verification"
+            return await self._save(candidate, actor_id, command)
 
     async def seat_entrants(self, *, actor_id: str) -> TournamentState:
         async with self._lock:

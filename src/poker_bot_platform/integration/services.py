@@ -133,7 +133,14 @@ class SyncedEntrantService:
         ip: str,
         port: int,
     ) -> BotRegistrationResult:
-        await self._registration_coordinator(tournament_id)
+        coordinator = await self._registration_coordinator(tournament_id)
+        entrant = await self.accounts.current(account_id, tournament_id)
+        try:
+            # Revoke seating eligibility before changing credentials, including
+            # when the subsequent account write fails or the process restarts.
+            await coordinator.invalidate_bot_verification(entrant.id, actor_id=account_id)
+        except TournamentError as exc:
+            raise AuthConflictError(str(exc)) from exc
         return await self.accounts.configure_bot(account_id, tournament_id, ip, port)
 
     async def verify_bot(self, account_id: str, tournament_id: str) -> AccountEntrant:

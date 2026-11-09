@@ -18,7 +18,7 @@ from poker_bot_platform.integration import (
     TournamentRegistry,
 )
 from poker_bot_platform.persistence import InMemoryTableRepository
-from poker_bot_platform.tournament import InMemoryTournamentStore
+from poker_bot_platform.tournament import InMemoryTournamentStore, TournamentError
 
 
 class SuccessfulVerifier:
@@ -94,6 +94,42 @@ async def test_bot_verification_propagates_and_closed_registration_is_rejected()
         item for item in coordinator.state.entrants if item.entrant_id == registered.id
     )
     assert tournament_entrant.bot_verified
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ip,port", [("192.168.1.51", 8_081), ("192.168.1.50", 8_080)])
+async def test_replacing_verified_bot_endpoint_requires_reverification_before_seating(
+    ip: str, port: int
+) -> None:
+    auth, entrants, admin, registry = service_stack()
+    await admin.create_tournament("club-event", TournamentConfig(), "admin")
+    await admin.open_registration("club-event", "admin")
+    human = await auth.register("human@example.com", "long-enough-password")
+    bot = await auth.register("bot@example.com", "long-enough-password")
+    await entrants.register(human.id, "club-event", EntryKind.HUMAN, "Human")
+    registered = await entrants.register(bot.id, "club-event", EntryKind.BOT, "Bot")
+    original = await entrants.configure_bot(bot.id, "club-event", "192.168.1.50", 8_080)
+    verified = await entrants.verify_bot(bot.id, "club-event")
+    coordinator = await registry.get("club-event")
+    assert verified.bot_verified_at is not None
+    assert next(
+        item for item in coordinator.state.entrants if item.entrant_id == registered.id
+    ).bot_verified
+
+    replacement = await entrants.configure_bot(bot.id, "club-event", ip, port)
+    assert replacement.bearer_token != original.bearer_token
+    assert replacement.entrant.bot_verified_at is None
+    with pytest.raises(TournamentError, match="all bots must be verified"):
+        await coordinator.seat_entrants(actor_id="admin")
+    assert coordinator.state.status is TournamentStatus.REGISTRATION_OPEN
+    assert coordinator.state.tables == ()
+    assert not next(
+        item for item in coordinator.state.entrants if item.entrant_id == registered.id
+    ).bot_verified
+
+    await entrants.verify_bot(bot.id, "club-event")
+    result = await admin.seat("club-event", "admin")
+    assert result.status == TournamentStatus.SEATED.value
 
 
 def test_application_factory_mounts_headless_api_without_connecting_to_database() -> None:
