@@ -171,10 +171,10 @@ class InMemoryAuthRepository:
         if account_id not in self.accounts:
             raise AuthNotFoundError("account not found")
         if any(
-            item.account_id == account_id and item.name.casefold() == name.casefold()
+            item.account_id == account_id
             for item in self.bot_profiles.values()
         ):
-            raise AuthConflictError("you already have a bot with that name")
+            raise AuthConflictError("you already have a bot; edit its settings instead")
         profile = BotProfile(
             id=str(uuid.uuid4()),
             account_id=account_id,

@@ -118,6 +118,12 @@ async def test_bot_profiles_reveal_tokens_only_to_the_owner_and_verify(app: Fast
         bot_id = body["bot"]["id"]
         assert body["bot"]["verified_at"] is None
 
+        second = await owner.post(
+            "/api/v1/bots", json={"name": "Another bot", "ip": "10.20.0.12", "port": 8001}
+        )
+        assert second.status_code == 409
+        assert "already have a bot" in second.json()["detail"]
+
         listed = await owner.get("/api/v1/bots")
         assert token not in listed.text
 

@@ -136,11 +136,9 @@ async def test_bot_profiles_encrypt_tokens_verify_and_are_reusable() -> None:
     assert created.profile.name == "River Runner"
     assert created.bearer_token not in created.profile.bot_token_ciphertext
     assert token_store.decrypt(created.profile.bot_token_ciphertext) == created.bearer_token
-    second = await service.create(account.id, "Second Bot", "192.168.1.26", 8002)
-    assert [item.id for item in await service.list(account.id)] == [
-        created.profile.id,
-        second.profile.id,
-    ]
+    with pytest.raises(AuthConflictError, match="already have a bot"):
+        await service.create(account.id, "Second Bot", "192.168.1.26", 8002)
+    assert [item.id for item in await service.list(account.id)] == [created.profile.id]
 
     with pytest.raises(AuthConflictError):
         await service.create(account.id, "river runner", "192.168.1.27", 8003)

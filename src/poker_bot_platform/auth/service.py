@@ -255,6 +255,8 @@ class BotProfileService:
     async def create(self, account_id: str, name: str, ip: str, port: int) -> BotTokenResult:
         clean_name = _clean_name(name)
         endpoint = self._validate(ip, port)
+        if await self.repository.list_bot_profiles(account_id):
+            raise AuthConflictError("you already have a bot; edit its settings instead")
         token = generate_bearer_token()
         profile = await self.repository.create_bot_profile(
             account_id,

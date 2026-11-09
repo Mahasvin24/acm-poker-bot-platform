@@ -175,7 +175,7 @@ class SqlAlchemyAuthRepository:
                 await session.refresh(row)
                 return self._bot_profile(row)
         except AuthConflictError as exc:
-            raise AuthConflictError("you already have a bot with that name") from exc
+            raise AuthConflictError("you already have a bot; edit its settings instead") from exc
 
     async def get_bot_profile(self, profile_id: str) -> BotProfile | None:
         identifier = _uuid_or_none(profile_id)

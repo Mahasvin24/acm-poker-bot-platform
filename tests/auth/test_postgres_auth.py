@@ -47,7 +47,7 @@ async def test_postgres_auth_constraints_sessions_and_bot_profiles(
 
         results = await asyncio.gather(
             repository.create_bot_profile(account.id, "Same Name", "192.168.1.25", 8001, "a"),
-            repository.create_bot_profile(account.id, "same name", "192.168.1.26", 8002, "b"),
+            repository.create_bot_profile(account.id, "Different Name", "192.168.1.26", 8002, "b"),
             return_exceptions=True,
         )
         assert sum(not isinstance(result, Exception) for result in results) == 1

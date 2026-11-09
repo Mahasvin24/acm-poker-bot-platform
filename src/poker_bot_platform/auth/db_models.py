@@ -117,6 +117,7 @@ class BotProfileRow(Base):
 
     __table_args__ = (
         Index("uq_bot_profiles_account_name", "account_id", func.lower(name), unique=True),
+        Index("uq_bot_profiles_account", "account_id", unique=True),
         CheckConstraint(
             "bot_port BETWEEN 1024 AND 65535",
             name="ck_bot_profiles_port",
