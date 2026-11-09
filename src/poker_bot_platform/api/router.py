@@ -399,6 +399,21 @@ def create_api_router(
         return BotProfileResponse.from_profile(profile)
 
     @router.post(
+        "/bots/{bot_id}/token",
+        response_model=BotTokenResponse,
+        dependencies=mutation_guard,
+    )
+    async def reveal_bot_token(
+        bot_id: str, response: Response, account: CurrentAccount
+    ) -> BotTokenResponse:
+        result = await _translate(bots.get_token(account.id, bot_id))
+        response.headers["Cache-Control"] = "no-store"
+        return BotTokenResponse(
+            bot=BotProfileResponse.from_profile(result.profile),
+            bearer_token=result.bearer_token,
+        )
+
+    @router.post(
         "/bots/{bot_id}/rotate-token",
         response_model=BotTokenResponse,
         dependencies=mutation_guard,

@@ -301,6 +301,13 @@ class BotProfileService:
         )
         return BotTokenResult(profile=profile, bearer_token=token)
 
+    async def get_token(self, account_id: str, profile_id: str) -> BotTokenResult:
+        profile = await self._owned(account_id, profile_id)
+        return BotTokenResult(
+            profile=profile,
+            bearer_token=self.token_store.decrypt(profile.bot_token_ciphertext),
+        )
+
     async def delete(self, account_id: str, profile_id: str) -> None:
         await self._owned(account_id, profile_id)
         await self.repository.delete_bot_profile(profile_id)

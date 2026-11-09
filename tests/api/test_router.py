@@ -106,7 +106,7 @@ async def test_mutations_require_same_origin_and_login_is_rate_limited(app: Fast
         assert int(locked.headers["retry-after"]) > 0
 
 
-async def test_bot_profiles_show_the_token_once_and_verify(app: FastAPI, stack: MatchStack) -> None:
+async def test_bot_profiles_reveal_tokens_only_to_the_owner_and_verify(app: FastAPI, stack: MatchStack) -> None:
     async with signed_in(app, "owner@example.com", "bot") as owner:
         created = await owner.post(
             "/api/v1/bots", json={"name": "Atlas", "ip": "10.20.0.11", "port": 8001}
@@ -130,6 +130,13 @@ async def test_bot_profiles_show_the_token_once_and_verify(app: FastAPI, stack: 
         assert verified.status_code == 200
         assert verified.json()["verified_at"] is not None
         assert verified.json()["last_verification_error"] is None
+
+        revealed = await owner.post(f"/api/v1/bots/{bot_id}/token")
+        assert revealed.status_code == 200
+        assert revealed.headers["cache-control"] == "no-store"
+        assert revealed.json()["bearer_token"] == token
+        assert revealed.json()["bot"]["verified_at"] == verified.json()["verified_at"]
+        assert token not in (await owner.get("/api/v1/bots")).text
 
         assert stack.network.calls[("10.20.0.11", "/v1/health")] == 2
         verify_calls = stack.network.calls[("10.20.0.11", "/v1/verify")]
@@ -156,6 +163,10 @@ async def test_bot_profiles_show_the_token_once_and_verify(app: FastAPI, stack: 
 
     async with signed_in(app, "other@example.com") as other:
         assert (await other.post(f"/api/v1/bots/{bot_id}/verify")).status_code == 404
+        assert (await other.post(f"/api/v1/bots/{bot_id}/token")).status_code == 404
+
+    async with client_for(app) as guest:
+        assert (await guest.post(f"/api/v1/bots/{bot_id}/token")).status_code == 401
 
 
 async def test_admin_creates_match_and_players_join_by_code(
