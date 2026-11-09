@@ -34,6 +34,11 @@ from poker_bot_platform.integration import (
     SyncedEntrantService,
     TournamentRegistry,
 )
+from poker_bot_platform.integration.runtime import (
+    GameplayAccessError,
+    GameplayNotFoundError,
+    GameplayWaitingForStartError,
+)
 from poker_bot_platform.persistence import InMemoryTableRepository
 from poker_bot_platform.tournament import InMemoryTournamentStore
 
@@ -155,6 +160,47 @@ async def live_player_state(
         assert state.hand_result is not None
         state = await runtime.player_state(account_id, tournament_id)
     return state
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_start_is_distinct_from_missing_or_eliminated_player() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        human = await stack.auth.register("human@example.com", "long-enough-password")
+        opponent = await stack.auth.register("opponent@example.com", "long-enough-password")
+        entrant = await stack.entrants.register(human.id, "event", EntryKind.HUMAN, "Human")
+        await stack.entrants.register(opponent.id, "event", EntryKind.HUMAN, "Opponent")
+
+        with pytest.raises(GameplayWaitingForStartError):
+            await stack.runtime.player_state(human.id, "event")
+        with pytest.raises(GameplayAccessError):
+            await stack.runtime.player_state("not-entered", "event")
+        with pytest.raises(GameplayNotFoundError) as missing:
+            await stack.runtime.player_state(human.id, "unknown-event")
+        assert not isinstance(missing.value, GameplayWaitingForStartError)
+
+        await stack.admin.seat("event", "admin")
+        with pytest.raises(GameplayWaitingForStartError):
+            await stack.runtime.player_state(human.id, "event")
+        await stack.admin.start("event", "admin")
+        table = await stack.runtime.player_state(human.id, "event")
+        assert table.viewer_seat in {seat.seat for seat in table.seats}
+
+        # Supply a completed hand result to exercise the eliminated-player lookup.
+        tournament = await stack.registry.get("event")
+        scheduled = tournament.state.tables[0]
+        await tournament.record_hand_completed(
+            scheduled.table_id,
+            {
+                player.entrant_id: 0 if player.entrant_id == entrant.id else 40_000
+                for player in scheduled.players
+            },
+        )
+        with pytest.raises(GameplayNotFoundError) as eliminated:
+            await stack.runtime.player_state(human.id, "event")
+        assert not isinstance(eliminated.value, GameplayWaitingForStartError)
 
 
 @pytest.mark.asyncio

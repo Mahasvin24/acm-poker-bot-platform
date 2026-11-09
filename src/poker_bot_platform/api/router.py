@@ -321,6 +321,7 @@ def create_api_router(
             GameplayAccessError,
             GameplayConflictError,
             GameplayNotFoundError,
+            GameplayWaitingForStartError,
         )
 
         @router.get(
@@ -337,6 +338,11 @@ def create_api_router(
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(exc),
+                ) from exc
+            except GameplayWaitingForStartError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"code": "tournament_not_started", "message": str(exc)},
                 ) from exc
             except GameplayNotFoundError as exc:
                 raise HTTPException(

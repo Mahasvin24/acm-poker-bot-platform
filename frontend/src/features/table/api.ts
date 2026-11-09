@@ -4,6 +4,7 @@ export class TableApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "TableApiError";
@@ -16,13 +17,22 @@ async function readResponse(response: Response): Promise<PlayerTableState> {
   }
 
   let message = `Request failed (${response.status})`;
+  let code: string | undefined;
   try {
     const payload = (await response.json()) as { detail?: unknown };
     if (typeof payload.detail === "string") message = payload.detail;
+    if (payload.detail && typeof payload.detail === "object") {
+      if ("message" in payload.detail && typeof payload.detail.message === "string") {
+        message = payload.detail.message;
+      }
+      if ("code" in payload.detail && typeof payload.detail.code === "string") {
+        code = payload.detail.code;
+      }
+    }
   } catch {
     // Keep the status-based fallback when the API does not return JSON.
   }
-  throw new TableApiError(message, response.status);
+  throw new TableApiError(message, response.status, code);
 }
 
 function tablePath(tournamentId: string): string {

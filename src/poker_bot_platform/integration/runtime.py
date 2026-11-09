@@ -63,6 +63,10 @@ class GameplayNotFoundError(GameplayError):
     pass
 
 
+class GameplayWaitingForStartError(GameplayNotFoundError):
+    pass
+
+
 class GameplayAccessError(GameplayError):
     pass
 
@@ -344,6 +348,11 @@ class HeadlessGameplayRuntime:
         entrant = await self._accounts.get_entrant(account_id, tournament_id)
         if entrant is None:
             raise GameplayAccessError("account is not entered in this tournament")
+        if entrant.kind is EntryKind.HUMAN and tournament.state.status in {
+            TournamentStatus.REGISTRATION_OPEN,
+            TournamentStatus.SEATED,
+        }:
+            raise GameplayWaitingForStartError("Waiting for tournament to start")
         for table in tournament.state.tables:
             for player in table.players:
                 if player.entrant_id == entrant.id:

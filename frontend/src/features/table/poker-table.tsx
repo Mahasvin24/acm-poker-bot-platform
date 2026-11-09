@@ -19,6 +19,7 @@ interface AccessIssue {
   title: string;
   message: string;
   status?: number;
+  waiting?: boolean;
 }
 
 function actionCopy(action: ActionType): string {
@@ -34,7 +35,10 @@ function issueFromError(error: unknown): AccessIssue {
       return { status: error.status, title: "No player entry found", message: "This account is not registered as a human entrant in this tournament." };
     }
     if (error.status === 404) {
-      return { status: error.status, title: "Waiting for a seat", message: "The tournament has not assigned this entrant to an active table yet." };
+      if (error.code === "tournament_not_started") {
+        return { status: error.status, waiting: true, title: "Waiting for tournament to start", message: "Your entry is registered. Your table will open automatically when the organizer starts play. Checking every 2 seconds…" };
+      }
+      return { status: error.status, title: "No active table available", message: "No active table is available for this entry. Check your dashboard or contact the organizer for your tournament status." };
     }
     return { status: error.status, title: "Table unavailable", message: error.message };
   }
@@ -124,10 +128,11 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       } catch (error) {
         if (stopped || (error instanceof DOMException && error.name === "AbortError")) return;
         const nextIssue = issueFromError(error);
-        connectionInterrupted.current = true;
+        if (!nextIssue.waiting) connectionInterrupted.current = true;
         setIssue(nextIssue);
         setConnection("reconnecting");
-        if (!nextIssue.status || nextIssue.status >= 500) timer = setTimeout(poll, 1800);
+        if (nextIssue.waiting) timer = setTimeout(poll, 2000);
+        else if (!nextIssue.status || nextIssue.status >= 500) timer = setTimeout(poll, 1800);
       }
     };
     void poll();
@@ -179,9 +184,10 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
           <Link className={styles.wordmark} href="/">ACM / POKER</Link>
           {issue ? (
             <>
-              <p className={styles.kicker}>Player table</p><h1>{issue.title}</h1><p>{issue.message}</p>
+              {issue.waiting && <span className={styles.loader} aria-hidden="true" />}
+              <p className={styles.kicker}>Player table</p><h1 aria-live="polite">{issue.title}</h1><p>{issue.message}</p>
               <div className={styles.gateActions}>
-                {issue.status === 401 ? <Link href={`/account?tournament=${encodeURIComponent(tournamentId)}`}>Sign In</Link> : <button type="button" onClick={() => setRefreshToken((value) => value + 1)}>Try Again</button>}
+                {issue.status === 401 ? <Link href={`/account?tournament=${encodeURIComponent(tournamentId)}`}>Sign In</Link> : !issue.waiting && <button type="button" onClick={() => setRefreshToken((value) => value + 1)}>Try Again</button>}
                 <Link href="/play">Change tournament</Link>
               </div>
             </>
