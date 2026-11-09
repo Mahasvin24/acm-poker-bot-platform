@@ -126,6 +126,21 @@ class AdminTournamentStateResponse(ApiModel):
     config: TournamentConfig
 
 
+class PlayerStandingResponse(ApiModel):
+    entrant_id: str
+    display_name: str
+    position: int = Field(ge=1)
+
+
+class PlayerTournamentResponse(ApiModel):
+    tournament_id: str
+    tournament_status: TournamentStatus
+    entrant_id: str
+    status: Literal["waiting", "active", "eliminated", "completed", "unavailable"]
+    placement: int | None = Field(default=None, ge=1)
+    standings: tuple[PlayerStandingResponse, ...] = ()
+
+
 class PlayerActionRequest(ApiModel):
     decision_id: Annotated[StrictStr, StringConstraints(min_length=1, max_length=128)]
     table_version: StrictInt = Field(ge=0)

@@ -1,4 +1,4 @@
-import type { ActionSubmission, PlayerTableState } from "./types";
+import type { ActionSubmission, PlayerTableState, PlayerTournamentState } from "./types";
 
 export class TableApiError extends Error {
   constructor(
@@ -11,9 +11,9 @@ export class TableApiError extends Error {
   }
 }
 
-async function readResponse(response: Response): Promise<PlayerTableState> {
+async function readResponse<T>(response: Response): Promise<T> {
   if (response.ok) {
-    return (await response.json()) as PlayerTableState;
+    return (await response.json()) as T;
   }
 
   let message = `Request failed (${response.status})`;
@@ -37,6 +37,19 @@ async function readResponse(response: Response): Promise<PlayerTableState> {
 
 function tablePath(tournamentId: string): string {
   return `/api/v1/tournaments/${encodeURIComponent(tournamentId)}/table`;
+}
+
+export async function getPlayerTournamentState(
+  tournamentId: string,
+  signal?: AbortSignal,
+): Promise<PlayerTournamentState> {
+  const response = await fetch(`/api/v1/tournaments/${encodeURIComponent(tournamentId)}/player-status`, {
+    cache: "no-store",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  return readResponse(response);
 }
 
 export async function getTableState(

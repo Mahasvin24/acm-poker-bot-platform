@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getTableState, submitTableAction, TableApiError } from "./api";
+import { getPlayerTournamentState, getTableState, submitTableAction, TableApiError } from "./api";
 import { createDemoTableState } from "./demo-state";
 import styles from "./poker-table.module.css";
 import { PokerTableView } from "./poker-table-view";
-import type { ActionSubmission, ActionType, PlayerTableState } from "./types";
+import { TournamentResults } from "./tournament-results";
+import type { ActionSubmission, ActionType, PlayerTableState, PlayerTournamentState } from "./types";
 
 type ConnectionState = "syncing" | "live" | "reconnecting" | "demo";
 
@@ -82,6 +83,7 @@ function applyPreviewAction(state: PlayerTableState, submission: ActionSubmissio
 export function PokerTable({ tournamentId }: PokerTableProps) {
   const demoMode = tournamentId === "demo";
   const [table, setTable] = useState<PlayerTableState | null>(null);
+  const [tournamentState, setTournamentState] = useState<PlayerTournamentState | null>(null);
   const [connection, setConnection] = useState<ConnectionState>(demoMode ? "demo" : "syncing");
   const [issue, setIssue] = useState<AccessIssue | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -89,6 +91,10 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const terminalUntil = useRef(0);
   const connectionInterrupted = useRef(false);
+  const results = tournamentState?.tournament_id === tournamentId &&
+    (tournamentState.status === "eliminated" || tournamentState.status === "completed")
+    ? tournamentState : null;
+  const showingResults = results !== null;
 
   const mergeTable = useCallback((current: PlayerTableState | null, next: PlayerTableState) => {
     if (next.completed) terminalUntil.current = Date.now() + 4_000;
@@ -104,6 +110,35 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
   }, []);
 
   useEffect(() => {
+    if (demoMode) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let controller: AbortController | undefined;
+    const poll = async () => {
+      controller = new AbortController();
+      try {
+        const next = await getPlayerTournamentState(tournamentId, controller.signal);
+        if (stopped) return;
+        setTournamentState(next);
+        if (next.status === "eliminated" || next.status === "completed") setIssue(null);
+        if (next.status !== "completed") timer = setTimeout(poll, 2000);
+      } catch (error) {
+        if (stopped || (error instanceof DOMException && error.name === "AbortError")) return;
+        const nextIssue = issueFromError(error);
+        setIssue(nextIssue);
+        if (!nextIssue.status || nextIssue.status >= 500) timer = setTimeout(poll, 1800);
+      }
+    };
+    void poll();
+    return () => {
+      stopped = true;
+      controller?.abort();
+      if (timer) clearTimeout(timer);
+    };
+  }, [demoMode, refreshToken, tournamentId]);
+
+  useEffect(() => {
+    if (showingResults) return;
     if (demoMode) {
       const timer = window.setTimeout(() => setTable(createDemoTableState()), 0);
       return () => window.clearTimeout(timer);
@@ -141,7 +176,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       controller?.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [demoMode, mergeTable, refreshToken, tournamentId]);
+  }, [demoMode, mergeTable, refreshToken, showingResults, tournamentId]);
 
   const submit = async (action: ActionType, amountTo?: number) => {
     if (!table?.decision || submitting) return;
@@ -162,7 +197,19 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       }
       setNotice(`You ${actionCopy(action).toLowerCase()}${amountTo === undefined ? "" : ` to ${amountTo}`}.`);
     } catch (error) {
-      if (error instanceof TableApiError && error.status === 409) {
+      if (error instanceof TableApiError && error.status === 404 && !demoMode) {
+        try {
+          const next = await getPlayerTournamentState(tournamentId);
+          if (next.status === "eliminated" || next.status === "completed") {
+            setTournamentState(next);
+            setIssue(null);
+          } else {
+            setIssue(issueFromError(error));
+          }
+        } catch (statusError) {
+          setIssue(issueFromError(statusError));
+        }
+      } else if (error instanceof TableApiError && error.status === 409) {
         setNotice("The table advanced before that action arrived. Resyncing now.");
         try {
           setTable(await getTableState(tournamentId));
@@ -176,6 +223,10 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       setSubmitting(false);
     }
   };
+
+  if (results) {
+    return <TournamentResults result={results} error={issue?.message ?? null} signInRequired={issue?.status === 401} onRetry={() => setRefreshToken((value) => value + 1)} />;
+  }
 
   if (!table) {
     return (

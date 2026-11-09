@@ -16,6 +16,7 @@ from poker_bot_platform.api.models import (
     LoginRequest,
     PlayerActionRequest,
     PlayerTableStateResponse,
+    PlayerTournamentResponse,
     RegisterRequest,
 )
 from poker_bot_platform.api.security import SameOriginGuard
@@ -73,6 +74,10 @@ class AdminControlService(Protocol):
 
 
 class GameplayControlService(Protocol):
+    async def player_tournament_state(
+        self, account_id: str, tournament_id: str
+    ) -> PlayerTournamentResponse: ...
+
     async def player_state(
         self,
         account_id: str,
@@ -323,6 +328,24 @@ def create_api_router(
             GameplayNotFoundError,
             GameplayWaitingForStartError,
         )
+
+        @router.get(
+            "/tournaments/{tournament_id}/player-status",
+            response_model=PlayerTournamentResponse,
+        )
+        async def player_tournament_status(
+            tournament_id: str,
+            response: Response,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> PlayerTournamentResponse:
+            try:
+                result = await gameplay.player_tournament_state(account.id, tournament_id)
+            except GameplayAccessError as exc:
+                raise HTTPException(status_code=403, detail=str(exc)) from exc
+            except GameplayNotFoundError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            response.headers["Cache-Control"] = "no-store"
+            return result
 
         @router.get(
             "/tournaments/{tournament_id}/table",

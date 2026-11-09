@@ -8,8 +8,10 @@ from ipaddress import ip_network
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
 from poker_bot_platform.api.models import PlayerActionRequest, PlayerTableStateResponse
+from poker_bot_platform.api.router import create_api_router
 from poker_bot_platform.auth import Account, AuthService, EntrantService, InMemoryAuthRepository
 from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.models import BotActionRequest, VerifyRequest
@@ -160,6 +162,126 @@ async def live_player_state(
         assert state.hand_result is not None
         state = await runtime.player_state(account_id, tournament_id)
     return state
+
+
+@pytest.mark.asyncio
+async def test_player_results_survive_restore_and_include_authoritative_tied_standings() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("results", TournamentConfig(), "admin")
+        await stack.admin.open_registration("results", "admin")
+        humans = [
+            await stack.auth.register(f"player-{number}@example.com", "long-enough-password")
+            for number in range(4)
+        ]
+        entrants = [
+            await stack.entrants.register(human.id, "results", EntryKind.HUMAN, f"Player {number}")
+            for number, human in enumerate(humans)
+        ]
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "waiting"
+        )
+        await stack.admin.seat("results", "admin")
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "waiting"
+        )
+        tournament = await stack.registry.get("results")
+        await tournament.start(actor_id="admin")
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "active"
+        )
+
+        # Exercise the durable tournament result boundary without simulating betting.
+        await tournament.record_hand_completed(
+            tournament.state.tables[0].table_id,
+            {
+                entrants[0].id: 0,
+                entrants[1].id: 40_000,
+                entrants[2].id: 20_000,
+                entrants[3].id: 20_000,
+            },
+        )
+
+        def restored_runtime() -> HeadlessGameplayRuntime:
+            return HeadlessGameplayRuntime(
+                TournamentRegistry(stack.tournament_store, stack.tables),
+                stack.tables,
+                stack.accounts,
+                EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3),
+                gateway,
+            )
+
+        eliminated = await stack.runtime.player_tournament_state(humans[0].id, "results")
+        assert eliminated.status == "eliminated"
+        assert eliminated.placement == 4
+        assert eliminated.standings == ()
+        assert (
+            await restored_runtime().player_tournament_state(humans[0].id, "results") == eliminated
+        )
+        assert await stack.runtime.player_tournament_state(humans[0].id, "results") == eliminated
+
+        await tournament.record_hand_completed(
+            tournament.state.tables[0].table_id,
+            {entrants[1].id: 80_000, entrants[2].id: 0, entrants[3].id: 0},
+        )
+        for human, placement in zip(humans, [4, 1, 2, 2], strict=True):
+            result = await restored_runtime().player_tournament_state(human.id, "results")
+            assert result.status == "completed"
+            assert result.placement == placement
+            assert [item.position for item in result.standings] == [1, 2, 2, 4]
+            assert result.standings[0].entrant_id == entrants[1].id
+            assert result.standings[0].display_name == "Player 1"
+            assert set(result.model_dump()) == {
+                "tournament_id",
+                "tournament_status",
+                "entrant_id",
+                "status",
+                "placement",
+                "standings",
+            }
+            assert all(
+                set(item.model_dump()) == {"entrant_id", "display_name", "position"}
+                for item in result.standings
+            )
+
+
+@pytest.mark.asyncio
+async def test_player_status_endpoint_requires_owned_human_entry() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        human = await stack.auth.register("human@example.com", "long-enough-password")
+        bot = await stack.auth.register("bot@example.com", "long-enough-password")
+        outsider = await stack.auth.register("outsider@example.com", "long-enough-password")
+        entrant = await stack.entrants.register(human.id, "event", EntryKind.HUMAN, "Human")
+        await stack.entrants.register(bot.id, "event", EntryKind.BOT, "Bot")
+        app = FastAPI()
+        app.include_router(
+            create_api_router(
+                auth=stack.auth,
+                entrants=stack.entrants,
+                admin=stack.admin,
+                gameplay=stack.runtime,
+                allowed_origin="http://testserver",
+            )
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            path = "/api/v1/tournaments/event/player-status"
+            assert (await client.get(path)).status_code == 401
+            for account, expected in [(outsider, 403), (bot, 403), (human, 200)]:
+                issued = await stack.auth.login(account.email, "long-enough-password")
+                client.cookies.set("poker_session", issued.token)
+                response = await client.get(path)
+                assert response.status_code == expected
+            assert response.headers["cache-control"] == "no-store"
+            assert response.json()["entrant_id"] == entrant.id
+            assert response.json()["status"] == "waiting"
+            assert (
+                await client.get("/api/v1/tournaments/unknown/player-status")
+            ).status_code == 404
 
 
 @pytest.mark.asyncio

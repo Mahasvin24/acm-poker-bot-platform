@@ -1,6 +1,21 @@
 export type ActionType = "fold" | "check" | "call" | "raise";
 export type EntryKind = "human" | "bot";
 
+export interface TournamentStanding {
+  entrant_id: string;
+  display_name: string;
+  position: number;
+}
+
+export interface PlayerTournamentState {
+  tournament_id: string;
+  tournament_status: string;
+  entrant_id: string;
+  status: "waiting" | "active" | "eliminated" | "completed" | "unavailable";
+  placement: number | null;
+  standings: TournamentStanding[];
+}
+
 export interface LegalAction {
   action: ActionType;
   amount: number | null;

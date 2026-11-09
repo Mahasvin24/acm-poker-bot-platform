@@ -1268,6 +1268,39 @@
   margin-bottom: 72px;
 }
 
+.resultsCard {
+  width: min(720px, 100%);
+}
+
+.resultsCard .gateActions {
+  flex-wrap: wrap;
+}
+
+.standings {
+  width: 100%;
+  margin-top: 32px;
+  border-collapse: collapse;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.standings caption {
+  margin-bottom: 12px;
+  text-align: left;
+  color: #606b64;
+  font-size: 12px;
+}
+
+.standings th,
+.standings td {
+  padding: 12px 8px;
+  border-bottom: 1px solid rgb(23 35 30 / 18%);
+}
+
+.standings tr[data-viewer="true"] {
+  background: rgb(23 35 30 / 7%);
+}
+
 .kicker {
   margin: 0 0 18px !important;
   color: var(--table-red) !important;

@@ -11,6 +11,7 @@ from poker_bot_platform.api.models import (
     AdminTournamentStateResponse,
     PlayerActionRequest,
     PlayerTableStateResponse,
+    PlayerTournamentResponse,
 )
 from poker_bot_platform.api.router import GameplayControlService, create_api_router
 from poker_bot_platform.auth import (
@@ -139,6 +140,16 @@ def make_services(
 class FakeGameplay:
     def __init__(self) -> None:
         self.actions: list[PlayerActionRequest] = []
+
+    async def player_tournament_state(
+        self, account_id: str, tournament_id: str
+    ) -> PlayerTournamentResponse:
+        return PlayerTournamentResponse(
+            tournament_id=tournament_id,
+            tournament_status=TournamentStatus.RUNNING,
+            entrant_id="human-entry",
+            status="active",
+        )
 
     async def player_state(
         self,
