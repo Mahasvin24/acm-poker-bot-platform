@@ -14,6 +14,7 @@ import {
   verifyBot,
 } from "./api";
 import styles from "./account.module.css";
+import { BotTestPanel } from "./bot-test-panel";
 import type { Account, Entrant, EntrantKind } from "./types";
 
 interface ParticipantDashboardProps {
@@ -32,6 +33,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [bearerToken, setBearerToken] = useState<string | null>(null);
+  const [endpointRevision, setEndpointRevision] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -132,6 +134,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
       const result = await configureBot(activeTournamentId, ip, port);
       setEntrant(result.entrant);
       setBearerToken(result.bearer_token);
+      setEndpointRevision((value) => value + 1);
       setNotice("Endpoint saved. Copy the token before leaving this page.");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Endpoint setup failed.");
@@ -341,6 +344,11 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
                         </button>
                         <Link className={styles.textButton} href="/bot-guide">Protocol Guide</Link>
                       </div>
+                      <BotTestPanel
+                        configured={Boolean(entrant.bot_ip && entrant.bot_port)}
+                        key={`${entrant.id}-${entrant.bot_ip}-${entrant.bot_port}-${entrant.bot_verified_at}-${endpointRevision}`}
+                        tournamentId={activeTournamentId}
+                      />
                     </div>
                   )}
                   {notice && <p className={styles.successMessage}>{notice}</p>}

@@ -20,6 +20,7 @@ from poker_bot_platform.integration import (
     SyncedEntrantService,
     TournamentRegistry,
 )
+from poker_bot_platform.integration.bot_testing import BotTestingService
 from poker_bot_platform.integration.demo_match import EphemeralDemoMatch
 from poker_bot_platform.persistence import create_database_components
 from poker_bot_platform.tournament import SqlAlchemyTournamentStore
@@ -87,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             entrants=entrants,
             admin=admin,
             gameplay=gameplay,
+            bot_testing=BotTestingService(entrant_accounts, registry, bot_gateway),
             allowed_origin=settings.allowed_origin,
             cookie_secure=settings.cookie_secure,
         )

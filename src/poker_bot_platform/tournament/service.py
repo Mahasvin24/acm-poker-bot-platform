@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import math
 import secrets
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 
 from poker_bot_platform.coordinator import TableCoordinator
 from poker_bot_platform.domain import (
@@ -102,6 +103,13 @@ class TournamentCoordinator:
     @property
     def state(self) -> TournamentState:
         return self._state
+
+    @asynccontextmanager
+    async def registration_check(self) -> AsyncIterator[None]:
+        """Keep seating closed until a bounded pre-event external check finishes."""
+        async with self._lock:
+            self._require_status(TournamentStatus.REGISTRATION_OPEN)
+            yield
 
     async def update_config(
         self,
@@ -213,6 +221,10 @@ class TournamentCoordinator:
     async def tick(self, elapsed_seconds: int, *, actor_id: str = "clock") -> TournamentState:
         if elapsed_seconds < 0:
             raise ValueError("elapsed_seconds cannot be negative")
+        # A bounded registration check may hold the lock; inactive clocks must
+        # not delay the shared scheduler servicing unrelated live tournaments.
+        if self._state.status not in {TournamentStatus.RUNNING, TournamentStatus.BREAK}:
+            return self._state
         async with self._lock:
             if self._state.status not in {TournamentStatus.RUNNING, TournamentStatus.BREAK}:
                 return self._state

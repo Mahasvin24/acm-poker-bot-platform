@@ -1,6 +1,19 @@
 export type AccountRole = "user" | "admin";
 export type EntrantKind = "human" | "bot";
 
+export interface BotTestReport {
+  passed: boolean;
+  checks: {
+    name: string;
+    description: string;
+    passed: boolean;
+    elapsed_ms: number;
+    message: string;
+    action: "fold" | "check" | "call" | "raise" | null;
+    amount_to: number | null;
+  }[];
+}
+
 export interface Account {
   id: string;
   email: string;

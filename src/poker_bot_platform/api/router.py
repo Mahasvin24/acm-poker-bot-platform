@@ -29,7 +29,10 @@ from poker_bot_platform.auth.service import (
     InvalidCredentialsError,
     InvalidSessionError,
 )
+from poker_bot_platform.bots.testing import BotTestReport
 from poker_bot_platform.domain import EntryKind, Role, TournamentConfig
+from poker_bot_platform.integration.bot_testing import BotTestBusyError, BotTestingService
+from poker_bot_platform.tournament import TournamentStoreError
 
 
 class EntrantControlService(Protocol):
@@ -98,6 +101,7 @@ def create_api_router(
     entrants: EntrantControlService,
     admin: AdminControlService,
     gameplay: GameplayControlService | None = None,
+    bot_testing: BotTestingService | None = None,
     allowed_origin: str,
     cookie_name: str = "poker_session",
     cookie_secure: bool = False,
@@ -257,6 +261,41 @@ def create_api_router(
         ) as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         return EntrantResponse.from_entrant(entrant)
+
+    if bot_testing is not None:
+
+        @router.post(
+            "/tournaments/{tournament_id}/entrant/bot-endpoint/test",
+            response_model=BotTestReport,
+            dependencies=mutation_guard,
+        )
+        async def test_bot(
+            tournament_id: str,
+            response: Response,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> BotTestReport:
+            try:
+                report = await bot_testing.run(account.id, tournament_id)
+            except AuthNotFoundError as exc:
+                raise HTTPException(status_code=404, detail="bot entry not found") from exc
+            except (AuthConflictError, TournamentStoreError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Testing requires a configured bot and open registration. "
+                        "The endpoint must not be in use by a live tournament."
+                    ),
+                ) from exc
+            except BotTestBusyError as exc:
+                raise HTTPException(
+                    status_code=429, detail=str(exc), headers={"Retry-After": "2"}
+                ) from exc
+            except TimeoutError as exc:
+                raise HTTPException(
+                    status_code=504, detail="Bot test suite exceeded its 20-second limit."
+                ) from exc
+            response.headers["Cache-Control"] = "no-store"
+            return report
 
     @router.post(
         "/admin/tournaments",
