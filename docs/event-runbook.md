@@ -62,7 +62,8 @@ machine names, and drill results in a separate event worksheet; do not commit se
   for one participant bot.
 - API process unavailable: restart the exact validated build with one worker. Do not manually
   clear pending decisions.
-- Router failure: administratively pause after active hands if the API remains reachable, restore
-  the network, re-register changed bot addresses, then resume.
+- Router failure: administratively pause after active hands if the API remains reachable and
+  restore the network. V1 only permits endpoint changes before seating; restore the registered
+  bot addresses (for example using DHCP reservations) before resuming.
 - Engine invariant failure: quarantine the affected table and preserve logs/database for review;
   do not invent a result. Other tables may continue.

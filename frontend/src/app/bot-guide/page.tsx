@@ -33,7 +33,7 @@ export default function BotGuidePage() {
               <div>
                 <p className={styles.sectionLabel}>Required Interface</p>
                 <h2>Protocol Surface</h2>
-                <p className={styles.panelIntro}>All routes use the bearer token shown during endpoint setup.</p>
+                <p className={styles.panelIntro}>POST routes use the bearer token shown during endpoint setup. Health is unauthenticated.</p>
               </div>
               <span className={styles.statusPill}>poker-bot.v1</span>
             </div>
@@ -97,7 +97,7 @@ export default function BotGuidePage() {
                 </div>
               </section>
               <p className={styles.panelIntro}>
-                Starter bots and the conformance runner live in <code>examples/bots/</code>. The
+                Starter bots live in <code>examples/bots/</code>; run the CLI checker with <code>python -m poker_bot_platform.bots.conformance</code>. The
                 versioned request and response schemas live in <code>schemas/</code>.
               </p>
               <div className={styles.panelActions}>

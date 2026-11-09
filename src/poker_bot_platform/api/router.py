@@ -30,7 +30,7 @@ from poker_bot_platform.auth.service import (
     InvalidSessionError,
 )
 from poker_bot_platform.bots.testing import BotTestReport
-from poker_bot_platform.domain import EntryKind, Role, TournamentConfig
+from poker_bot_platform.domain import EntryKind, Role, TournamentConfig, TournamentStatus
 from poker_bot_platform.integration.bot_testing import BotTestBusyError, BotTestingService
 from poker_bot_platform.tournament import TournamentStoreError
 
@@ -102,6 +102,7 @@ def create_api_router(
     admin: AdminControlService,
     gameplay: GameplayControlService | None = None,
     bot_testing: BotTestingService | None = None,
+    tournament_status: Callable[[str], Awaitable[TournamentStatus]] | None = None,
     allowed_origin: str,
     cookie_name: str = "poker_session",
     cookie_secure: bool = False,
@@ -219,7 +220,10 @@ def create_api_router(
             entrant = await entrants.current(account.id, tournament_id)
         except AuthNotFoundError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        return EntrantResponse.from_entrant(entrant)
+        return EntrantResponse.from_entrant(
+            entrant,
+            tournament_status=await tournament_status(tournament_id) if tournament_status else None,
+        )
 
     @router.put(
         "/tournaments/{tournament_id}/entrant/bot-endpoint",

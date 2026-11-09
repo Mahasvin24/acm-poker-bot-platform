@@ -104,7 +104,9 @@ async def stack() -> AsyncIterator[TestStack]:
     server = BotServer()
     repository = InMemoryAuthRepository()
     auth = AuthService(repository)
-    registry = TournamentRegistry(InMemoryTournamentStore(), InMemoryTableRepository())
+    registry = TournamentRegistry(
+        InMemoryTournamentStore(), InMemoryTableRepository(), accounts=repository
+    )
     async with BotGateway(
         participant_subnet=ip_network("192.168.1.0/24"), transport=httpx.MockTransport(server)
     ) as gateway:
@@ -386,3 +388,114 @@ async def test_suite_timeout_is_a_safe_api_error(
     assert response.status_code == 504
     assert response.json() == {"detail": "Bot test suite exceeded its 20-second limit."}
     assert stack.server.token not in response.text
+
+
+async def other_tournament(stack: TestStack, name: str, ip: str = "192.168.1.20"):
+    admin = AdminCoordinatorService(stack.registry)
+    await admin.create_tournament(name, TournamentConfig(), "admin")
+    await admin.open_registration(name, "admin")
+    await stack.entrants.register(stack.owner.id, name, EntryKind.BOT, "Bot")
+    original_token = stack.server.token
+    configured = await stack.entrants.configure_bot(stack.owner.id, name, ip, 8001)
+    stack.server.token = configured.bearer_token
+    await stack.entrants.verify_bot(stack.owner.id, name)
+    stack.server.token = original_token
+    human = await stack.auth.register(f"{name}@race.test", "long-enough-password")
+    await stack.entrants.register(human.id, name, EntryKind.HUMAN, "Human")
+    return await stack.registry.get(name)
+
+
+@pytest.mark.parametrize("testing_first", [True, False])
+async def test_cross_tournament_endpoint_admission_is_exclusive(
+    stack: TestStack, testing_first: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = await other_tournament(stack, "other")
+    unrelated = await other_tournament(stack, "unrelated", "192.168.1.21")
+    stack.server.requests.clear()
+    stack.server.started.clear()
+    if not testing_first:
+        await other.seat_entrants(actor_id="admin")
+        await other.start(actor_id="admin")
+        with pytest.raises(AuthConflictError, match="another live tournament"):
+            await stack.tester.run(stack.owner.id, "event")
+        assert not stack.server.requests
+        return
+
+    outbound_states = []
+    original = type(stack.server).__call__
+
+    async def observed(self, request):
+        outbound_states.append(other.state.status.value)
+        return await original(self, request)
+
+    monkeypatch.setattr(type(stack.server), "__call__", observed)
+    stack.server.mode = "blocked"
+    running = asyncio.create_task(stack.tester.run(stack.owner.id, "event"))
+    await stack.server.started.wait()
+    admission_entered = asyncio.Event()
+
+    async def admit():
+        admission_entered.set()
+        await other.seat_entrants(actor_id="admin")
+        await other.start(actor_id="admin")
+
+    admission = asyncio.create_task(admit())
+    await admission_entered.wait()
+    assert not admission.done()
+    # An unrelated endpoint must remain usable during this entire run.
+    await asyncio.wait_for(unrelated.seat_entrants(actor_id="admin"), 1)
+    await asyncio.wait_for(unrelated.start(actor_id="admin"), 1)
+    stack.server.release.set()
+    assert (await running).passed
+    await admission
+    assert "running" not in outbound_states
+    assert other.state.status.value == "running"
+
+
+async def test_multi_endpoint_reservations_release_partial_acquisitions_on_cancel(
+    stack: TestStack,
+) -> None:
+    usage = stack.registry.endpoints
+    first, second = ("192.168.1.1", 8001), ("192.168.1.2", 8001)
+    entered = asyncio.Event()
+    async with usage.reserve([second]):
+
+        async def waiting():
+            entered.set()
+            async with usage.reserve([second, first]):
+                pytest.fail("second endpoint should still be locked")
+
+        task = asyncio.create_task(waiting())
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        async with asyncio.timeout(1):
+            async with usage.reserve([first]):
+                pass
+    async with usage.reserve([second, first]):
+        pass
+
+
+async def test_reversed_multi_endpoint_requests_do_not_deadlock(stack: TestStack) -> None:
+    usage = stack.registry.endpoints
+    keys = [("192.168.1.20", 8001), ("192.168.1.21", 8001)]
+    acquired, release, second_started = (asyncio.Event() for _ in range(3))
+
+    async def first():
+        async with usage.reserve(keys):
+            acquired.set()
+            await release.wait()
+
+    async def second():
+        second_started.set()
+        async with usage.reserve(reversed(keys)):
+            pass
+
+    one = asyncio.create_task(first())
+    await acquired.wait()
+    two = asyncio.create_task(second())
+    await second_started.wait()
+    assert not two.done()
+    release.set()
+    await asyncio.wait_for(asyncio.gather(one, two), 1)

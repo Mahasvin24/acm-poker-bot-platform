@@ -511,7 +511,7 @@ class HeadlessGameplayRuntime:
             completed=snapshot.completed,
             decision=decision,
             turn=turn,
-            hand_result=natural_hand_result(snapshot),
+            hand_result=natural_hand_result(snapshot, viewer_entrant_id=player.entrant_id),
         )
 
     def _hand_needs_dispatch(self, table_id: str, hand_number: int) -> bool:

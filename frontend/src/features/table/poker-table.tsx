@@ -8,6 +8,7 @@ import { createDemoTableState } from "./demo-state";
 import styles from "./poker-table.module.css";
 import { PokerTableView } from "./poker-table-view";
 import { TournamentResults } from "./tournament-results";
+import { acceptTournamentUpdate, resultTransitionDelay } from "./result-transition";
 import type { ActionSubmission, ActionType, PlayerTableState, PlayerTournamentState } from "./types";
 
 type ConnectionState = "syncing" | "live" | "reconnecting" | "demo";
@@ -84,6 +85,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
   const demoMode = tournamentId === "demo";
   const [table, setTable] = useState<PlayerTableState | null>(null);
   const [tournamentState, setTournamentState] = useState<PlayerTournamentState | null>(null);
+  const [resultsReadyFor, setResultsReadyFor] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>(demoMode ? "demo" : "syncing");
   const [issue, setIssue] = useState<AccessIssue | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -94,16 +96,32 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
   const results = tournamentState?.tournament_id === tournamentId &&
     (tournamentState.status === "eliminated" || tournamentState.status === "completed")
     ? tournamentState : null;
-  const showingResults = results !== null;
+  const showingResults = results !== null && resultsReadyFor === tournamentId;
+  const displayedHandId = table?.tournament_id === tournamentId ? table.hand_id : null;
+  const displayedHandCompleted = table?.tournament_id === tournamentId && table.completed;
+  const resultsStatus = results?.status;
+  const stopTablePolling = showingResults || Boolean(results && displayedHandCompleted);
+
+  useEffect(() => {
+    if (!resultsStatus) return;
+    const timer = setTimeout(
+      () => setResultsReadyFor(tournamentId),
+      resultTransitionDelay(displayedHandId ? { completed: Boolean(displayedHandCompleted) } : null, terminalUntil.current, Date.now()),
+    );
+    return () => clearTimeout(timer);
+    // A repeated status poll must not restart the presentation clock.
+  }, [resultsStatus, displayedHandId, displayedHandCompleted, tournamentId]);
 
   const mergeTable = useCallback((current: PlayerTableState | null, next: PlayerTableState) => {
-    if (next.completed) terminalUntil.current = Date.now() + 4_000;
     if (
       current?.completed &&
       next.hand_id !== current.hand_id &&
       Date.now() < terminalUntil.current
     ) {
       return current;
+    }
+    if (next.completed && (current?.hand_id !== next.hand_id || !current.completed)) {
+      terminalUntil.current = Date.now() + 4_000;
     }
     if (!current || next.hand_id !== current.hand_id) return next;
     return next.table_version >= current.table_version ? next : current;
@@ -119,7 +137,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       try {
         const next = await getPlayerTournamentState(tournamentId, controller.signal);
         if (stopped) return;
-        setTournamentState(next);
+        setTournamentState((current) => acceptTournamentUpdate(current, next));
         if (next.status === "eliminated" || next.status === "completed") setIssue(null);
         if (next.status !== "completed") timer = setTimeout(poll, 2000);
       } catch (error) {
@@ -138,7 +156,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
   }, [demoMode, refreshToken, tournamentId]);
 
   useEffect(() => {
-    if (showingResults) return;
+    if (stopTablePolling) return;
     if (demoMode) {
       const timer = window.setTimeout(() => setTable(createDemoTableState()), 0);
       return () => window.clearTimeout(timer);
@@ -176,7 +194,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
       controller?.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [demoMode, mergeTable, refreshToken, showingResults, tournamentId]);
+  }, [demoMode, mergeTable, refreshToken, stopTablePolling, tournamentId]);
 
   const submit = async (action: ActionType, amountTo?: number) => {
     if (!table?.decision || submitting) return;
@@ -201,7 +219,7 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
         try {
           const next = await getPlayerTournamentState(tournamentId);
           if (next.status === "eliminated" || next.status === "completed") {
-            setTournamentState(next);
+            setTournamentState((current) => acceptTournamentUpdate(current, next));
             setIssue(null);
           } else {
             setIssue(issueFromError(error));
@@ -224,8 +242,8 @@ export function PokerTable({ tournamentId }: PokerTableProps) {
     }
   };
 
-  if (results) {
-    return <TournamentResults result={results} error={issue?.message ?? null} signInRequired={issue?.status === 401} onRetry={() => setRefreshToken((value) => value + 1)} />;
+  if (results && showingResults) {
+    return <TournamentResults result={results} error={issue?.status === 404 ? null : issue?.message ?? null} signInRequired={issue?.status === 401} onRetry={() => setRefreshToken((value) => value + 1)} />;
   }
 
   if (!table) {

@@ -29,6 +29,7 @@ export interface Entrant {
   bot_ip: string | null;
   bot_port: number | null;
   bot_verified_at: string | null;
+  tournament_status?: string | null;
 }
 
 export interface BotEndpointRegistration {

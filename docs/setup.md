@@ -236,6 +236,12 @@ python -m poker_bot_platform.bots.conformance \
 ```
 
 See [`../examples/bots/README.md`](../examples/bots/README.md) for the complete wire contract.
-Malformed JSON, duplicate keys, schema mismatches, stale identifiers, illegal actions, wrong
-content types, non-success responses, oversized responses, connection failures, and timeouts all
-produce one deterministic automatic check-or-fold.
+The dashboard's **Test My Bot** runs six bounded checks while registration is open. It does
+not mark the bot verified; use **Verify Bot Connection** separately. Testing and tournament
+admission share endpoint reservations, so seating may wait up to the 20-second test limit.
+Credential replacement requires verification again. Failed edits preserve verification only
+when the original verified credentials are confirmed unchanged.
+
+During tournament play, malformed JSON, duplicate keys, schema mismatches, stale identifiers,
+illegal actions, wrong content types, non-success responses, oversized responses, connection
+failures, and timeouts all produce one deterministic automatic check-or-fold.

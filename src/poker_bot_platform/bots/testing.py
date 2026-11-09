@@ -50,15 +50,33 @@ SCENARIOS = (
 )
 
 _FAILURES = {
-    FailureReason.TIMEOUT: "No valid response within the 3-second deadline.",
-    FailureReason.CONNECTION: "Could not connect to the registered LAN endpoint.",
-    FailureReason.HTTP_STATUS: "Bot returned a non-success HTTP status. Check its token and logs.",
+    FailureReason.TIMEOUT: (
+        "No valid response within the 3-second deadline. "
+        "Check the bot terminal; simplify slow decision code."
+    ),
+    FailureReason.CONNECTION: (
+        "Cannot reach your bot. Keep its terminal open, check the saved Wi-Fi IP and port, "
+        "and allow that port through your firewall."
+    ),
+    FailureReason.HTTP_STATUS: (
+        "Bot refused the request or reported an error. "
+        "Restart it with the saved token and check its terminal."
+    ),
     FailureReason.CONTENT_TYPE: "Response must use Content-Type: application/json.",
     FailureReason.OVERSIZED: "Request or response exceeded the protocol size limit.",
     FailureReason.MALFORMED_JSON: "Response was invalid JSON or contained duplicate keys.",
-    FailureReason.SCHEMA: "Response did not match poker-bot.v1. Check fields, types, and protocol.",
-    FailureReason.STALE: "Response did not echo the current identifiers or verification challenge.",
-    FailureReason.ILLEGAL_ACTION: "Action was illegal or the raise was out of bounds.",
+    FailureReason.SCHEMA: (
+        "Response format was incorrect. Keep the starter's response fields "
+        "and use whole numbers for chips."
+    ),
+    FailureReason.STALE: (
+        "Response used old identifiers or the wrong verification challenge. "
+        "Copy them from the current request, not a saved example."
+    ),
+    FailureReason.ILLEGAL_ACTION: (
+        "Action was illegal or the raise was out of bounds. Choose from legal_actions "
+        "and use the allowed raise-to range shown above."
+    ),
 }
 
 
@@ -108,7 +126,10 @@ async def run_bot_tests(gateway: BotGateway, endpoint: BotEndpoint, token: str) 
             elapsed_ms=round((perf_counter() - started) * 1000),
             message="Ready."
             if healthy
-            else "Health check failed. Check reachability, JSON, and ready status.",
+            else (
+                "Health check failed. Open /v1/health on your bot's local port. "
+                "If it works locally, check the competition Wi-Fi and firewall."
+            ),
         )
     )
     started = perf_counter()

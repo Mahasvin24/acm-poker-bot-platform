@@ -31,7 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database_engine, sessions, table_repository = create_database_components(settings.database_url)
     auth_repository = SqlAlchemyAuthRepository(sessions)
     tournament_store = SqlAlchemyTournamentStore(sessions)
-    registry = TournamentRegistry(tournament_store, table_repository)
+    registry = TournamentRegistry(tournament_store, table_repository, accounts=auth_repository)
     bot_gateway = BotGateway(
         participant_subnet=settings.participant_subnet,
         blocked_ips=settings.blocked_ips,
@@ -86,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         create_api_router(
             auth=auth,
             entrants=entrants,
+            tournament_status=entrants.tournament_status,
             admin=admin,
             gameplay=gameplay,
             bot_testing=BotTestingService(entrant_accounts, registry, bot_gateway),

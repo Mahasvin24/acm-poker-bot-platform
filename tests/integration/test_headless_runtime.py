@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,7 @@ from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.models import BotActionRequest, VerifyRequest
 from poker_bot_platform.bots.reference import deterministic_reference_action
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
+from poker_bot_platform.coordinator import TableCoordinator
 from poker_bot_platform.domain import (
     ActionType,
     EngineTransition,
@@ -88,7 +90,7 @@ def make_stack(
     accounts = InMemoryAuthRepository()
     tables = InMemoryTableRepository()
     tournament_store = InMemoryTournamentStore()
-    registry = TournamentRegistry(tournament_store, tables)
+    registry = TournamentRegistry(tournament_store, tables, accounts=accounts)
     token_store = EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3)
     gateway = BotGateway(
         participant_subnet=ip_network("192.168.1.0/24"),
@@ -204,7 +206,7 @@ async def test_player_results_survive_restore_and_include_authoritative_tied_sta
 
         def restored_runtime() -> HeadlessGameplayRuntime:
             return HeadlessGameplayRuntime(
-                TournamentRegistry(stack.tournament_store, stack.tables),
+                TournamentRegistry(stack.tournament_store, stack.tables, accounts=stack.accounts),
                 stack.tables,
                 stack.accounts,
                 EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3),
@@ -325,6 +327,97 @@ async def test_waiting_for_start_is_distinct_from_missing_or_eliminated_player()
         assert not isinstance(eliminated.value, GameplayWaitingForStartError)
 
 
+@pytest.mark.parametrize("ending", ["fold", "muck", "all_in"])
+async def test_entire_player_response_respects_showdown_disclosure(ending: str) -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("privacy", TournamentConfig(), "admin")
+        await stack.admin.open_registration("privacy", "admin")
+        for number in [1, 2]:
+            account = await stack.auth.register(
+                f"privacy-{number}@test.example", "long-enough-password"
+            )
+            await stack.entrants.register(account.id, "privacy", EntryKind.HUMAN, f"Human {number}")
+        await stack.admin.seat("privacy", "admin")
+        tournament = await stack.registry.get("privacy")
+        await tournament.start(actor_id="admin")
+        table = tournament.state.tables[0]
+        deck = [f"{rank}{suit}" for rank in "23456789TJQKA" for suit in "cdhs"]
+        random.Random(0).shuffle(deck)
+        request = tournament.hand_request(table.table_id).model_copy(
+            update={"deck_order": tuple(deck), "button_seat": 1}
+        )
+        coordinator = TableCoordinator(table.table_id, PokerKitEngine(), stack.tables)
+        snapshot = await coordinator.start_table(request)
+        while not snapshot.completed:
+            pending = await coordinator.open_decision(datetime.now(UTC) + timedelta(seconds=30))
+            legal = {item.action: item for item in pending.legal_actions}
+            amount = None
+            if ending == "fold":
+                action = ActionType.FOLD
+            elif ending == "all_in" and ActionType.RAISE in legal:
+                action = ActionType.RAISE
+                amount = legal[action].max_amount_to
+            else:
+                action = ActionType.CHECK if ActionType.CHECK in legal else ActionType.CALL
+            snapshot = await coordinator.submit_action(
+                PlayerAction(
+                    decision_id=pending.decision_id,
+                    table_version=pending.table_version,
+                    seat=pending.seat,
+                    action=action,
+                    amount_to=amount,
+                )
+            )
+        public_seats = {seat.seat for seat in snapshot.seats if seat.public_hole_cards}
+        if ending == "muck":
+            assert len(public_seats) == 1  # Reproduces the original disclosure leak.
+        elif ending == "all_in":
+            assert len(public_seats) == 2
+        else:
+            assert not public_seats
+        for player in table.players:
+            response = stack.runtime._project(tournament, coordinator, player)
+            payload = response.model_dump(mode="json")
+            assert "engine_state" not in payload and "deck_order" not in payload
+            assert response.hand_result is not None
+            for seat in snapshot.seats:
+                projected = next(item for item in response.seats if item.seat == seat.seat)
+                expected = (
+                    seat.hole_cards
+                    if seat.entrant_id == player.entrant_id
+                    else seat.public_hole_cards
+                )
+                assert projected.hole_cards == expected
+                revealed = next(
+                    (
+                        item
+                        for item in response.hand_result.revealed_hands
+                        if item.seat == seat.seat
+                    ),
+                    None,
+                )
+                if ending == "fold":
+                    assert revealed is None
+                elif expected:
+                    assert revealed is not None and revealed.hole_cards == expected
+                else:
+                    assert revealed is None
+                if not expected:
+
+                    def strings(value):
+                        if isinstance(value, str):
+                            yield value
+                        elif isinstance(value, dict):
+                            for child in value.values():
+                                yield from strings(child)
+                        elif isinstance(value, list):
+                            for child in value:
+                                yield from strings(child)
+
+                    assert not set(seat.hole_cards).intersection(strings(payload))
+
+
 @pytest.mark.asyncio
 async def test_runtime_dispatches_real_hand_drives_bot_and_projects_private_state() -> None:
     bot_actions = 0
@@ -439,7 +532,9 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
         # A new runtime represents a process restart. Restoring the table sees the
         # unresolved durable decision, applies exactly one restart fallback, and
         # reconciles the completed hand into the tournament state.
-        restored_registry = TournamentRegistry(stack.tournament_store, stack.tables)
+        restored_registry = TournamentRegistry(
+            stack.tournament_store, stack.tables, accounts=stack.accounts
+        )
         restored_runtime = HeadlessGameplayRuntime(
             restored_registry,
             stack.tables,
@@ -704,7 +799,9 @@ async def test_restart_reconciles_table_quarantine_crash_gap_once() -> None:
         )
         assert tournament.state.tables[0].hand_in_progress
 
-        restored_registry = TournamentRegistry(stack.tournament_store, stack.tables)
+        restored_registry = TournamentRegistry(
+            stack.tournament_store, stack.tables, accounts=stack.accounts
+        )
         restored_runtime = HeadlessGameplayRuntime(
             restored_registry,
             stack.tables,
