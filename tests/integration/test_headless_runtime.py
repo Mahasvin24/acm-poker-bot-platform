@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -8,13 +9,16 @@ from ipaddress import ip_network
 
 import httpx
 import pytest
+from fastapi import FastAPI
 
 from poker_bot_platform.api.models import PlayerActionRequest, PlayerTableStateResponse
+from poker_bot_platform.api.router import create_api_router
 from poker_bot_platform.auth import Account, AuthService, EntrantService, InMemoryAuthRepository
 from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.models import BotActionRequest, VerifyRequest
 from poker_bot_platform.bots.reference import deterministic_reference_action
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
+from poker_bot_platform.coordinator import TableCoordinator
 from poker_bot_platform.domain import (
     ActionType,
     EngineTransition,
@@ -33,6 +37,11 @@ from poker_bot_platform.integration import (
     RuntimeAdminCoordinatorService,
     SyncedEntrantService,
     TournamentRegistry,
+)
+from poker_bot_platform.integration.runtime import (
+    GameplayAccessError,
+    GameplayNotFoundError,
+    GameplayWaitingForStartError,
 )
 from poker_bot_platform.persistence import InMemoryTableRepository
 from poker_bot_platform.tournament import InMemoryTournamentStore
@@ -81,7 +90,7 @@ def make_stack(
     accounts = InMemoryAuthRepository()
     tables = InMemoryTableRepository()
     tournament_store = InMemoryTournamentStore()
-    registry = TournamentRegistry(tournament_store, tables)
+    registry = TournamentRegistry(tournament_store, tables, accounts=accounts)
     token_store = EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3)
     gateway = BotGateway(
         participant_subnet=ip_network("192.168.1.0/24"),
@@ -155,6 +164,258 @@ async def live_player_state(
         assert state.hand_result is not None
         state = await runtime.player_state(account_id, tournament_id)
     return state
+
+
+@pytest.mark.asyncio
+async def test_player_results_survive_restore_and_include_authoritative_tied_standings() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("results", TournamentConfig(), "admin")
+        await stack.admin.open_registration("results", "admin")
+        humans = [
+            await stack.auth.register(f"player-{number}@example.com", "long-enough-password")
+            for number in range(4)
+        ]
+        entrants = [
+            await stack.entrants.register(human.id, "results", EntryKind.HUMAN, f"Player {number}")
+            for number, human in enumerate(humans)
+        ]
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "waiting"
+        )
+        await stack.admin.seat("results", "admin")
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "waiting"
+        )
+        tournament = await stack.registry.get("results")
+        await tournament.start(actor_id="admin")
+        assert (await stack.runtime.player_tournament_state(humans[0].id, "results")).status == (
+            "active"
+        )
+
+        # Exercise the durable tournament result boundary without simulating betting.
+        await tournament.record_hand_completed(
+            tournament.state.tables[0].table_id,
+            {
+                entrants[0].id: 0,
+                entrants[1].id: 40_000,
+                entrants[2].id: 20_000,
+                entrants[3].id: 20_000,
+            },
+        )
+
+        def restored_runtime() -> HeadlessGameplayRuntime:
+            return HeadlessGameplayRuntime(
+                TournamentRegistry(stack.tournament_store, stack.tables, accounts=stack.accounts),
+                stack.tables,
+                stack.accounts,
+                EncryptedTokenStore.from_deployment_secret("runtime-test-secret" * 3),
+                gateway,
+            )
+
+        eliminated = await stack.runtime.player_tournament_state(humans[0].id, "results")
+        assert eliminated.status == "eliminated"
+        assert eliminated.placement == 4
+        assert eliminated.standings == ()
+        assert (
+            await restored_runtime().player_tournament_state(humans[0].id, "results") == eliminated
+        )
+        assert await stack.runtime.player_tournament_state(humans[0].id, "results") == eliminated
+
+        await tournament.record_hand_completed(
+            tournament.state.tables[0].table_id,
+            {entrants[1].id: 80_000, entrants[2].id: 0, entrants[3].id: 0},
+        )
+        for human, placement in zip(humans, [4, 1, 2, 2], strict=True):
+            result = await restored_runtime().player_tournament_state(human.id, "results")
+            assert result.status == "completed"
+            assert result.placement == placement
+            assert [item.position for item in result.standings] == [1, 2, 2, 4]
+            assert result.standings[0].entrant_id == entrants[1].id
+            assert result.standings[0].display_name == "Player 1"
+            assert set(result.model_dump()) == {
+                "tournament_id",
+                "tournament_status",
+                "entrant_id",
+                "status",
+                "placement",
+                "standings",
+            }
+            assert all(
+                set(item.model_dump()) == {"entrant_id", "display_name", "position"}
+                for item in result.standings
+            )
+
+
+@pytest.mark.asyncio
+async def test_player_status_endpoint_requires_owned_human_entry() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        human = await stack.auth.register("human@example.com", "long-enough-password")
+        bot = await stack.auth.register("bot@example.com", "long-enough-password")
+        outsider = await stack.auth.register("outsider@example.com", "long-enough-password")
+        entrant = await stack.entrants.register(human.id, "event", EntryKind.HUMAN, "Human")
+        await stack.entrants.register(bot.id, "event", EntryKind.BOT, "Bot")
+        app = FastAPI()
+        app.include_router(
+            create_api_router(
+                auth=stack.auth,
+                entrants=stack.entrants,
+                admin=stack.admin,
+                gameplay=stack.runtime,
+                allowed_origin="http://testserver",
+            )
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            path = "/api/v1/tournaments/event/player-status"
+            assert (await client.get(path)).status_code == 401
+            for account, expected in [(outsider, 403), (bot, 403), (human, 200)]:
+                issued = await stack.auth.login(account.email, "long-enough-password")
+                client.cookies.set("poker_session", issued.token)
+                response = await client.get(path)
+                assert response.status_code == expected
+            assert response.headers["cache-control"] == "no-store"
+            assert response.json()["entrant_id"] == entrant.id
+            assert response.json()["status"] == "waiting"
+            assert (
+                await client.get("/api/v1/tournaments/unknown/player-status")
+            ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_start_is_distinct_from_missing_or_eliminated_player() -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("event", TournamentConfig(), "admin")
+        await stack.admin.open_registration("event", "admin")
+        human = await stack.auth.register("human@example.com", "long-enough-password")
+        opponent = await stack.auth.register("opponent@example.com", "long-enough-password")
+        entrant = await stack.entrants.register(human.id, "event", EntryKind.HUMAN, "Human")
+        await stack.entrants.register(opponent.id, "event", EntryKind.HUMAN, "Opponent")
+
+        with pytest.raises(GameplayWaitingForStartError):
+            await stack.runtime.player_state(human.id, "event")
+        with pytest.raises(GameplayAccessError):
+            await stack.runtime.player_state("not-entered", "event")
+        with pytest.raises(GameplayNotFoundError) as missing:
+            await stack.runtime.player_state(human.id, "unknown-event")
+        assert not isinstance(missing.value, GameplayWaitingForStartError)
+
+        await stack.admin.seat("event", "admin")
+        with pytest.raises(GameplayWaitingForStartError):
+            await stack.runtime.player_state(human.id, "event")
+        await stack.admin.start("event", "admin")
+        table = await stack.runtime.player_state(human.id, "event")
+        assert table.viewer_seat in {seat.seat for seat in table.seats}
+
+        # Supply a completed hand result to exercise the eliminated-player lookup.
+        tournament = await stack.registry.get("event")
+        scheduled = tournament.state.tables[0]
+        await tournament.record_hand_completed(
+            scheduled.table_id,
+            {
+                player.entrant_id: 0 if player.entrant_id == entrant.id else 40_000
+                for player in scheduled.players
+            },
+        )
+        with pytest.raises(GameplayNotFoundError) as eliminated:
+            await stack.runtime.player_state(human.id, "event")
+        assert not isinstance(eliminated.value, GameplayWaitingForStartError)
+
+
+@pytest.mark.parametrize("ending", ["fold", "muck", "all_in"])
+async def test_entire_player_response_respects_showdown_disclosure(ending: str) -> None:
+    stack, gateway = make_stack(httpx.MockTransport(bot_handler))
+    async with gateway:
+        await stack.admin.create_tournament("privacy", TournamentConfig(), "admin")
+        await stack.admin.open_registration("privacy", "admin")
+        for number in [1, 2]:
+            account = await stack.auth.register(
+                f"privacy-{number}@test.example", "long-enough-password"
+            )
+            await stack.entrants.register(account.id, "privacy", EntryKind.HUMAN, f"Human {number}")
+        await stack.admin.seat("privacy", "admin")
+        tournament = await stack.registry.get("privacy")
+        await tournament.start(actor_id="admin")
+        table = tournament.state.tables[0]
+        deck = [f"{rank}{suit}" for rank in "23456789TJQKA" for suit in "cdhs"]
+        random.Random(0).shuffle(deck)
+        request = tournament.hand_request(table.table_id).model_copy(
+            update={"deck_order": tuple(deck), "button_seat": 1}
+        )
+        coordinator = TableCoordinator(table.table_id, PokerKitEngine(), stack.tables)
+        snapshot = await coordinator.start_table(request)
+        while not snapshot.completed:
+            pending = await coordinator.open_decision(datetime.now(UTC) + timedelta(seconds=30))
+            legal = {item.action: item for item in pending.legal_actions}
+            amount = None
+            if ending == "fold":
+                action = ActionType.FOLD
+            elif ending == "all_in" and ActionType.RAISE in legal:
+                action = ActionType.RAISE
+                amount = legal[action].max_amount_to
+            else:
+                action = ActionType.CHECK if ActionType.CHECK in legal else ActionType.CALL
+            snapshot = await coordinator.submit_action(
+                PlayerAction(
+                    decision_id=pending.decision_id,
+                    table_version=pending.table_version,
+                    seat=pending.seat,
+                    action=action,
+                    amount_to=amount,
+                )
+            )
+        public_seats = {seat.seat for seat in snapshot.seats if seat.public_hole_cards}
+        if ending == "muck":
+            assert len(public_seats) == 1  # Reproduces the original disclosure leak.
+        elif ending == "all_in":
+            assert len(public_seats) == 2
+        else:
+            assert not public_seats
+        for player in table.players:
+            response = stack.runtime._project(tournament, coordinator, player)
+            payload = response.model_dump(mode="json")
+            assert "engine_state" not in payload and "deck_order" not in payload
+            assert response.hand_result is not None
+            for seat in snapshot.seats:
+                projected = next(item for item in response.seats if item.seat == seat.seat)
+                expected = (
+                    seat.hole_cards
+                    if seat.entrant_id == player.entrant_id
+                    else seat.public_hole_cards
+                )
+                assert projected.hole_cards == expected
+                revealed = next(
+                    (
+                        item
+                        for item in response.hand_result.revealed_hands
+                        if item.seat == seat.seat
+                    ),
+                    None,
+                )
+                if ending == "fold":
+                    assert revealed is None
+                elif expected:
+                    assert revealed is not None and revealed.hole_cards == expected
+                else:
+                    assert revealed is None
+                if not expected:
+
+                    def strings(value):
+                        if isinstance(value, str):
+                            yield value
+                        elif isinstance(value, dict):
+                            for child in value.values():
+                                yield from strings(child)
+                        elif isinstance(value, list):
+                            for child in value:
+                                yield from strings(child)
+
+                    assert not set(seat.hole_cards).intersection(strings(payload))
 
 
 @pytest.mark.asyncio
@@ -271,7 +532,9 @@ async def test_runtime_expires_human_decision_and_restart_falls_back_once() -> N
         # A new runtime represents a process restart. Restoring the table sees the
         # unresolved durable decision, applies exactly one restart fallback, and
         # reconciles the completed hand into the tournament state.
-        restored_registry = TournamentRegistry(stack.tournament_store, stack.tables)
+        restored_registry = TournamentRegistry(
+            stack.tournament_store, stack.tables, accounts=stack.accounts
+        )
         restored_runtime = HeadlessGameplayRuntime(
             restored_registry,
             stack.tables,
@@ -536,7 +799,9 @@ async def test_restart_reconciles_table_quarantine_crash_gap_once() -> None:
         )
         assert tournament.state.tables[0].hand_in_progress
 
-        restored_registry = TournamentRegistry(stack.tournament_store, stack.tables)
+        restored_registry = TournamentRegistry(
+            stack.tournament_store, stack.tables, accounts=stack.accounts
+        )
         restored_runtime = HeadlessGameplayRuntime(
             restored_registry,
             stack.tables,

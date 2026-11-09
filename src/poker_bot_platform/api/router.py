@@ -16,6 +16,7 @@ from poker_bot_platform.api.models import (
     LoginRequest,
     PlayerActionRequest,
     PlayerTableStateResponse,
+    PlayerTournamentResponse,
     RegisterRequest,
 )
 from poker_bot_platform.api.security import SameOriginGuard
@@ -28,7 +29,10 @@ from poker_bot_platform.auth.service import (
     InvalidCredentialsError,
     InvalidSessionError,
 )
-from poker_bot_platform.domain import EntryKind, Role, TournamentConfig
+from poker_bot_platform.bots.testing import BotTestReport
+from poker_bot_platform.domain import EntryKind, Role, TournamentConfig, TournamentStatus
+from poker_bot_platform.integration.bot_testing import BotTestBusyError, BotTestingService
+from poker_bot_platform.tournament import TournamentStoreError
 
 
 class EntrantControlService(Protocol):
@@ -73,6 +77,10 @@ class AdminControlService(Protocol):
 
 
 class GameplayControlService(Protocol):
+    async def player_tournament_state(
+        self, account_id: str, tournament_id: str
+    ) -> PlayerTournamentResponse: ...
+
     async def player_state(
         self,
         account_id: str,
@@ -93,6 +101,8 @@ def create_api_router(
     entrants: EntrantControlService,
     admin: AdminControlService,
     gameplay: GameplayControlService | None = None,
+    bot_testing: BotTestingService | None = None,
+    tournament_status: Callable[[str], Awaitable[TournamentStatus]] | None = None,
     allowed_origin: str,
     cookie_name: str = "poker_session",
     cookie_secure: bool = False,
@@ -210,7 +220,10 @@ def create_api_router(
             entrant = await entrants.current(account.id, tournament_id)
         except AuthNotFoundError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        return EntrantResponse.from_entrant(entrant)
+        return EntrantResponse.from_entrant(
+            entrant,
+            tournament_status=await tournament_status(tournament_id) if tournament_status else None,
+        )
 
     @router.put(
         "/tournaments/{tournament_id}/entrant/bot-endpoint",
@@ -252,6 +265,41 @@ def create_api_router(
         ) as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         return EntrantResponse.from_entrant(entrant)
+
+    if bot_testing is not None:
+
+        @router.post(
+            "/tournaments/{tournament_id}/entrant/bot-endpoint/test",
+            response_model=BotTestReport,
+            dependencies=mutation_guard,
+        )
+        async def test_bot(
+            tournament_id: str,
+            response: Response,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> BotTestReport:
+            try:
+                report = await bot_testing.run(account.id, tournament_id)
+            except AuthNotFoundError as exc:
+                raise HTTPException(status_code=404, detail="bot entry not found") from exc
+            except (AuthConflictError, TournamentStoreError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Testing requires a configured bot and open registration. "
+                        "The endpoint must not be in use by a live tournament."
+                    ),
+                ) from exc
+            except BotTestBusyError as exc:
+                raise HTTPException(
+                    status_code=429, detail=str(exc), headers={"Retry-After": "2"}
+                ) from exc
+            except TimeoutError as exc:
+                raise HTTPException(
+                    status_code=504, detail="Bot test suite exceeded its 20-second limit."
+                ) from exc
+            response.headers["Cache-Control"] = "no-store"
+            return report
 
     @router.post(
         "/admin/tournaments",
@@ -321,7 +369,26 @@ def create_api_router(
             GameplayAccessError,
             GameplayConflictError,
             GameplayNotFoundError,
+            GameplayWaitingForStartError,
         )
+
+        @router.get(
+            "/tournaments/{tournament_id}/player-status",
+            response_model=PlayerTournamentResponse,
+        )
+        async def player_tournament_status(
+            tournament_id: str,
+            response: Response,
+            account: Annotated[Account, Depends(current_account)],
+        ) -> PlayerTournamentResponse:
+            try:
+                result = await gameplay.player_tournament_state(account.id, tournament_id)
+            except GameplayAccessError as exc:
+                raise HTTPException(status_code=403, detail=str(exc)) from exc
+            except GameplayNotFoundError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            response.headers["Cache-Control"] = "no-store"
+            return result
 
         @router.get(
             "/tournaments/{tournament_id}/table",
@@ -337,6 +404,11 @@ def create_api_router(
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=str(exc),
+                ) from exc
+            except GameplayWaitingForStartError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"code": "tournament_not_started", "message": str(exc)},
                 ) from exc
             except GameplayNotFoundError as exc:
                 raise HTTPException(

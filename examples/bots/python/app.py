@@ -6,6 +6,7 @@ import os
 import secrets
 
 from fastapi import FastAPI, Header, HTTPException
+from strategy import choose_action
 
 from poker_bot_platform.bots.models import (
     BotActionRequest,
@@ -14,7 +15,6 @@ from poker_bot_platform.bots.models import (
     VerifyRequest,
     VerifyResponse,
 )
-from poker_bot_platform.bots.reference import deterministic_reference_action
 
 app = FastAPI()
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "replace-me")
@@ -46,4 +46,14 @@ async def action(
     authorization: str | None = Header(default=None),
 ) -> BotActionResponse:
     authorize(authorization)
-    return deterministic_reference_action(request)
+    selected, amount_to = choose_action(request)
+    return BotActionResponse(
+        protocol="poker-bot.v1",
+        tournament_id=request.tournament_id,
+        table_id=request.table_id,
+        hand_id=request.hand_id,
+        decision_id=request.decision_id,
+        table_version=request.table_version,
+        action=selected,
+        amount_to=amount_to,
+    )

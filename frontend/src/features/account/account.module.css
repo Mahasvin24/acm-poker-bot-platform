@@ -674,6 +674,24 @@
   content: "…";
 }
 
+.botTestReport {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+.botTestReport li {
+  padding: 16px;
+  border: 1px solid rgb(23 35 30 / 22%);
+}
+
+.botTestReport p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .authLayout { grid-template-columns: 1fr; }
   .authIntro { min-height: 500px; }

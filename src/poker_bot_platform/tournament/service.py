@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import math
 import secrets
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, nullcontext
 
 from poker_bot_platform.coordinator import TableCoordinator
 from poker_bot_platform.domain import (
@@ -34,6 +35,7 @@ from poker_bot_platform.tournament.models import (
 from poker_bot_platform.tournament.store import TournamentStore
 
 _STANDARD_DECK = tuple(f"{rank}{suit}" for rank in "23456789TJQKA" for suit in "cdhs")
+AdmissionGuard = Callable[[TournamentState], AbstractAsyncContextManager[None]]
 
 
 class TournamentError(RuntimeError):
@@ -53,11 +55,14 @@ class TournamentCoordinator:
         state: TournamentState,
         store: TournamentStore,
         table_repository: TableRepository,
+        admission_guard: AdmissionGuard | None = None,
     ) -> None:
         self._state = state
         self._store = store
         self._table_repository = table_repository
         self._lock = asyncio.Lock()
+        self._registration_lock = asyncio.Lock()
+        self._admission_guard = admission_guard or (lambda _state: nullcontext())
 
     @classmethod
     async def create(
@@ -69,6 +74,7 @@ class TournamentCoordinator:
         *,
         seed_hex: str | None = None,
         actor_id: str = "system",
+        admission_guard: AdmissionGuard | None = None,
     ) -> TournamentCoordinator:
         seed_hex = seed_hex or secrets.token_hex(32)
         state = TournamentState(
@@ -88,7 +94,7 @@ class TournamentCoordinator:
             if existing.status is not TournamentStatus.DRAFT or existing.version != 0:
                 raise
         await store.create(state, AuditEntry(actor_id=actor_id, command="create_tournament"))
-        return cls(state, store, table_repository)
+        return cls(state, store, table_repository, admission_guard)
 
     @classmethod
     async def restore(
@@ -96,12 +102,20 @@ class TournamentCoordinator:
         tournament_id: str,
         store: TournamentStore,
         table_repository: TableRepository,
+        admission_guard: AdmissionGuard | None = None,
     ) -> TournamentCoordinator:
-        return cls(await store.load(tournament_id), store, table_repository)
+        return cls(await store.load(tournament_id), store, table_repository, admission_guard)
 
     @property
     def state(self) -> TournamentState:
         return self._state
+
+    @asynccontextmanager
+    async def registration_check(self) -> AsyncIterator[None]:
+        """Serialize pre-seating account operations against tournament admission."""
+        async with self._registration_lock:
+            self._require_status(TournamentStatus.REGISTRATION_OPEN)
+            yield
 
     async def update_config(
         self,
@@ -142,6 +156,16 @@ class TournamentCoordinator:
             return await self._save(candidate, actor_id, "register_entrant")
 
     async def verify_bot(self, entrant_id: str, *, actor_id: str) -> TournamentState:
+        return await self._set_bot_verification(entrant_id, verified=True, actor_id=actor_id)
+
+    async def invalidate_bot_verification(
+        self, entrant_id: str, *, actor_id: str
+    ) -> TournamentState:
+        return await self._set_bot_verification(entrant_id, verified=False, actor_id=actor_id)
+
+    async def _set_bot_verification(
+        self, entrant_id: str, *, verified: bool, actor_id: str
+    ) -> TournamentState:
         async with self._lock:
             self._require_status(TournamentStatus.REGISTRATION_OPEN)
             found = False
@@ -150,16 +174,17 @@ class TournamentCoordinator:
                 if entrant.entrant_id == entrant_id:
                     if entrant.kind is not EntryKind.BOT:
                         raise TournamentError("entrant is not a bot")
-                    entrant = entrant.model_copy(update={"bot_verified": True})
+                    entrant = entrant.model_copy(update={"bot_verified": verified})
                     found = True
                 entrants.append(entrant)
             if not found:
                 raise TournamentError("entrant does not exist")
             candidate = self._state.model_copy(update={"entrants": tuple(entrants)})
-            return await self._save(candidate, actor_id, "verify_bot")
+            command = "verify_bot" if verified else "invalidate_bot_verification"
+            return await self._save(candidate, actor_id, command)
 
     async def seat_entrants(self, *, actor_id: str) -> TournamentState:
-        async with self._lock:
+        async with self._registration_lock, self._admission_guard(self._state), self._lock:
             self._require_status(TournamentStatus.REGISTRATION_OPEN)
             if not 2 <= len(self._state.entrants) <= self._state.config.max_players:
                 raise TournamentError("tournament requires between 2 and max_players entrants")
@@ -175,7 +200,7 @@ class TournamentCoordinator:
             return await self._save(candidate, actor_id, "seat_entrants")
 
     async def start(self, *, actor_id: str) -> TournamentState:
-        async with self._lock:
+        async with self._registration_lock, self._admission_guard(self._state), self._lock:
             self._require_status(TournamentStatus.SEATED)
             candidate = self._state.model_copy(update={"status": TournamentStatus.RUNNING})
             candidate = candidate.model_copy(update={"tables": self._start_ready_hands(candidate)})

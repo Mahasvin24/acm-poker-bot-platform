@@ -79,9 +79,12 @@ class EntrantResponse(ApiModel):
     bot_ip: str | None
     bot_port: int | None
     bot_verified_at: datetime | None
+    tournament_status: TournamentStatus | None = None
 
     @classmethod
-    def from_entrant(cls, entrant: Entrant) -> EntrantResponse:
+    def from_entrant(
+        cls, entrant: Entrant, *, tournament_status: TournamentStatus | None = None
+    ) -> EntrantResponse:
         return cls(
             id=entrant.id,
             tournament_id=entrant.tournament_id,
@@ -90,6 +93,7 @@ class EntrantResponse(ApiModel):
             bot_ip=entrant.bot_ip,
             bot_port=entrant.bot_port,
             bot_verified_at=entrant.bot_verified_at,
+            tournament_status=tournament_status,
         )
 
 
@@ -124,6 +128,21 @@ class AdminTournamentStateResponse(ApiModel):
     phase_remaining_seconds: int = Field(ge=0)
     revision: int = Field(ge=0)
     config: TournamentConfig
+
+
+class PlayerStandingResponse(ApiModel):
+    entrant_id: str
+    display_name: str
+    position: int = Field(ge=1)
+
+
+class PlayerTournamentResponse(ApiModel):
+    tournament_id: str
+    tournament_status: TournamentStatus
+    entrant_id: str
+    status: Literal["waiting", "active", "eliminated", "completed", "unavailable"]
+    placement: int | None = Field(default=None, ge=1)
+    standings: tuple[PlayerStandingResponse, ...] = ()
 
 
 class PlayerActionRequest(ApiModel):

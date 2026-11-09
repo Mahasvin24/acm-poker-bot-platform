@@ -102,6 +102,11 @@ async def test_postgres_auth_constraints_sessions_and_bot_round_trip(
             datetime.now(UTC),
         )
         assert verified.bot_verified_at is not None
+        await repository.configure_bot(entrant.id, "192.168.1.26", 8001, "rotated-token")
+        with pytest.raises(AuthConflictError, match="changed"):
+            await repository.mark_bot_verified(entrant.id, "encrypted-token", datetime.now(UTC))
+        rotated = await repository.get_entrant(account.id, tournament_id)
+        assert rotated is not None and rotated.bot_verified_at is None
 
         with pytest.raises(AuthConflictError):
             await repository.create_entrant(

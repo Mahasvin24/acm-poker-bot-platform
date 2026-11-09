@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 
 from poker_bot_platform.api.models import AdminCommandResponse, AdminTournamentStateResponse
 from poker_bot_platform.auth.models import Entrant as AccountEntrant
-from poker_bot_platform.auth.repository import AuthConflictError
+from poker_bot_platform.auth.repository import AuthConflictError, AuthRepository
 from poker_bot_platform.auth.service import BotRegistrationResult, EntrantService
+from poker_bot_platform.bots.network import validate_bot_endpoint
 from poker_bot_platform.domain import EntryKind, TournamentConfig, TournamentStatus
+from poker_bot_platform.integration.endpoint_usage import EndpointKey, EndpointUsage
 from poker_bot_platform.persistence import TableRepository
 from poker_bot_platform.tournament import (
     Entrant,
@@ -28,11 +31,15 @@ logger = logging.getLogger(__name__)
 class TournamentRegistry:
     """Single-process owner and resolver for tournament coordinators."""
 
-    def __init__(self, store: TournamentStore, tables: TableRepository) -> None:
+    def __init__(
+        self, store: TournamentStore, tables: TableRepository, *, accounts: AuthRepository
+    ) -> None:
         self._store = store
         self._tables = tables
         self._coordinators: dict[str, TournamentCoordinator] = {}
         self._lock = asyncio.Lock()
+        self._accounts = accounts
+        self.endpoints = EndpointUsage()
 
     async def create(
         self,
@@ -50,6 +57,7 @@ class TournamentRegistry:
                 self._store,
                 self._tables,
                 actor_id=actor_id,
+                admission_guard=self._admission_guard,
             )
             self._coordinators[tournament_id] = coordinator
             return coordinator
@@ -65,9 +73,27 @@ class TournamentRegistry:
                     tournament_id,
                     self._store,
                     self._tables,
+                    admission_guard=self._admission_guard,
                 )
                 self._coordinators[tournament_id] = coordinator
             return coordinator
+
+    @asynccontextmanager
+    async def _admission_guard(self, state: TournamentState) -> AsyncIterator[None]:
+        endpoints: list[EndpointKey] = []
+        for entrant in state.entrants:
+            if entrant.kind is EntryKind.BOT:
+                account = await self._accounts.get_entrant_by_id(entrant.entrant_id)
+                if (
+                    account is None
+                    or account.bot_verified_at is None
+                    or account.bot_ip is None
+                    or account.bot_port is None
+                ):
+                    raise TournamentError("all bots must be verified before seating")
+                endpoints.append((account.bot_ip, account.bot_port))
+        async with self.endpoints.reserve(endpoints):
+            yield
 
     async def known_tournament_ids(self) -> tuple[str, ...]:
         """Return tournaments restored or created in this application process."""
@@ -99,8 +125,18 @@ class SyncedEntrantService:
     accounts: EntrantService
     tournaments: TournamentRegistry
 
+    async def tournament_status(self, tournament_id: str) -> TournamentStatus:
+        return (await self.tournaments.get(tournament_id)).state.status
+
     async def current(self, account_id: str, tournament_id: str) -> AccountEntrant:
-        return await self.accounts.current(account_id, tournament_id)
+        entrant = await self.accounts.current(account_id, tournament_id)
+        if entrant.kind is EntryKind.BOT:
+            state = (await self.tournaments.get(tournament_id)).state
+            if not any(
+                item.entrant_id == entrant.id and item.bot_verified for item in state.entrants
+            ):
+                return entrant.model_copy(update={"bot_verified_at": None})
+        return entrant
 
     async def register(
         self,
@@ -133,17 +169,52 @@ class SyncedEntrantService:
         ip: str,
         port: int,
     ) -> BotRegistrationResult:
-        await self._registration_coordinator(tournament_id)
-        return await self.accounts.configure_bot(account_id, tournament_id, ip, port)
+        coordinator = await self._registration_coordinator(tournament_id)
+        try:
+            async with coordinator.registration_check():
+                entrant = await self.accounts.current(account_id, tournament_id)
+                if entrant.kind is not EntryKind.BOT:
+                    raise AuthConflictError("only bot entrants can configure an endpoint")
+                validate_bot_endpoint(
+                    ip,
+                    port,
+                    participant_subnet=self.accounts.participant_subnet,
+                    blocked_ips=self.accounts.blocked_ips,
+                )
+                # Invalidate durably first; admission also checks the account record.
+                was_verified = next(
+                    item.bot_verified
+                    for item in coordinator.state.entrants
+                    if item.entrant_id == entrant.id
+                )
+                await coordinator.invalidate_bot_verification(entrant.id, actor_id=account_id)
+                try:
+                    return await self.accounts.configure_bot(account_id, tournament_id, ip, port)
+                except (Exception, asyncio.CancelledError):
+                    # Restore eligibility only when a failed write provably left
+                    # the original verified credentials intact (not an ambiguous commit).
+                    current = await self.accounts.current(account_id, tournament_id)
+                    if was_verified and current == entrant and current.bot_verified_at is not None:
+                        await coordinator.verify_bot(entrant.id, actor_id=account_id)
+                    raise
+        except TournamentError as exc:
+            raise AuthConflictError(str(exc)) from exc
 
     async def verify_bot(self, account_id: str, tournament_id: str) -> AccountEntrant:
         coordinator = await self._registration_coordinator(tournament_id)
-        entrant = await self.accounts.verify_bot(account_id, tournament_id)
         try:
-            await coordinator.verify_bot(entrant.id, actor_id=account_id)
+            async with coordinator.registration_check():
+                entrant = await self.accounts.verify_bot(account_id, tournament_id)
+                current = await self.accounts.current(account_id, tournament_id)
+                if (
+                    current.bot_token_ciphertext != entrant.bot_token_ciphertext
+                    or current.bot_verified_at is None
+                ):
+                    raise AuthConflictError("bot endpoint changed during verification")
+                await coordinator.verify_bot(entrant.id, actor_id=account_id)
+                return entrant
         except TournamentError as exc:
             raise AuthConflictError(str(exc)) from exc
-        return entrant
 
     async def _registration_coordinator(self, tournament_id: str) -> TournamentCoordinator:
         try:

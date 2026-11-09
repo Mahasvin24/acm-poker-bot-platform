@@ -5,13 +5,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address
+from typing import Literal
 
 from poker_bot_platform.api.models import (
     AdminCommandResponse,
     AdminTournamentStateResponse,
     PlayerActionRequest,
     PlayerDecisionResponse,
+    PlayerStandingResponse,
     PlayerTableStateResponse,
+    PlayerTournamentResponse,
     PublicPlayerActionResponse,
     PublicPlayerSeatResponse,
     PublicSidePotResponse,
@@ -63,6 +66,10 @@ class GameplayNotFoundError(GameplayError):
     pass
 
 
+class GameplayWaitingForStartError(GameplayNotFoundError):
+    pass
+
+
 class GameplayAccessError(GameplayError):
     pass
 
@@ -107,6 +114,52 @@ class HeadlessGameplayRuntime:
         async with lock:
             tournament = await self._get_tournament(tournament_id)
             await self._synchronize_locked(tournament)
+
+    async def player_tournament_state(
+        self, account_id: str, tournament_id: str
+    ) -> PlayerTournamentResponse:
+        tournament = await self._get_tournament(tournament_id)
+        entrant = await self._accounts.get_entrant(account_id, tournament_id)
+        state = tournament.state
+        if (
+            entrant is None
+            or entrant.kind is not EntryKind.HUMAN
+            or not any(item.entrant_id == entrant.id for item in state.entrants)
+        ):
+            raise GameplayAccessError("a human entry in this tournament is required")
+        standing = next((item for item in state.standings if item.entrant_id == entrant.id), None)
+        status: Literal["waiting", "active", "eliminated", "completed", "unavailable"]
+        if state.status is TournamentStatus.COMPLETED:
+            status = "completed"
+        elif standing is not None and standing.eliminated_hand_number is not None:
+            status = "eliminated"
+        elif state.status in {TournamentStatus.REGISTRATION_OPEN, TournamentStatus.SEATED}:
+            status = "waiting"
+        elif any(
+            player.entrant_id == entrant.id for table in state.tables for player in table.players
+        ):
+            status = "active"
+        else:
+            status = "unavailable"
+        return PlayerTournamentResponse(
+            tournament_id=tournament_id,
+            tournament_status=state.status,
+            entrant_id=entrant.id,
+            status=status,
+            placement=standing.position if standing is not None else None,
+            standings=tuple(
+                PlayerStandingResponse(
+                    entrant_id=item.entrant_id,
+                    display_name=item.display_name,
+                    position=item.position,
+                )
+                for item in sorted(
+                    state.standings, key=lambda item: (item.position, item.entrant_id)
+                )
+            )
+            if state.status is TournamentStatus.COMPLETED
+            else (),
+        )
 
     async def player_state(
         self,
@@ -344,6 +397,11 @@ class HeadlessGameplayRuntime:
         entrant = await self._accounts.get_entrant(account_id, tournament_id)
         if entrant is None:
             raise GameplayAccessError("account is not entered in this tournament")
+        if entrant.kind is EntryKind.HUMAN and tournament.state.status in {
+            TournamentStatus.REGISTRATION_OPEN,
+            TournamentStatus.SEATED,
+        }:
+            raise GameplayWaitingForStartError("Waiting for tournament to start")
         for table in tournament.state.tables:
             for player in table.players:
                 if player.entrant_id == entrant.id:
@@ -453,7 +511,7 @@ class HeadlessGameplayRuntime:
             completed=snapshot.completed,
             decision=decision,
             turn=turn,
-            hand_result=natural_hand_result(snapshot),
+            hand_result=natural_hand_result(snapshot, viewer_entrant_id=player.entrant_id),
         )
 
     def _hand_needs_dispatch(self, table_id: str, hand_number: int) -> bool:

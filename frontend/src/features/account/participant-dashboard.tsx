@@ -14,6 +14,8 @@ import {
   verifyBot,
 } from "./api";
 import styles from "./account.module.css";
+import { BotTestPanel } from "./bot-test-panel";
+import { botSetupError } from "./bot-readiness";
 import type { Account, Entrant, EntrantKind } from "./types";
 
 interface ParticipantDashboardProps {
@@ -32,6 +34,28 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [bearerToken, setBearerToken] = useState<string | null>(null);
+  const [endpointRevision, setEndpointRevision] = useState(0);
+  const [verificationKnown, setVerificationKnown] = useState(true);
+
+  useEffect(() => {
+    if (!activeTournamentId || entrant?.kind !== "bot" || busy) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        const current = await getEntrant(activeTournamentId);
+        if (stopped) return;
+        setEntrant(current);
+        setVerificationKnown(true);
+      } catch {
+        if (stopped) return;
+        setVerificationKnown(false);
+      }
+      timer = setTimeout(refresh, 2000);
+    };
+    void refresh();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [activeTournamentId, entrant?.kind, busy]);
 
   useEffect(() => {
     let active = true;
@@ -61,7 +85,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
           router.replace("/account");
           return;
         }
-        setError("The account service is unavailable. Check that the API is running.");
+        setError("The competition website is unavailable. Try again shortly; if it continues, contact the organizer.");
       }
     };
     void load();
@@ -128,13 +152,16 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
     setError(null);
     setNotice(null);
     setBearerToken(null);
+    setVerificationKnown(false);
     try {
       const result = await configureBot(activeTournamentId, ip, port);
       setEntrant(result.entrant);
+      setVerificationKnown(true);
       setBearerToken(result.bearer_token);
+      setEndpointRevision((value) => value + 1);
       setNotice("Endpoint saved. Copy the token before leaving this page.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Endpoint setup failed.");
+      setError(requestError instanceof Error ? botSetupError(requestError.message) : "Endpoint setup failed. Try saving again.");
     } finally {
       setBusy(null);
     }
@@ -147,9 +174,9 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
     try {
       const verified = await verifyBot(activeTournamentId);
       setEntrant(verified);
-      setNotice("Bot verified and ready for seating.");
+      setNotice("Connection verified. Run Test My Bot separately to check poker decisions.");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Bot verification failed.");
+      setError(requestError instanceof Error ? botSetupError(requestError.message) : "Bot verification failed. Check the bot terminal and try again.");
     } finally {
       setBusy(null);
     }
@@ -256,9 +283,9 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
                     <h2>{entrant.kind === "human" ? "Human Entry" : "Bot Entry"}</h2>
                     <p className={styles.panelIntro}>Registration is attached to this account.</p>
                   </div>
-                  <span className={styles.statusPill} data-status={entrant.bot_verified_at ? "verified" : "registered"}>
+                  <span className={styles.statusPill} data-status={verificationKnown && entrant.bot_verified_at ? "verified" : "registered"}>
                     {entrant.kind === "bot"
-                      ? entrant.bot_verified_at ? "Verified" : "Needs Verification"
+                      ? !verificationKnown ? busy ? "Checking Status…" : "Status unavailable" : entrant.bot_verified_at ? "Verified" : "Needs Verification"
                       : "Registered"}
                   </span>
                 </div>
@@ -315,7 +342,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
                             />
                           </div>
                         </div>
-                        <button className={styles.secondaryButton} disabled={busy === "configure"} type="submit">
+                        <button className={styles.secondaryButton} disabled={Boolean(busy)} type="submit">
                           {busy === "configure" ? "Saving…" : entrant.bot_ip ? "Replace Endpoint & Token" : "Save Endpoint"}
                         </button>
                       </form>
@@ -333,7 +360,7 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
                       <div className={styles.panelActions}>
                         <button
                           className={styles.primaryButton}
-                          disabled={!entrant.bot_ip || busy === "verify"}
+                          disabled={!entrant.bot_ip || Boolean(busy)}
                           onClick={runVerification}
                           type="button"
                         >
@@ -341,6 +368,12 @@ export function ParticipantDashboard({ initialTournamentId }: ParticipantDashboa
                         </button>
                         <Link className={styles.textButton} href="/bot-guide">Protocol Guide</Link>
                       </div>
+                      <BotTestPanel
+                        entrant={entrant}
+                        verificationKnown={verificationKnown}
+                        key={`${entrant.id}-${entrant.bot_ip}-${entrant.bot_port}-${endpointRevision}`}
+                        tournamentId={activeTournamentId}
+                      />
                     </div>
                   )}
                   {notice && <p className={styles.successMessage}>{notice}</p>}

@@ -3,6 +3,7 @@ import type {
   AdminCommandResult,
   AdminTournamentState,
   BotEndpointRegistration,
+  BotTestReport,
   Entrant,
   EntrantKind,
   TournamentConfig,
@@ -109,6 +110,13 @@ export function configureBot(
 export function verifyBot(tournamentId: string): Promise<Entrant> {
   return request<Entrant>(`${entrantPath(tournamentId)}/bot-endpoint/verify`, {
     method: "POST",
+  });
+}
+
+export function testBot(tournamentId: string, signal?: AbortSignal): Promise<BotTestReport> {
+  return request<BotTestReport>(`${entrantPath(tournamentId)}/bot-endpoint/test`, {
+    method: "POST",
+    signal,
   });
 }
 

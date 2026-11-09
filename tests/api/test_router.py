@@ -11,6 +11,7 @@ from poker_bot_platform.api.models import (
     AdminTournamentStateResponse,
     PlayerActionRequest,
     PlayerTableStateResponse,
+    PlayerTournamentResponse,
 )
 from poker_bot_platform.api.router import GameplayControlService, create_api_router
 from poker_bot_platform.auth import (
@@ -27,6 +28,10 @@ from poker_bot_platform.domain import (
     TableStatus,
     TournamentConfig,
     TournamentStatus,
+)
+from poker_bot_platform.integration.runtime import (
+    GameplayNotFoundError,
+    GameplayWaitingForStartError,
 )
 
 ORIGIN = "http://testserver"
@@ -135,6 +140,16 @@ def make_services(
 class FakeGameplay:
     def __init__(self) -> None:
         self.actions: list[PlayerActionRequest] = []
+
+    async def player_tournament_state(
+        self, account_id: str, tournament_id: str
+    ) -> PlayerTournamentResponse:
+        return PlayerTournamentResponse(
+            tournament_id=tournament_id,
+            tournament_status=TournamentStatus.RUNNING,
+            entrant_id="human-entry",
+            status="active",
+        )
 
     async def player_state(
         self,
@@ -350,6 +365,34 @@ async def test_admin_routes_require_explicit_admin_role() -> None:
         assert started.status_code == 200
         assert started.json()["status"] == "running"
         assert [call[0] for call in admin.calls] == ["create", "get", "start"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("waiting", [True, False])
+async def test_table_not_found_distinguishes_waiting_from_unavailable(waiting: bool) -> None:
+    class UnavailableGameplay(FakeGameplay):
+        async def player_state(
+            self, account_id: str, tournament_id: str
+        ) -> PlayerTableStateResponse:
+            if waiting:
+                raise GameplayWaitingForStartError("Waiting for tournament to start")
+            raise GameplayNotFoundError("entrant does not have an active table")
+
+    app, _, auth, _ = make_services(UnavailableGameplay())
+    await auth.register("player@example.com", "long-enough-password")
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post(
+            "/api/v1/auth/login",
+            json={"email": "player@example.com", "password": "long-enough-password"},
+            headers=HEADERS,
+        )
+        response = await client.get("/api/v1/tournaments/event/table")
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        {"code": "tournament_not_started", "message": "Waiting for tournament to start"}
+        if waiting
+        else "entrant does not have an active table"
+    )
 
 
 @pytest.mark.asyncio
