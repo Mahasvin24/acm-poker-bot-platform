@@ -113,6 +113,7 @@ export const createBot = (name: string, ip: string, port: number) =>
   post<BotToken>("/bots", { name, ip, port });
 export const updateBot = (botId: string, changes: { name?: string; ip?: string; port?: number }) =>
   apiRequest<BotProfile>(botPath(botId), { method: "PATCH", body: JSON.stringify(changes) });
+export const getBotToken = (botId: string) => post<BotToken>(`${botPath(botId)}/token`);
 export const rotateBotToken = (botId: string) => post<BotToken>(`${botPath(botId)}/rotate-token`);
 export const verifyBot = (botId: string) => post<BotProfile>(`${botPath(botId)}/verify`);
 export const deleteBot = (botId: string) => apiRequest<void>(botPath(botId), { method: "DELETE" });

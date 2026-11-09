@@ -594,6 +594,24 @@
   gap: 16px;
 }
 
+.tokenField {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tokenField input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tokenField .secondaryButton,
+.tokenField .textButton {
+  flex: none;
+  width: auto;
+}
+
 .tokenBox {
   display: grid;
   gap: 12px;

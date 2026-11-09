@@ -14,6 +14,7 @@ import {
   deleteAccount,
   deleteBot,
   getBotDiagnostics,
+  getBotToken,
   getLeaderboard,
   listBots,
   logoutAccount,
@@ -33,34 +34,68 @@ import {
 } from "./types";
 import { useAccount } from "./use-account";
 
-function TokenReveal({ token, onDismiss }: { token: string; onDismiss: () => void }) {
-  const [copied, setCopied] = useState<string | null>(null);
-  const copy = async () => {
+function TokenField({ botId, initialToken }: { botId: string; initialToken: string | null }) {
+  const [token, setToken] = useState(initialToken);
+  const [visible, setVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const toggle = async () => {
+    if (visible) {
+      setVisible(false);
+      setMessage(null);
+      return;
+    }
+    setLoading(true);
+    setMessage(null);
     try {
-      if (!navigator.clipboard) throw new Error("unavailable");
-      await navigator.clipboard.writeText(token);
-      setCopied("Copied. Paste it into your bot as BOT_TOKEN.");
-    } catch {
-      setCopied("Select the token and copy it manually.");
+      if (!token) setToken((await getBotToken(botId)).bearer_token);
+      setVisible(true);
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Could not load your token. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const copy = async () => {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      setMessage("Copied! Paste it into your starter as BOT_TOKEN.");
+    } catch {
+      setMessage("Select the token in the field and copy it.");
+    }
+  };
+
   return (
-    <div className={styles.tokenBox}>
-      <span className={styles.tokenLabel}>Shown once · Save this bearer token</span>
-      <code translate="no">{token}</code>
-      <div className={styles.tokenActions}>
-        <button className={styles.copyButton} onClick={() => void copy()} type="button">Copy Token</button>
-        <button className={styles.textButton} onClick={onDismiss} type="button">I saved it</button>
+    <div className={styles.field}>
+      <label htmlFor={`token-${botId}`}>Bot token</label>
+      <div className={styles.tokenField}>
+        <input
+          autoComplete="off"
+          id={`token-${botId}`}
+          readOnly
+          spellCheck={false}
+          type={visible ? "text" : "password"}
+          value={visible && token ? token : "hidden-token"}
+          aria-describedby={`token-help-${botId}`}
+        />
+        <button aria-controls={`token-${botId}`} aria-pressed={visible} className={styles.secondaryButton} disabled={loading} onClick={() => void toggle()} type="button">
+          {loading ? "Loading…" : visible ? "Hide" : "Show"}
+        </button>
+        {visible && <button className={styles.textButton} onClick={() => void copy()} type="button">Copy</button>}
       </div>
-      {copied && <p className={styles.fieldHint}>{copied}</p>}
+      <p className={styles.fieldHint} id={`token-help-${botId}`}>Paste this into your starter as BOT_TOKEN, then start your bot.</p>
+      {message && <p className={styles.fieldHint} role="status">{message}</p>}
     </div>
   );
 }
 
-function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<void> }) {
+function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToken: string | null; onChange: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(initialToken);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
@@ -126,10 +161,9 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
       </div>
       <div className={styles.connectionStatus} aria-live="polite" aria-busy={testing} data-state={testing ? "pending" : testPassed ? "success" : testFailure ? "error" : "pending"}>
         <strong>{testing ? "Checking health and token…" : testPassed ? "Connection test passed" : testFailure ? "Connection test failed" : "Finish setup, then test your bot"}</strong>
-        <p>{testing ? "Contacting your bot from the event server." : testPassed ? "The starter health check passed and your token was accepted. Your bot is ready to join a match." : testFailure ?? "Save all three fields, set BOT_TOKEN in your starter, and start the bot before testing."}</p>
+        <p>{testing ? "Contacting your bot from the event server." : testPassed ? "Your bot is responding and the token works. You’re ready to join a match!" : testFailure ?? "Fill in your bot’s details, copy the token into your starter, and fire it up. Then give it a test."}</p>
         {testPassed && bot.verified_at && !testing && <p>Last passed: <time dateTime={bot.verified_at}>{new Date(bot.verified_at).toLocaleString()}</time>. Test again after restarting your bot or changing networks.</p>}
       </div>
-      {token && <TokenReveal onDismiss={() => setToken(null)} token={token} />}
       {saved && <p className={styles.successMessage} role="status">Bot settings saved. Test the connection if you changed the IP or port.</p>}
       <form className={styles.form} onSubmit={saveEndpoint}>
         <p className={styles.fieldHint}>All three fields are required: bot name, LAN IP address, and port.</p>
@@ -150,7 +184,6 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
           </div>
         </fieldset>
         <p className={styles.fieldHint}>Saved to your account. Changing the IP or port requires a new connection test. Your token stays the same.</p>
-        {!token && <p className={styles.fieldHint}>Token saved securely · Shown only when issued. Use New Token if you lost your copy.</p>}
         {editing && (
           <div className={styles.panelActions}>
             <button className={styles.secondaryButton} disabled={busy !== null} type="submit">Save</button>
@@ -158,6 +191,7 @@ function BotCard({ bot, onChange }: { bot: BotProfile; onChange: () => Promise<v
           </div>
         )}
       </form>
+      <TokenField key={token ?? bot.id} botId={bot.id} initialToken={token} />
       <p className={styles.fieldHint}>
         {editing ? "Save or cancel your edits to enable testing. " : ""}
         Test connection checks GET /v1/health, then verifies your token with POST /v1/verify.
@@ -342,7 +376,6 @@ export function ParticipantDashboard() {
   const [matches, setMatches] = useState<MyMatch[] | null>(null);
   const [bots, setBots] = useState<BotProfile[] | null>(null);
   const [newToken, setNewToken] = useState<{ botId: string; value: string } | null>(null);
-  const [addingBot, setAddingBot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
@@ -387,7 +420,6 @@ export function ParticipantDashboard() {
         Number(data.get("port")),
       );
       setNewToken({ botId: created.bot.id, value: created.bearer_token });
-      setAddingBot(false);
       form.reset();
       await refresh();
     } catch (reason) {
@@ -449,6 +481,7 @@ export function ParticipantDashboard() {
                 <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
             </section>}
+            {account.participant_kind !== "bot" && <>
             <ProfileCard
               account={account}
               onChange={async () => {
@@ -457,6 +490,7 @@ export function ParticipantDashboard() {
               }}
             />
             <PasswordCard />
+            </>}
             {leaderboard && leaderboard.length > 0 && (
               <section className={styles.sidebarCard}>
                 <h2>Event leaderboard</h2>
@@ -480,16 +514,13 @@ export function ParticipantDashboard() {
                   <p className={styles.sectionLabel}>Bots</p>
                   <h2>Bot configuration</h2>
                   <p className={styles.panelIntro}>
-                    All three fields are required. Save your settings to get a token, start your bot, then test the connection.{" "}
+                    All three fields are required. One account, one bot. Save your settings, copy the token into your starter, and try a connection test.{" "}
                     <Link href="/bot-guide">Read the protocol guide</Link>.
                   </p>
                 </div>
               </div>
               {bots === null ? <p className={styles.panelIntro}>Loading saved bots…</p> : <>
-              {bots.length > 0 && !addingBot && (
-                <button className={styles.secondaryButton} onClick={() => setAddingBot(true)} type="button">Add another bot</button>
-              )}
-              {(bots.length === 0 || addingBot) && <form className={styles.form} onSubmit={(event) => void addBot(event)}>
+              {bots.length === 0 && <form className={styles.form} onSubmit={(event) => void addBot(event)}>
                 <div className={styles.inlineFields}>
                   <div className={styles.field}>
                     <label htmlFor="bot-name">Bot name (required)</label>
@@ -507,14 +538,12 @@ export function ParticipantDashboard() {
                 <p className={styles.fieldHint}>A successful connection test is required before joining a match. Use your laptop’s address on the event Wi-Fi, not localhost. Port 8001 matches both starters. Saving generates the BOT_TOKEN your starter needs.</p>
                 <div className={styles.panelActions}>
                   <button className={styles.secondaryButton} disabled={busy} type="submit">{busy ? "Saving…" : "Save bot & get token"}</button>
-                  {addingBot && <button className={styles.textButton} disabled={busy} onClick={() => setAddingBot(false)} type="button">Cancel</button>}
                 </div>
               </form>}
               {error && <p className={styles.formError} role="alert">{error}</p>}
               <div className={styles.botList}>
                 {bots.map((bot) => <div key={bot.id}>
-                  {newToken?.botId === bot.id && <TokenReveal onDismiss={() => setNewToken(null)} token={newToken.value} />}
-                  <BotCard bot={bot} onChange={refresh} />
+                  <BotCard bot={bot} initialToken={newToken?.botId === bot.id ? newToken.value : null} onChange={refresh} />
                 </div>)}
               </div>
               </>}
