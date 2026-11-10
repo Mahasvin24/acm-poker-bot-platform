@@ -20,6 +20,8 @@ class BotPath(StrEnum):
     HEALTH = "/v1/health"
     VERIFY = "/v1/verify"
     ACTION = "/v1/action"
+    GAME_START = "/v1/game/start"
+    GAME_END = "/v1/game/end"
 
 
 def validate_bot_endpoint(

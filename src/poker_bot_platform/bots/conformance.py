@@ -14,6 +14,8 @@ from poker_bot_platform.bots.models import (
     BotActionRequest,
     BotLegalAction,
     FinalStack,
+    GameEndRequest,
+    GameStartRequest,
     MatchContext,
     PotAward,
     PreviousHand,
@@ -122,7 +124,30 @@ async def run_conformance(
         health = await gateway.health(endpoint)
         challenge = generate_verification_challenge()
         verification = await gateway.verify(endpoint, token, challenge)
+        start = await gateway.start_game(
+            endpoint,
+            token,
+            GameStartRequest(
+                protocol=BOT_PROTOCOL_VERSION,
+                match_id="conformance",
+                table_id="table-1",
+                entrant_id="conformance-bot",
+                starting_stack=20_000,
+                blinds=BlindState(small_blind=100, big_blind=200, big_blind_ante=0),
+            ),
+        )
         action = await gateway.request_action(endpoint, token, conformance_request())
+        end = await gateway.end_game(
+            endpoint,
+            token,
+            GameEndRequest(
+                protocol=BOT_PROTOCOL_VERSION,
+                match_id="conformance",
+                table_id="table-1",
+                entrant_id="conformance-bot",
+                status="cancelled",
+            ),
+        )
     return {
         "health": health is not None,
         "verified": verification.verified,
@@ -132,6 +157,10 @@ async def run_conformance(
         "action_accepted": not action.used_fallback,
         "action": action.action.action.value,
         "action_failure": action.failure_reason.value if action.failure_reason else None,
+        "game_start_acknowledged": start.verified,
+        "game_start_failure": start.failure_reason.value if start.failure_reason else None,
+        "game_end_acknowledged": end.verified,
+        "game_end_failure": end.failure_reason.value if end.failure_reason else None,
     }
 
 

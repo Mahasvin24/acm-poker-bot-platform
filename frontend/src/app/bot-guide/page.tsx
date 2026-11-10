@@ -5,7 +5,7 @@ import styles from "@/features/account/account.module.css";
 
 export const metadata: Metadata = {
   title: "Bot Protocol Guide | ACM Poker",
-  description: "Build a poker bot: three HTTP endpoints, one JSON request per decision.",
+  description: "Build a poker bot: three required HTTP endpoints, plus optional match lifecycle hooks.",
 };
 
 const sampleRequest = `{
@@ -140,6 +140,25 @@ export default function BotGuidePage() {
                 <div><span className={styles.sectionLabel}>Decisions</span><h3><code>POST /v1/action</code></h3></div>
                 <span>Return one action</span>
               </div>
+              <section className={styles.protocolSection}>
+                <div>
+                  <h3>Optional match state hooks</h3>
+                  <p className={styles.panelIntro}>
+                    Implement <code>POST /v1/game/start</code> to initialize state and
+                    <code> POST /v1/game/end</code> to read results and clean up.
+                    A game is the whole match, across all hands. Both hooks use your bearer
+                    token; respond with JSON echoing <code>protocol</code>, <code>match_id</code>,
+                    and <code>entrant_id</code>. End includes <code>status</code> and
+                    <code> standings</code>, and reaches eliminated bots too.
+                  </p>
+                  <p className={styles.panelIntro}>
+                    These are best effort notifications with a 5 second deadline. Key state by
+                    <code> match_id</code>, preserve it on repeated starts, and initialize it on
+                    action requests if absent. Pause/resume keeps the same game; a platform
+                    restart can repeat start. Missing hooks do not stop play.
+                  </p>
+                </div>
+              </section>
               <section className={styles.protocolSection}>
                 <div>
                   <h3>A complete request</h3>

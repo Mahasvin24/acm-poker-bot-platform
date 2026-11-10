@@ -9,6 +9,8 @@
 - **One bot per account; casual club event** — Keep setup simple for members building and testing bots. Each account owns one editable bot, reused across matches; migration `0007_one_bot_per_account` enforces the limit. The owner can show/hide their existing token through `POST /api/v1/bots/{id}/token` without rotating it. Keep bot settings compact and use the site’s existing typography and colors. Evidence: `auth/service.py::BotProfileService`, `frontend/src/features/account/participant-dashboard.tsx`. Last verified: 2026-11-11.
 - **Published bot schemas are generated** — `schemas/*.json` come from the Pydantic wire models via `python -m poker_bot_platform.bots.schemas`; a test fails if they are stale. Edit the models, never the JSON. Evidence: `src/poker_bot_platform/bots/schemas.py`, `tests/bots/test_models_and_security.py`. Last verified: 2026-10-18.
 
+- **Bot lifecycle hooks are advisory** — A game is a whole match. Scheduler-owned `/v1/game/start` and `/v1/game/end` use best effort, once-per-process attempts; restored active matches replay start, with no durable delivery or retry queue. Bot state must be keyed by `match_id`, initialized lazily on actions, and preserved on duplicate starts. Older bots may return 404 without losing gameplay readiness. Canonical payloads and limits: `examples/bots/README.md#game-lifecycle-and-state`. Evidence: `integration/runtime.py::_notify_game_lifecycle`, `tests/integration/test_bot_lifecycle.py`.
+
 ## Constraints and invariants
 
 - **Event environment** — Participants share the event Wi-Fi; bots run on their owners' laptops at registered numeric LAN addresses inside `POKER_PARTICIPANT_SUBNET`. Real-router reachability is still unproven. Evidence: `docs/event-runbook.md`. Last verified: 2026-10-18.

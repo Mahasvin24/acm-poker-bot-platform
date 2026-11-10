@@ -108,11 +108,13 @@ class MatchService:
     async def end(self, admin: Account, match_id: str) -> AdminMatchResponse:
         coordinator = await self._get(match_id)
         await self._run(coordinator.request_end(actor_id=admin.id))
+        self._runtime.wake()
         return await self._admin_view(coordinator.state)
 
     async def cancel(self, admin: Account, match_id: str) -> AdminMatchResponse:
         coordinator = await self._get(match_id)
         await self._run(coordinator.cancel(actor_id=admin.id))
+        self._runtime.wake()
         return await self._admin_view(coordinator.state)
 
     async def regenerate_code(self, admin: Account, match_id: str) -> AdminMatchResponse:

@@ -100,7 +100,9 @@ stay private in table views, hand results, and the bot `previous_hand` summary.
 
 ## Bot protocol v2
 
-Bots implement `GET /v1/health`, `POST /v1/verify`, and `POST /v1/action`. The platform accepts a
+Bots implement `GET /v1/health`, `POST /v1/verify`, and `POST /v1/action`. Optional
+`POST /v1/game/start` and `POST /v1/game/end` hooks initialize and clean up match state;
+see [delivery semantics](../examples/bots/README.md#game-lifecycle-and-state). The platform accepts a
 numeric LAN IP and bounded port and rejects hostnames, redirects, proxies, loopback, link-local,
 multicast, event infrastructure, and addresses outside `POKER_PARTICIPANT_SUBNET`.
 

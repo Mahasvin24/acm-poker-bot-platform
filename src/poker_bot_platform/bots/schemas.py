@@ -16,6 +16,9 @@ from poker_bot_platform.bots.models import (
     BOT_PROTOCOL_VERSION,
     BotActionRequest,
     BotActionResponse,
+    GameEndRequest,
+    GameResponse,
+    GameStartRequest,
     HealthResponse,
     VerifyRequest,
     VerifyResponse,
@@ -28,6 +31,9 @@ _SCHEMAS: dict[str, tuple[type[BaseModel], str, str]] = {
     "health-response": (HealthResponse, "Poker Bot Health Response", "validation"),
     "verify-request": (VerifyRequest, "Poker Bot Verify Request", "serialization"),
     "verify-response": (VerifyResponse, "Poker Bot Verify Response", "validation"),
+    "game-start-request": (GameStartRequest, "Poker Bot Game Start Request", "serialization"),
+    "game-end-request": (GameEndRequest, "Poker Bot Game End Request", "serialization"),
+    "game-response": (GameResponse, "Poker Bot Game Response", "validation"),
 }
 
 

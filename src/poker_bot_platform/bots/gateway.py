@@ -15,6 +15,9 @@ from poker_bot_platform.bots.models import (
     BotActionResponse,
     BotEndpoint,
     BotLegalAction,
+    GameEndRequest,
+    GameResponse,
+    GameStartRequest,
     HealthResponse,
     VerifyRequest,
     VerifyResponse,
@@ -152,6 +155,39 @@ class BotGateway:
         except _GatewayFailure as exc:
             return VerificationOutcome(verified=False, failure_reason=exc.reason)
         if response.challenge != challenge:
+            return VerificationOutcome(verified=False, failure_reason=FailureReason.STALE)
+        return VerificationOutcome(verified=True)
+
+    async def start_game(
+        self, endpoint: BotEndpoint, bearer_token: str, request: GameStartRequest
+    ) -> VerificationOutcome:
+        return await self._notify_game(endpoint, bearer_token, BotPath.GAME_START, request)
+
+    async def end_game(
+        self, endpoint: BotEndpoint, bearer_token: str, request: GameEndRequest
+    ) -> VerificationOutcome:
+        return await self._notify_game(endpoint, bearer_token, BotPath.GAME_END, request)
+
+    async def _notify_game(
+        self,
+        endpoint: BotEndpoint,
+        bearer_token: str,
+        path: BotPath,
+        request: GameStartRequest | GameEndRequest,
+    ) -> VerificationOutcome:
+        try:
+            response = await self._request_json(
+                endpoint=endpoint,
+                path=path,
+                method="POST",
+                bearer_token=bearer_token,
+                body=request,
+                response_model=GameResponse,
+                timeout_seconds=TOTAL_TIMEOUT_SECONDS,
+            )
+        except _GatewayFailure as exc:
+            return VerificationOutcome(verified=False, failure_reason=exc.reason)
+        if response.match_id != request.match_id or response.entrant_id != request.entrant_id:
             return VerificationOutcome(verified=False, failure_reason=FailureReason.STALE)
         return VerificationOutcome(verified=True)
 

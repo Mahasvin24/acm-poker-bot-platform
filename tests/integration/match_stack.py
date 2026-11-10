@@ -17,6 +17,7 @@ from poker_bot_platform.auth import (
     bootstrap_admin,
 )
 from poker_bot_platform.bots import BotActionRequest, BotGateway
+from poker_bot_platform.bots.models import GameEndRequest, GameResponse, GameStartRequest
 from poker_bot_platform.bots.reference import deterministic_reference_action
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.domain import EntryKind, MatchConfig
@@ -47,6 +48,7 @@ class FakeBotNetwork:
     delay_seconds: float = 0.0
     calls: Counter[tuple[str, str]] = field(default_factory=Counter)
     action_requests: list[dict[str, object]] = field(default_factory=list)
+    game_requests: list[dict[str, object]] = field(default_factory=list)
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host
@@ -63,6 +65,18 @@ class FakeBotNetwork:
             body = json.loads(request.content)
             return httpx.Response(
                 200, json={"protocol": "poker-bot.v2", "challenge": body["challenge"]}
+            )
+        if request.url.path in {"/v1/game/start", "/v1/game/end"}:
+            model = GameStartRequest if request.url.path.endswith("start") else GameEndRequest
+            event = model.model_validate_json(request.content)
+            self.game_requests.append(event.model_dump(mode="json"))
+            return httpx.Response(
+                200,
+                json=GameResponse(
+                    protocol="poker-bot.v2",
+                    match_id=event.match_id,
+                    entrant_id=event.entrant_id,
+                ).model_dump(),
             )
         self.action_requests.append(json.loads(request.content))
         bot_request = BotActionRequest.model_validate_json(request.content)

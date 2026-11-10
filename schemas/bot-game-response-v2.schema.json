@@ -1,0 +1,31 @@
+{
+  "$id": "https://acm.example/schemas/bot-game-response-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entrant_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Entrant Id",
+      "type": "string"
+    },
+    "match_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Match Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "poker-bot.v2",
+      "title": "Protocol",
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol",
+    "match_id",
+    "entrant_id"
+  ],
+  "title": "Poker Bot Game Response v2",
+  "type": "object"
+}

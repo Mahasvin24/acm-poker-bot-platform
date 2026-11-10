@@ -2,6 +2,7 @@
 import { createServer } from "node:http";
 
 const token = process.env.BOT_TOKEN ?? "replace-me";
+const games = new Map(); // State is isolated by match_id.
 const port = Number(process.env.PORT ?? 8001);
 
 function send(response, status, body) {
@@ -39,7 +40,28 @@ createServer(async (request, response) => {
       send(response, 200, { protocol: "poker-bot.v2", challenge: body.challenge });
       return;
     }
+    if (request.method === "POST" &&
+        ["/v1/game/start", "/v1/game/end"].includes(request.url)) {
+      if (body.protocol !== "poker-bot.v2" ||
+          typeof body.match_id !== "string" || !body.match_id ||
+          typeof body.entrant_id !== "string" || !body.entrant_id) {
+        send(response, 400, { error: "invalid game notification" });
+        return;
+      }
+      if (request.url === "/v1/game/start") {
+        // Duplicate starts must not erase accumulated state.
+        if (!games.has(body.match_id)) games.set(body.match_id, {});
+      } else {
+        games.delete(body.match_id);
+      }
+      send(response, 200, {
+        protocol: "poker-bot.v2", match_id: body.match_id, entrant_id: body.entrant_id,
+      });
+      return;
+    }
     if (request.method === "POST" && request.url === "/v1/action") {
+      // Recover when the bot restarts or misses the start notification.
+      if (!games.has(body.match_id)) games.set(body.match_id, {});
       const allowed = new Set(body.legal_actions.map((item) => item.action));
       const action = allowed.has("check") ? "check" : allowed.has("call") ? "call" : "fold";
       send(response, 200, {

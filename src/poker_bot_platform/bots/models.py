@@ -310,3 +310,33 @@ class VerifyResponse(WireModel):
 class HealthResponse(WireModel):
     protocol: Protocol
     status: Literal["ready"]
+
+
+class GameStartRequest(WireModel):
+    protocol: Protocol
+    match_id: WireIdentifier
+    table_id: WireIdentifier
+    entrant_id: WireIdentifier
+    starting_stack: StrictInt = Field(gt=0)
+    blinds: BlindState
+
+
+class GameStanding(WireModel):
+    entrant_id: WireIdentifier
+    position: StrictInt = Field(ge=1, le=6)
+    final_stack: StrictInt = Field(ge=0)
+
+
+class GameEndRequest(WireModel):
+    protocol: Protocol
+    match_id: WireIdentifier
+    table_id: WireIdentifier
+    entrant_id: WireIdentifier
+    status: Literal["completed", "cancelled"]
+    standings: tuple[GameStanding, ...] = ()
+
+
+class GameResponse(WireModel):
+    protocol: Protocol
+    match_id: WireIdentifier
+    entrant_id: WireIdentifier

@@ -1,7 +1,7 @@
 # Participant bot protocol (`poker-bot.v2`)
 
 A bot is a small HTTP server you run on your own laptop on the event network. The platform
-calls it whenever your seat has a decision. Every bot hosts three fixed endpoints on its
+calls it whenever your seat has a decision. The protocol has five fixed endpoints on its
 registered LAN IP and port:
 
 | Endpoint | Auth | Purpose |
@@ -9,6 +9,8 @@ registered LAN IP and port:
 | `GET /v1/health` | none | Return `{"protocol":"poker-bot.v2","status":"ready"}`. |
 | `POST /v1/verify` | bearer token | Echo the `challenge` you receive. |
 | `POST /v1/action` | bearer token | Return one legal action before `deadline_at`. |
+| `POST /v1/game/start` | bearer token | Initialize state for a match (optional). |
+| `POST /v1/game/end` | bearer token | Consume results and clear match state (optional). |
 
 Authenticated requests carry `Authorization: Bearer <token>`. The token is shown once when you
 create the bot under **My Bots**; rotating it or changing the address requires verifying again.
@@ -47,6 +49,67 @@ python -m poker_bot_platform.bots.conformance \
   --ip 192.168.1.42 --port 8001 --token paste-token-here \
   --participant-subnet 192.168.0.0/16
 ```
+
+## Game lifecycle and state
+
+A **game means the whole match**, across all of its hands. The platform attempts
+`POST /v1/game/start` for every seated bot before the first action. Pause/resume does not
+start a new game. A restored active match sends start again after a platform restart.
+
+Start body:
+
+```json
+{
+  "protocol": "poker-bot.v2",
+  "match_id": "m-example",
+  "table_id": "m-example-table",
+  "entrant_id": "e-bot",
+  "starting_stack": 20000,
+  "blinds": { "small_blind": 100, "big_blind": 200, "big_blind_ante": 0 }
+}
+```
+
+`starting_stack` and `blinds` are the match's opening configuration, including on replay.
+`entrant_id` identifies your bot in action requests' public seats.
+
+When the match completes (naturally or after an admin end request), the platform attempts
+`POST /v1/game/end` for **all original bots**, including eliminated ones. Cancelling a started
+match sends end with `status: "cancelled"`; cancelling a lobby sends neither hook.
+Elimination alone does not send end. End body:
+
+```json
+{
+  "protocol": "poker-bot.v2",
+  "match_id": "m-example",
+  "table_id": "m-example-table",
+  "entrant_id": "e-bot",
+  "status": "completed",
+  "standings": [
+    { "entrant_id": "e-bot", "position": 1, "final_stack": 40000 },
+    { "entrant_id": "e-other", "position": 2, "final_stack": 0 }
+  ]
+}
+```
+
+Cancelled matches may have incomplete or empty standings; they are not final rankings.
+Both hooks return HTTP 200 with `Content-Type: application/json` and the same acknowledgement:
+
+```json
+{ "protocol": "poker-bot.v2", "match_id": "m-example", "entrant_id": "e-bot" }
+```
+
+Hooks use the same bearer token, LAN restrictions, 500 ms connection timeout, 5 second total
+timeout, and payload limits as actions. They are **optional, best effort notifications**:
+failures are logged by the platform, do not count as action failures, and do not stop play.
+There is one attempt per bot/event per platform process, without retries or durable delivery.
+Existing bots returning 404 keep playing. The conformance runner reports hook results but
+requires only health, verification, and action success to pass.
+
+Key state by `match_id`, make both hooks idempotent, and lazily initialize on `/v1/action` too.
+A repeated start must preserve accumulated state. A restart, network failure, or quick
+cancellation can leave a bot seeing end without start, or missing end entirely. Use expiry
+or bounded storage for abandoned match state; end is a cleanup opportunity, not a delivery
+guarantee. These hooks do not command the platform to start or stop a match.
 
 ## A complete action request
 

@@ -29,7 +29,14 @@ from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.bots import BotEndpoint, BotGateway
 from poker_bot_platform.bots.factory import previous_hand_from_snapshot
 from poker_bot_platform.bots.messages import explain_failure
-from poker_bot_platform.bots.models import MatchContext, PreviousHand
+from poker_bot_platform.bots.models import (
+    BlindState,
+    GameEndRequest,
+    GameStanding,
+    GameStartRequest,
+    MatchContext,
+    PreviousHand,
+)
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.coordinator import (
     ActorDecisionFailure,
@@ -174,6 +181,7 @@ class MatchRuntime:
         self._away: set[str] = set()
         self._bot_stats: dict[str, BotStats] = {}
         self._profiles: dict[str, tuple[BotProfile | None, float]] = {}
+        self._game_notifications: set[tuple[str, str, str]] = set()
         self._wake: Callable[[], None] = lambda: None
 
     def set_wake_callback(self, wake: Callable[[], None]) -> None:
@@ -285,6 +293,7 @@ class MatchRuntime:
                     return
 
     async def _step(self, match: MatchCoordinator) -> bool:
+        await self._notify_game_lifecycle(match.state)
         state = match.state
         table = state.table
         if state.status not in _DRIVING_STATUSES or table is None or table.quarantined:
@@ -316,6 +325,91 @@ class MatchRuntime:
         runtime.backoff_seconds = 0.0
         runtime.retry_at = None
         return progressed
+
+    async def _notify_game_lifecycle(self, state: MatchState) -> None:
+        # Scheduler-owned, best effort hooks. Match/entrant IDs make replay after a
+        # process restart safe for idempotent bot handlers. Never send start for a
+        # terminal match or hooks for a lobby that never acquired a table.
+        if state.table is None:
+            return
+        terminal = state.status in {MatchStatus.COMPLETED, MatchStatus.CANCELLED}
+        event = "end" if terminal else "start"
+        pending = []
+        for entry in state.entries:
+            key = (state.match_id, entry.entry_id, event)
+            if entry.kind is not EntryKind.BOT or key in self._game_notifications:
+                continue
+            self._game_notifications.add(key)
+            pending.append(self._notify_game_entry(state, entry, terminal))
+        if pending:
+            # Each bot has its own deadline; six slow hooks cost one deadline.
+            await asyncio.gather(*pending)
+
+    async def _notify_game_entry(
+        self, state: MatchState, entry: MatchEntry, terminal: bool
+    ) -> None:
+        assert state.table is not None
+        try:
+            profile = await self._profile(entry.bot_profile_id) if entry.bot_profile_id else None
+            if profile is None or profile.verified_at is None:
+                return
+            token = self._token_store.decrypt(profile.bot_token_ciphertext)
+            endpoint = BotEndpoint(ip=ip_address(profile.bot_ip), port=profile.bot_port)
+            if terminal:
+                outcome = await self._gateway.end_game(
+                    endpoint,
+                    token,
+                    GameEndRequest(
+                        protocol="poker-bot.v2",
+                        match_id=state.match_id,
+                        table_id=state.table.table_id,
+                        entrant_id=entry.entry_id,
+                        status=(
+                            "cancelled" if state.status is MatchStatus.CANCELLED else "completed"
+                        ),
+                        standings=tuple(
+                            GameStanding(
+                                entrant_id=standing.entry_id,
+                                position=standing.position,
+                                final_stack=standing.final_stack,
+                            )
+                            for standing in state.standings
+                        ),
+                    ),
+                )
+            else:
+                level = state.config.level(1)
+                outcome = await self._gateway.start_game(
+                    endpoint,
+                    token,
+                    GameStartRequest(
+                        protocol="poker-bot.v2",
+                        match_id=state.match_id,
+                        table_id=state.table.table_id,
+                        entrant_id=entry.entry_id,
+                        starting_stack=state.config.starting_stack,
+                        blinds=BlindState(
+                            small_blind=level.small_blind,
+                            big_blind=level.big_blind,
+                            big_blind_ante=level.big_blind_ante,
+                        ),
+                    ),
+                )
+            if not outcome.verified:
+                logger.warning(
+                    "bot game notification failed",
+                    extra={
+                        "match": state.match_id,
+                        "entry": entry.entry_id,
+                        "event": "end" if terminal else "start",
+                        "reason": outcome.failure_reason,
+                    },
+                )
+        except Exception:
+            logger.exception(
+                "bot game notification failed",
+                extra={"match": state.match_id, "entry": entry.entry_id},
+            )
 
     async def _step_table(
         self,

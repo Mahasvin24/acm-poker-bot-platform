@@ -224,6 +224,8 @@ Both examples expose:
 - `GET /v1/health`
 - `POST /v1/verify`
 - `POST /v1/action`
+- `POST /v1/game/start` (optional match-state initialization)
+- `POST /v1/game/end` (optional results and cleanup)
 
 Confirm that the bot is listening from the bot machine:
 

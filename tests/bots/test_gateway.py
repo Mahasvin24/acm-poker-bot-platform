@@ -260,3 +260,50 @@ async def test_verification_requires_exact_challenge_echo() -> None:
         outcome = await gateway.verify(ENDPOINT, TOKEN, challenge)
     assert not outcome.verified
     assert outcome.failure_reason is FailureReason.STALE
+
+
+@pytest.mark.parametrize("event", ["start", "end"])
+@pytest.mark.parametrize("result", ["ok", "stale", "missing", "timeout"])
+async def test_game_hooks_are_authenticated_bounded_and_validate_acknowledgements(
+    event: str, result: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from poker_bot_platform.bots.models import BlindState, GameEndRequest, GameStartRequest
+
+    monkeypatch.setattr("poker_bot_platform.bots.gateway.TOTAL_TIMEOUT_SECONDS", 0.01)
+    identifiers = dict(
+        protocol="poker-bot.v2", match_id="match", table_id="table", entrant_id="bot"
+    )
+    start = GameStartRequest(
+        **identifiers, starting_stack=20_000,
+        blinds=BlindState(small_blind=100, big_blind=200, big_blind_ante=0),
+    )
+    end = GameEndRequest(**identifiers, status="completed")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == f"/v1/game/{event}"
+        assert request.method == "POST"
+        assert request.headers["authorization"] == f"Bearer {TOKEN}"
+        assert json.loads(request.content)["entrant_id"] == "bot"
+        if result == "missing":
+            return httpx.Response(404)
+        if result == "timeout":
+            await asyncio.sleep(1)
+        return httpx.Response(200, json={
+            "protocol": "poker-bot.v2", "match_id": "wrong" if result == "stale" else "match",
+            "entrant_id": "bot",
+        })
+
+    async with BotGateway(
+        participant_subnet=ip_network("192.168.0.0/16"),
+        transport=httpx.MockTransport(handler),
+    ) as gateway:
+        outcome = (
+            await gateway.start_game(ENDPOINT, TOKEN, start) if event == "start"
+            else await gateway.end_game(ENDPOINT, TOKEN, end)
+        )
+    expected = {
+        "ok": None, "stale": FailureReason.STALE,
+        "missing": FailureReason.HTTP_STATUS, "timeout": FailureReason.TIMEOUT,
+    }[result]
+    assert outcome.verified is (result == "ok")
+    assert outcome.failure_reason == expected
