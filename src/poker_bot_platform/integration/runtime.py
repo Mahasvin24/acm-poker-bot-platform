@@ -540,7 +540,7 @@ class MatchRuntime:
 
         async def probed(pending: PendingDecision, snapshot: HandSnapshot) -> PlayerAction:
             # A bot that keeps failing is probed briefly first so a dead process costs
-            # half a second per decision instead of the full three-second deadline.
+            # half a second per decision instead of the full five-second deadline.
             if await gateway.health(endpoint, timeout_seconds=probe_seconds) is None:
                 raise ActorDecisionFailure(FailureReason.CONNECTION)
             return await actor(pending, snapshot)

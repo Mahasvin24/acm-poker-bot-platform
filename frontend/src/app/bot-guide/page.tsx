@@ -70,7 +70,7 @@ const sampleResponse = `{
 }`;
 
 const failures: [string, string][] = [
-  ["timeout", "No complete answer within 3 seconds (500 ms to connect)."],
+  ["timeout", "No complete answer within 5 seconds (500 ms to connect)."],
   ["connection", "Wrong IP or port, bot not running, or a firewall blocking the port."],
   ["http_status", "A non-2xx status. 401 usually means a stale token."],
   ["content_type", "Missing Content-Type: application/json."],
@@ -170,7 +170,7 @@ export default function BotGuidePage() {
                     and records why. Your recent decisions and these reasons appear under
                     <strong> My Bots → Diagnostics</strong>. After three connection failures in a
                     row, the platform probes <code>/v1/health</code> briefly before each decision
-                    instead of waiting the full three seconds.
+                    instead of waiting the full five seconds.
                   </p>
                 </div>
                 <ul className={styles.protocolList}>

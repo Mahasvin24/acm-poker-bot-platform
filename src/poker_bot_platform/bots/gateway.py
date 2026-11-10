@@ -26,7 +26,7 @@ from poker_bot_platform.domain.models import ActionType, FailureReason, PlayerAc
 REQUEST_LIMIT_BYTES = 64 * 1024
 RESPONSE_LIMIT_BYTES = 4 * 1024
 CONNECT_TIMEOUT_SECONDS = 0.5
-TOTAL_TIMEOUT_SECONDS = 3.0
+TOTAL_TIMEOUT_SECONDS = 5.0
 
 ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 

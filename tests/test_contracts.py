@@ -17,7 +17,7 @@ def test_default_match_contract() -> None:
     assert config.starting_stack == 20_000
     assert (config.small_blind, config.big_blind) == (100, 200)
     assert not config.escalates
-    assert BOT_ACTION_TIMEOUT_MS == 3_000
+    assert BOT_ACTION_TIMEOUT_MS == 5_000
     assert BOT_CONNECT_TIMEOUT_MS == 500
 
 

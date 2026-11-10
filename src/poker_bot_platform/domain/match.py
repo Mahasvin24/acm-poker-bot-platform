@@ -4,7 +4,7 @@ from pydantic import Field, model_validator
 
 from poker_bot_platform.domain.models import ContractModel
 
-BOT_ACTION_TIMEOUT_MS = 3_000
+BOT_ACTION_TIMEOUT_MS = 5_000
 BOT_CONNECT_TIMEOUT_MS = 500
 
 

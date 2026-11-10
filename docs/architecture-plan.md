@@ -107,7 +107,7 @@ multicast, event infrastructure, and addresses outside `POKER_PARTICIPANT_SUBNET
 Action requests include the public table, the acting player's hole cards, legal actions, the
 current hand's action history with streets, match context (hand number, level, players
 remaining, next blinds), and a public summary of the previous hand. Live calls use a 500 ms
-connect timeout, a three-second decision deadline, no retry, a 64 KiB request ceiling, and a
+connect timeout, a five-second decision deadline, no retry, a 64 KiB request ceiling, and a
 4 KiB response ceiling. All JSON objects reject extra properties, duplicate keys, wrong protocol
 versions, non-integer chip values, stale identifiers, wrong content types, and illegal actions.
 The schemas in `schemas/` are generated from the models by

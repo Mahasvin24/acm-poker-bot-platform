@@ -4,7 +4,7 @@ from poker_bot_platform.domain import FailureReason
 
 _EXPLANATIONS: dict[FailureReason, str] = {
     FailureReason.TIMEOUT: (
-        "Your bot did not answer within 3 seconds. Check that it is running and "
+        "Your bot did not answer within 5 seconds. Check that it is running and "
         "listening on the registered address and port."
     ),
     FailureReason.CONNECTION: (

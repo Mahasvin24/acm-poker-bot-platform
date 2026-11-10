@@ -194,7 +194,7 @@ async def test_player_reads_do_not_wait_for_a_slow_bot() -> None:
     assert not drive.done()
     assert during.turn is not None
     assert during.turn.kind is EntryKind.BOT
-    assert during.turn.duration_ms == 3_000
+    assert during.turn.duration_ms == 5_000
     await drive
 
 

@@ -146,7 +146,7 @@ the hand continues. The reason is recorded and shown to you under **My Bots → 
 
 | Reason | Typical cause |
 | --- | --- |
-| `timeout` | No complete response within 3 seconds of the request (500 ms to connect). |
+| `timeout` | No complete response within 5 seconds of the request (500 ms to connect). |
 | `connection` | Wrong IP or port, bot not running, or a firewall blocking the port. |
 | `http_status` | Non-2xx status; `401` usually means the token in your bot is stale. |
 | `content_type` | Missing `Content-Type: application/json`. |
