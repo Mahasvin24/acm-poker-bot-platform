@@ -19,6 +19,7 @@ class Account(AuthModel):
     participant_kind: EntryKind | None = None
     display_name: str | None = None
     deleted_at: datetime | None = None
+    looking_for_match_at: datetime | None = None
     created_at: datetime
 
 

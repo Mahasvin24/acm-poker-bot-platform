@@ -413,3 +413,29 @@ async def test_bot_settings_survive_edit_and_new_session_without_changing_token(
         assert token not in str(saved)
         stack.network.tokens["10.20.0.12"] = token
         assert (await client.post(f"/api/v1/bots/{bot_id}/verify")).status_code == 200
+
+
+async def test_players_signal_match_interest_and_admin_sees_latest_first(
+    app: FastAPI, stack: MatchStack, admin: httpx.AsyncClient
+) -> None:
+    async with signed_in(app, "human-interest@example.com", "human") as human, signed_in(
+        app, "bot-interest@example.com", "bot"
+    ) as bot:
+        before = (await human.get("/api/v1/auth/me")).json()
+        assert before["looking_for_match_at"] is None
+        first = (await human.post("/api/v1/auth/looking-for-match")).json()
+        assert first["looking_for_match_at"] == stack.clock().isoformat().replace("+00:00", "Z")
+        stack.clock.advance(10)
+        second = (await bot.post("/api/v1/auth/looking-for-match")).json()
+        accounts = (await admin.get("/api/v1/admin/accounts")).json()
+        assert [row["id"] for row in accounts[:2]] == [second["id"], first["id"]]
+        stack.clock.advance(5)
+        refreshed = (await human.post("/api/v1/auth/looking-for-match")).json()
+        assert refreshed["looking_for_match_at"] != first["looking_for_match_at"]
+        persisted = (await human.get("/api/v1/auth/me")).json()
+        assert persisted["looking_for_match_at"] == refreshed["looking_for_match_at"]
+        accounts = (await admin.get("/api/v1/admin/accounts")).json()
+        assert accounts[0]["id"] == first["id"]
+        assert (await human.get("/api/v1/admin/accounts")).status_code == 403
+    async with client_for(app) as guest:
+        assert (await guest.post("/api/v1/auth/looking-for-match")).status_code == 401

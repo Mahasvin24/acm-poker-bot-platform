@@ -38,6 +38,7 @@ class AuthRepository(Protocol):
     async def get_account_by_email(self, email: str) -> Account | None: ...
     async def get_account(self, account_id: str) -> Account | None: ...
     async def list_accounts(self) -> tuple[Account, ...]: ...
+    async def mark_looking_for_match(self, account_id: str, at: datetime) -> Account: ...
     async def set_password_hash(self, account_id: str, password_hash: str) -> Account: ...
     async def create_session(
         self, account_id: str, token_hash: str, expires_at: datetime
@@ -256,6 +257,14 @@ class InMemoryAuthRepository:
     async def delete_bot_profile(self, profile_id: str) -> None:
         if self.bot_profiles.pop(profile_id, None) is None:
             raise AuthNotFoundError("bot not found")
+
+    async def mark_looking_for_match(self, account_id: str, at: datetime) -> Account:
+        account = self.accounts.get(account_id)
+        if account is None or account.deleted_at is not None:
+            raise AuthNotFoundError("account not found")
+        updated = account.model_copy(update={"looking_for_match_at": at})
+        self.accounts[account_id] = updated
+        return updated
 
     async def update_account_profile(
         self, account_id: str, *, display_name: str | None

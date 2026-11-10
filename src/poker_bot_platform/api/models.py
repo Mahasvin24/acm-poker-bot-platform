@@ -82,6 +82,7 @@ class AccountResponse(ApiModel):
     career_chip_total: int = 0
     matches_finished: int = 0
     created_at: datetime
+    looking_for_match_at: datetime | None = None
 
     @classmethod
     def from_account(
@@ -97,6 +98,7 @@ class AccountResponse(ApiModel):
             role=account.role,
             participant_kind=account.participant_kind,
             display_name=account.display_name,
+            looking_for_match_at=account.looking_for_match_at,
             career_chip_total=career_chip_total,
             matches_finished=matches_finished,
             created_at=account.created_at,
@@ -121,6 +123,7 @@ class AdminAccountResponse(AccountResponse):
             role=account.role,
             participant_kind=account.participant_kind,
             display_name=account.display_name,
+            looking_for_match_at=account.looking_for_match_at,
             career_chip_total=career_chip_total,
             matches_finished=matches_finished,
             password_reset_requested=password_reset_requested,

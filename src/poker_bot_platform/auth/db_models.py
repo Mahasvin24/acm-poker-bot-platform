@@ -29,6 +29,7 @@ class AccountRow(Base):
     participant_kind: Mapped[str | None] = mapped_column(String(16))
     display_name: Mapped[str | None] = mapped_column(String(80))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    looking_for_match_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

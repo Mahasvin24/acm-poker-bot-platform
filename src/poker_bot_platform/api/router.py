@@ -205,6 +205,14 @@ def create_api_router(
             samesite="lax",
         )
 
+    @router.post(
+        "/auth/looking-for-match",
+        response_model=AccountResponse,
+        dependencies=mutation_guard,
+    )
+    async def looking_for_match(account: CurrentAccount) -> AccountResponse:
+        return await account_response(await _translate(auth.mark_looking_for_match(account)))
+
     @router.get("/auth/me", response_model=AccountResponse)
     async def me(account: CurrentAccount) -> AccountResponse:
         return await account_response(account)

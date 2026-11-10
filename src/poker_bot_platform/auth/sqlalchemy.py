@@ -249,6 +249,16 @@ class SqlAlchemyAuthRepository:
             row = await self._locked_profile(session, profile_id)
             await session.delete(row)
 
+    async def mark_looking_for_match(self, account_id: str, at: datetime) -> Account:
+        identifier = _uuid_or_none(account_id)
+        async with self._transaction() as session:
+            row = await session.get(AccountRow, identifier) if identifier else None
+            if row is None or row.deleted_at is not None:
+                raise AuthNotFoundError("account not found")
+            row.looking_for_match_at = at
+            await session.flush()
+            return self._account(row)
+
     async def update_account_profile(
         self, account_id: str, *, display_name: str | None
     ) -> Account:
@@ -454,6 +464,7 @@ class SqlAlchemyAuthRepository:
             participant_kind=EntryKind(row.participant_kind) if row.participant_kind else None,
             display_name=row.display_name,
             deleted_at=row.deleted_at,
+            looking_for_match_at=row.looking_for_match_at,
             created_at=row.created_at,
         )
 

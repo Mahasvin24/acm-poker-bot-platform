@@ -150,7 +150,15 @@ class AuthService:
         )
 
     async def list_accounts(self) -> tuple[Account, ...]:
-        return await self.repository.list_accounts()
+        accounts = await self.repository.list_accounts()
+        return tuple(sorted(
+            accounts,
+            key=lambda account: account.looking_for_match_at or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        ))
+
+    async def mark_looking_for_match(self, account: Account) -> Account:
+        return await self.repository.mark_looking_for_match(account.id, self._now())
 
     async def reset_password(self, account_id: str) -> str:
         """Set a temporary password, sign the account out everywhere, and return it once."""
