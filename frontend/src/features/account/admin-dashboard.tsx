@@ -23,6 +23,7 @@ import {
   type MatchConfig,
 } from "./types";
 import { useAccount } from "./use-account";
+import { PlayersPanel } from "./match-interest";
 
 function AccountsCard() {
   const [accounts, setAccounts] = useState<AdminAccount[] | null>(null);
@@ -240,6 +241,8 @@ export function AdminDashboard() {
             )}
           </aside>
 
+          <div className={styles.stack}>
+            <PlayersPanel />
           <section className={styles.panel}>
             <div className={styles.panelHead}>
               <div>
@@ -270,6 +273,7 @@ export function AdminDashboard() {
               </ul>
             )}
           </section>
+          </div>
         </div>
       </div>
     </main>

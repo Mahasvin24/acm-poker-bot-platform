@@ -14,6 +14,7 @@ export interface Account {
   role: Role;
   participant_kind: EntrantKind | null;
   display_name: string | null;
+  looking_for_match_at: string | null;
   career_chip_total: number;
   matches_finished: number;
   created_at: string;

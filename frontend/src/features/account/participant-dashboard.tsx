@@ -28,6 +28,7 @@ import {
   type MyMatch,
 } from "./types";
 import { useAccount } from "./use-account";
+import { LookingForMatchCard } from "./match-interest";
 
 function TokenField({ botId, initialToken }: { botId: string; initialToken: string | null }) {
   const [token, setToken] = useState(initialToken);
@@ -404,6 +405,7 @@ export function ParticipantDashboard() {
               <p>Codes look like K7Q-4PM.</p>
               <CodeEntry compact />
             </section>
+            <LookingForMatchCard account={account} />
             {account.participant_kind !== "bot" && <section className={styles.sidebarCard}>
               <h2>Practice</h2>
               <p>Play a full hand against three built-in bots. Nothing is saved.</p>

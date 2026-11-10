@@ -1042,6 +1042,99 @@
   padding: 24px;
 }
 
+.interestActions {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.interestStatus,
+.playerIdentity strong {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lookingDot {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin: 5px;
+  border-radius: 50%;
+  background: var(--portal-green);
+}
+
+.lookingDot::after {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid var(--portal-green);
+  border-radius: 50%;
+  content: "";
+  animation: lookingBroadcast 1.8s ease-out infinite;
+}
+
+@keyframes lookingBroadcast {
+  from { transform: scale(0.6); opacity: 0.8; }
+  to { transform: scale(1.6); opacity: 0; }
+}
+
+.playerFilter {
+  margin-top: 20px;
+}
+
+.playerList {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0;
+}
+
+.playerList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-bottom: 1px solid rgb(23 35 30 / 15%);
+}
+
+.playerIdentity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.playerIdentity small,
+.playerInterest time {
+  display: block;
+  margin-top: 6px;
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+
+.playerInterest {
+  text-align: right;
+  font-size: 12px;
+}
+
+.playerInterest[data-looking="true"] > span {
+  color: var(--portal-green);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .botDashboard .sidebar > .matchInterest { order: 1; }
+}
+
+@media (max-width: 620px) {
+  .playerList li { align-items: start; flex-direction: column; gap: 8px; }
+  .playerInterest { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lookingDot::after { animation: none; opacity: 0.5; }
+}
+
 .diagnosticsWindowHeader {
   display: flex;
   align-items: center;

@@ -85,6 +85,7 @@ export const registerAccount = (email: string, password: string, participantKind
   post<Account>("/auth/register", { email, password, participant_kind: participantKind });
 export const loginAccount = (email: string, password: string) =>
   post<Account>("/auth/login", { email, password });
+export const signalLookingForMatch = () => post<Account>("/auth/looking-for-match");
 export const logoutAccount = () => post<void>("/auth/logout");
 export const changePassword = (currentPassword: string, newPassword: string) =>
   post<Account>("/auth/password", { current_password: currentPassword, new_password: newPassword });
