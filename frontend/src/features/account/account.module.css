@@ -933,55 +933,55 @@
 }
 
 /* A compact settings page, using the site's existing type, surfaces and rules. */
-.botDashboard .header {
+:is(.botDashboard, .humanDashboard) .header {
   min-height: 56px;
 }
 
-.botDashboard .dashboard {
+:is(.botDashboard, .humanDashboard) .dashboard {
   padding-top: 16px;
   padding-bottom: 32px;
 }
 
-.botDashboard .dashboardIntro {
+:is(.botDashboard, .humanDashboard) .dashboardIntro {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   padding-bottom: 20px;
 }
 
-.botDashboard .dashboardIntro h1 {
+:is(.botDashboard, .humanDashboard) .dashboardIntro h1 {
   margin: 0;
   font-size: clamp(32px, 3.4vw, 46px);
   line-height: 1.05;
 }
 
-.botDashboard .dashboardIntro > p {
+:is(.botDashboard, .humanDashboard) .dashboardIntro > p {
   font-size: 14px;
   line-height: 1.5;
 }
 
-.botDashboard .workspace {
+:is(.botDashboard, .humanDashboard) .workspace {
   grid-template-columns: minmax(240px, 0.35fr) minmax(0, 1fr);
   gap: 24px;
   padding-top: 24px;
 }
 
-.botDashboard .panel {
+:is(.botDashboard, .humanDashboard) .panel {
   padding: 20px;
 }
 
-.botDashboard .panelHead {
+:is(.botDashboard, .humanDashboard) .panelHead {
   padding-bottom: 14px;
 }
 
-.botDashboard .panelHead h2 {
+:is(.botDashboard, .humanDashboard) .panelHead h2 {
   font-size: 30px;
 }
 
-.botDashboard .sectionLabel {
+:is(.botDashboard, .humanDashboard) .sectionLabel {
   margin-bottom: 8px;
 }
 
-.botDashboard .panelIntro {
+:is(.botDashboard, .humanDashboard) .panelIntro {
   margin-top: 10px;
   font-size: 13px;
   line-height: 1.5;
@@ -996,7 +996,7 @@
   gap: 12px;
 }
 
-.botDashboard .form {
+:is(.botDashboard, .humanDashboard) .form {
   margin-top: 14px;
   gap: 12px;
 }
@@ -1009,9 +1009,9 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(90px, 0.45fr);
 }
 
-.botDashboard .field input,
-.botDashboard .primaryButton,
-.botDashboard .secondaryButton {
+:is(.botDashboard, .humanDashboard) .field input,
+:is(.botDashboard, .humanDashboard) .primaryButton,
+:is(.botDashboard, .humanDashboard) .secondaryButton {
   min-height: 40px;
 }
 
@@ -1024,9 +1024,9 @@
 }
 
 @media (max-width: 620px) {
-  .botDashboard .dashboardIntro { grid-template-columns: 1fr; gap: 12px; }
+  :is(.botDashboard, .humanDashboard) .dashboardIntro { grid-template-columns: 1fr; gap: 12px; }
   .botDashboard .inlineFields { grid-template-columns: 1fr; }
-  .botDashboard .panel { padding: 16px; }
+  :is(.botDashboard, .humanDashboard) .panel { padding: 16px; }
 }
 
 /* Keep setup ahead of account utilities when the shared layout stacks. */
@@ -1036,6 +1036,74 @@
   .botDashboard .sidebar > * { width: 100%; order: 3; }
   .botDashboard .sidebar > :first-child { order: 1; }
   .botDashboard .stack { order: 2; width: 100%; }
+}
+
+/* The human profile has only join, match interest, and a scrollable history. */
+.humanDashboard {
+  height: 100svh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.humanDashboard .header { flex: none; }
+
+.humanDashboard .dashboard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 20px;
+}
+
+.humanDashboard .workspace {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.humanDashboard .sidebar { gap: 16px; align-content: start; }
+.humanDashboard .sidebarCard { padding: 18px; }
+.humanDashboard .sidebarCard h2 { font-size: 24px; }
+.humanDashboard .sidebarCard .form { gap: 12px; }
+.humanDashboard .stack { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.humanDashboard .stack > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.humanDashboard .panelHead { flex: none; }
+.humanDashboard .matchList { display: block; min-height: 0; overflow-y: auto; margin-top: 12px; }
+.humanDashboard .interestActions { margin-top: 14px; gap: 12px; }
+
+@media (max-width: 900px) and (min-width: 621px) {
+  .humanDashboard .workspace { grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr); }
+  .humanDashboard .sidebar { grid-template-columns: 1fr; }
+  .humanDashboard .dashboardIntro { grid-template-columns: 1fr; gap: 10px; }
+}
+
+@media (max-width: 900px) {
+  .humanDashboard .matchList li { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+  .humanDashboard .matchList li > div { grid-row: 1 / span 2; }
+  .humanDashboard .matchList li > span { grid-column: 2; grid-row: 1; justify-self: end; }
+  .humanDashboard .matchList li > a { grid-column: 2; grid-row: 2; min-height: 32px; width: auto; }
+}
+
+@media (max-width: 620px) {
+  .humanDashboard .dashboard { padding-top: 12px; padding-bottom: 12px; }
+  .humanDashboard .dashboardIntro { gap: 8px; padding-bottom: 12px; }
+  .humanDashboard .dashboardIntro h1 { font-size: 30px; }
+  .humanDashboard .workspace { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+  .humanDashboard .sidebar { gap: 12px; }
+  .humanDashboard .sidebarCard { padding: 14px; }
+  .humanDashboard .sidebarCard h2 { margin-bottom: 8px; font-size: 22px; }
+  .humanDashboard .sidebarCard p { line-height: 1.4; }
+  .humanDashboard .sidebarCard .form { gap: 8px; }
+  .humanDashboard .interestActions { margin-top: 10px; gap: 8px; }
+  .humanDashboard .stack { flex: 1; min-height: 120px; }
+  .humanDashboard .matchList li { padding: 12px 0; }
+}
+
+@media (max-height: 699px) {
+  .humanDashboard { height: auto; min-height: 100svh; }
+  .humanDashboard .matchList { max-height: 50svh; }
 }
 
 .diagnosticsWindow {

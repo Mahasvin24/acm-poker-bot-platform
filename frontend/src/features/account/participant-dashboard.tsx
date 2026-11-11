@@ -314,13 +314,13 @@ export function ParticipantDashboard() {
   const refresh = useCallback(async () => {
     const [nextMatches, nextBots, board] = await Promise.all([
       myMatches(),
-      listBots(),
-      getLeaderboard().catch(() => [] as LeaderboardEntry[]),
+      account?.participant_kind === "human" ? Promise.resolve([] as BotProfile[]) : listBots(),
+      account?.participant_kind === "human" ? Promise.resolve([] as LeaderboardEntry[]) : getLeaderboard().catch(() => [] as LeaderboardEntry[]),
     ]);
     setMatches(nextMatches);
     setBots(nextBots);
     setLeaderboard(board);
-  }, []);
+  }, [account?.participant_kind]);
 
   useEffect(() => {
     if (!account) return;
@@ -372,7 +372,7 @@ export function ParticipantDashboard() {
   const past = matches?.filter((item) => item.status === "completed" || item.status === "cancelled") ?? [];
 
   return (
-    <main className={`${styles.page} ${account.participant_kind === "bot" ? styles.botDashboard : ""}`} id="main-content">
+    <main className={`${styles.page} ${account.participant_kind === "bot" ? styles.botDashboard : account.participant_kind === "human" ? styles.humanDashboard : ""}`} id="main-content">
       <header className={styles.header}>
         <Link className={styles.wordmark} href="/">ACM / POKER</Link>
         <span className={styles.headerTitle}>{account.participant_kind === "bot" ? "Bot Dashboard" : "Player Dashboard"}</span>
@@ -406,14 +406,14 @@ export function ParticipantDashboard() {
               <CodeEntry compact />
             </section>
             <LookingForMatchCard account={account} />
-            {account.participant_kind !== "bot" && <section className={styles.sidebarCard}>
+            {account.participant_kind === null && <section className={styles.sidebarCard}>
               <h2>Practice</h2>
               <p>Play a full hand against three built-in bots. Nothing is saved.</p>
               <div className={styles.panelActions} style={{ marginTop: 16 }}>
                 <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
             </section>}
-            {account.participant_kind !== "bot" && <>
+            {account.participant_kind === null && <>
             <ProfileCard
               account={account}
               onChange={async () => {
@@ -423,7 +423,7 @@ export function ParticipantDashboard() {
             />
             <PasswordCard />
             </>}
-            {leaderboard && leaderboard.length > 0 && (
+            {account.participant_kind !== "human" && leaderboard && leaderboard.length > 0 && (
               <section className={styles.sidebarCard}>
                 <h2>Event leaderboard</h2>
                 <ol className={styles.standings}>
@@ -485,7 +485,7 @@ export function ParticipantDashboard() {
               <div className={styles.panelHead}>
                 <div>
                   <p className={styles.sectionLabel}>Matches</p>
-                  <h2>Your matches</h2>
+                  <h2>{account.participant_kind === "human" ? "Your match history" : "Your matches"}</h2>
                 </div>
               </div>
               {matches === null ? (
