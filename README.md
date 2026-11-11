@@ -73,6 +73,7 @@ BOT_TOKEN='token-from-my-bots' PORT=8001 node server.mjs
 ```
 
 See [`docs/setup.md`](docs/setup.md) for the complete local setup and checks,
+[`docs/building-a-bot.md`](docs/building-a-bot.md) for a step-by-step bot-building guide,
 [`docs/architecture-plan.md`](docs/architecture-plan.md) for the design,
 [`docs/event-runbook.md`](docs/event-runbook.md) for rehearsal and deployment,
 [`examples/bots/README.md`](examples/bots/README.md) for the public bot protocol, and
