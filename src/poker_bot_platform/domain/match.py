@@ -39,9 +39,13 @@ class MatchConfig(ContractModel):
     big_blind_ante: bool = False
     human_action_timeout_ms: int = Field(default=30_000, ge=5_000, le=300_000)
     blind_increase_minutes: int | None = Field(default=None, ge=1, le=120)
+    time_limit_minutes: int | None = Field(default=None, ge=1, le=1440)
+    hand_limit: int | None = Field(default=None, ge=1, le=10000)
 
     @model_validator(mode="after")
     def validate_blinds(self) -> MatchConfig:
+        if self.time_limit_minutes is not None and self.hand_limit is not None:
+            raise ValueError("choose a time limit or a round limit, not both")
         if self.small_blind >= self.big_blind:
             raise ValueError("small blind must be less than big blind")
         if self.big_blind * 2 > self.starting_stack:

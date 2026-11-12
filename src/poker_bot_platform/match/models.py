@@ -105,6 +105,7 @@ class MatchState(ContractModel):
     level_number: int = Field(default=1, ge=1)
     level_remaining_seconds: int | None = Field(default=None, ge=0)
     end_requested: bool = False
+    match_remaining_seconds: int | None = Field(default=None, ge=0)
     revision: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")

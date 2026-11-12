@@ -90,6 +90,9 @@ class MatchCoordinator:
             created_by=created_by,
             created_at=created_at,
             level_remaining_seconds=config.level_seconds,
+            match_remaining_seconds=(
+                config.time_limit_minutes * 60 if config.time_limit_minutes else None
+            ),
         )
         await store.create(state, AuditEntry(actor_id=created_by, command="create_match"))
         return cls(state, store)
@@ -248,23 +251,54 @@ class MatchCoordinator:
             raise ValueError("elapsed_seconds cannot be negative")
         async with self._lock:
             state = self._state
-            level_seconds = state.config.level_seconds
             if (
-                level_seconds is None
-                or state.level_remaining_seconds is None
-                or state.status not in {MatchStatus.RUNNING, MatchStatus.PAUSE_REQUESTED}
+                state.status not in {MatchStatus.RUNNING, MatchStatus.PAUSE_REQUESTED}
                 or elapsed_seconds == 0
             ):
                 return state
-            remaining = state.level_remaining_seconds - elapsed_seconds
-            level = state.level_number
-            while remaining <= 0:
-                level += 1
-                remaining += level_seconds
-            candidate = state.model_copy(
-                update={"level_number": level, "level_remaining_seconds": remaining}
-            )
+            updates: dict[str, object] = {}
+            level_seconds = state.config.level_seconds
+            if level_seconds is not None and state.level_remaining_seconds is not None:
+                remaining = state.level_remaining_seconds - elapsed_seconds
+                level = state.level_number
+                while remaining <= 0:
+                    level += 1
+                    remaining += level_seconds
+                updates.update(level_number=level, level_remaining_seconds=remaining)
+            if state.match_remaining_seconds is not None and state.match_remaining_seconds > 0:
+                remaining = max(0, state.match_remaining_seconds - elapsed_seconds)
+                updates["match_remaining_seconds"] = remaining
+                if remaining == 0:
+                    updates["end_requested"] = True
+            if not updates:
+                return state
+            candidate = state.model_copy(update=updates)
+            if (
+                candidate.end_requested
+                and candidate.table is not None
+                and not candidate.table.hand_in_progress
+            ):
+                candidate = self._finalize(candidate)
             return await self._save(candidate, actor_id, "advance_clock")
+
+    async def finish_before_deal(self, table_id: str) -> MatchState:
+        """The clock expired while a scheduled hand was waiting to be dealt."""
+        async with self._lock:
+            table = self._require_table(table_id)
+            if not self._state.end_requested:
+                return self._state
+            candidate = self._state.model_copy(
+                update={
+                    "table": table.model_copy(
+                        update={
+                            "hand_in_progress": False,
+                            "hand_number": max(0, table.hand_number - 1),
+                            "start_of_hand_stacks": {},
+                        }
+                    ),
+                }
+            )
+            return await self._save(self._finalize(candidate), "clock", "end_before_deal")
 
     async def record_hand_completed(
         self,
@@ -315,7 +349,14 @@ class MatchCoordinator:
                     "standings": (*state.standings, *standings),
                 }
             )
-            if len(remaining) <= 1 or candidate.end_requested:
+            if (
+                len(remaining) <= 1
+                or candidate.end_requested
+                or (
+                    state.config.hand_limit is not None
+                    and table.hand_number >= state.config.hand_limit
+                )
+            ):
                 candidate = self._finalize(candidate)
             elif candidate.status is MatchStatus.PAUSE_REQUESTED:
                 candidate = candidate.model_copy(update={"status": MatchStatus.PAUSED})

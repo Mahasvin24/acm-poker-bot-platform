@@ -330,6 +330,7 @@ class AdminMatchResponse(ApiModel):
     level_remaining_seconds: int | None
     end_requested: bool
     table_quarantined: bool
+    match_remaining_seconds: int | None = None
     created_at: datetime
     revision: int
 
@@ -433,6 +434,8 @@ class MatchContextResponse(ApiModel):
     players_remaining: int
     max_seats: int
     end_requested: bool
+    match_remaining_seconds: int | None = None
+    hand_limit: int | None = None
     standings: tuple[StandingResponse, ...]
 
 

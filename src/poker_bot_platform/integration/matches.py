@@ -475,6 +475,7 @@ class MatchService:
             level_remaining_seconds=state.level_remaining_seconds,
             end_requested=state.end_requested,
             table_quarantined=bool(state.table and state.table.quarantined),
+            match_remaining_seconds=state.match_remaining_seconds,
             created_at=state.created_at,
             revision=state.revision,
         )

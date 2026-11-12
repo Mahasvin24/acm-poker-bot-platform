@@ -432,6 +432,9 @@ class MatchRuntime:
             if snapshot is not None and not snapshot.completed:
                 logger.error("table has an unexpected unfinished hand", extra={"table": table})
                 return False
+            if match.state.end_requested:
+                await match.finish_before_deal(table.table_id)
+                return True
             if runtime.next_action_at is not None and now < runtime.next_action_at:
                 return False
             await match.dispatch_hand(coordinator)
@@ -898,5 +901,7 @@ def _match_context(state: MatchState) -> MatchContextResponse:
         players_remaining=state.players_remaining,
         max_seats=state.config.max_seats,
         end_requested=state.end_requested,
+        match_remaining_seconds=state.match_remaining_seconds,
+        hand_limit=state.config.hand_limit,
         standings=standing_responses(state),
     )

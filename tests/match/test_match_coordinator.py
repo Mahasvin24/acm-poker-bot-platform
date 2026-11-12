@@ -220,3 +220,79 @@ async def test_registry_allocates_codes_and_finds_open_matches() -> None:
     assert first.state.join_code != old_code
     assert await registry.find_by_code(old_code) is None
     assert [state.name for state in await registry.list_states()] == ["One", "Two"]
+
+
+async def test_time_limit_finishes_current_hand_and_survives_restore() -> None:
+    match, store = await lobby(MatchConfig(time_limit_minutes=5))
+    for name in ("A", "B"):
+        await match.join(human(name), actor_id=name)
+    await match.start(actor_id="admin")
+    await match.tick(299)
+    assert match.state.match_remaining_seconds == 1
+    restored = await MatchCoordinator.restore(match.state.match_id, store)
+    await restored.tick(1)
+    assert restored.state.end_requested
+    assert restored.state.status is MatchStatus.RUNNING
+    table = restored.state.table
+    assert table is not None
+    await restored.record_hand_completed(
+        table.table_id, {player.entry_id: player.stack for player in table.players}
+    )
+    assert restored.state.status is MatchStatus.COMPLETED
+    assert restored.state.table.hand_number == 1
+    assert len(restored.state.standings) == 2
+
+
+async def test_round_limit_finishes_exact_number_of_hands() -> None:
+    match, _ = await lobby(MatchConfig(hand_limit=2))
+    for name in ("A", "B"):
+        await match.join(human(name), actor_id=name)
+    await match.start(actor_id="admin")
+    for hand in (1, 2):
+        table = match.state.table
+        assert table is not None and table.hand_number == hand
+        await match.record_hand_completed(
+            table.table_id, {player.entry_id: player.stack for player in table.players}
+        )
+        assert match.state.status is (MatchStatus.RUNNING if hand == 1 else MatchStatus.COMPLETED)
+    assert match.state.table.hand_number == 2
+
+
+async def test_time_limit_freezes_while_paused() -> None:
+    match, _ = await lobby(MatchConfig(time_limit_minutes=5))
+    for name in ("A", "B"):
+        await match.join(human(name), actor_id=name)
+    await match.start(actor_id="admin")
+    await match.request_pause(actor_id="admin")
+    table = match.state.table
+    assert table is not None
+    await match.record_hand_completed(
+        table.table_id, {player.entry_id: player.stack for player in table.players}
+    )
+    await match.tick(600)
+    assert match.state.match_remaining_seconds == 300
+    await match.resume(actor_id="admin")
+    await match.tick(60)
+    assert match.state.match_remaining_seconds == 240
+
+
+async def test_expired_time_limit_does_not_deal_a_waiting_hand() -> None:
+    match, _ = await lobby(MatchConfig(time_limit_minutes=1))
+    for name in ("A", "B"):
+        await match.join(human(name), actor_id=name)
+    await match.start(actor_id="admin")
+    table = match.state.table
+    assert table is not None
+    await match.record_hand_completed(
+        table.table_id, {player.entry_id: player.stack for player in table.players}
+    )
+    assert match.state.table.hand_number == 2
+    await match.tick(60)
+    await match.finish_before_deal(table.table_id)
+    assert match.state.status is MatchStatus.COMPLETED
+    assert match.state.table.hand_number == 1
+
+
+def test_match_limits_are_mutually_exclusive() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        MatchConfig(time_limit_minutes=5, hand_limit=10)
