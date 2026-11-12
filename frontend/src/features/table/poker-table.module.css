@@ -1664,4 +1664,5 @@
 
 /* Reveal both rank and suit above the player panel in the admin broadcast. */
 .spectatorReveal .seatCards { margin-bottom: 4px; }
+.spectatorReveal .seatCards .card + .card { margin-left: 4px; }
 .spectatorReveal .foldedSeat { filter: none; opacity: 0.7; }
