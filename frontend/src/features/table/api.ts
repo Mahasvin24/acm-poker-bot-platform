@@ -7,8 +7,8 @@ export function getTableState(matchId: string, signal?: AbortSignal): Promise<Pl
   return apiRequest<PlayerTableState>(`/matches/${encodeURIComponent(matchId)}/table`, { signal });
 }
 
-export function getSpectatorState(matchId: string, signal?: AbortSignal): Promise<PlayerTableState> {
-  return apiRequest<PlayerTableState>(`/admin/matches/${encodeURIComponent(matchId)}/table`, {
+export function getSpectatorState(matchId: string, signal?: AbortSignal, revealCards = false): Promise<PlayerTableState> {
+  return apiRequest<PlayerTableState>(`/admin/matches/${encodeURIComponent(matchId)}/table${revealCards ? "?reveal_cards=true" : ""}`, {
     signal,
   });
 }

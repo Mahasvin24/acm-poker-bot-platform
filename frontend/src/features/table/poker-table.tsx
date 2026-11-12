@@ -15,6 +15,8 @@ interface PokerTableProps {
   mode?: "player" | "spectator";
   embedded?: boolean;
   exitHref?: string;
+  revealCards?: boolean;
+  fullScreen?: boolean;
 }
 
 interface AccessIssue {
@@ -56,7 +58,7 @@ function pollDelay(table: PlayerTableState): number {
   return 1_000;
 }
 
-export function PokerTable({ matchId, mode = "player", embedded = false, exitHref = "/dashboard" }: PokerTableProps) {
+export function PokerTable({ matchId, mode = "player", embedded = false, exitHref = "/dashboard", revealCards = false, fullScreen = false }: PokerTableProps) {
   const [table, setTable] = useState<PlayerTableState | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("syncing");
   const [issue, setIssue] = useState<AccessIssue | null>(null);
@@ -64,7 +66,8 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const interrupted = useRef(false);
-  const fetchState = mode === "spectator" ? getSpectatorState : getTableState;
+  const fetchState = useCallback((id: string, signal?: AbortSignal) =>
+    mode === "spectator" ? getSpectatorState(id, signal, revealCards) : getTableState(id, signal), [mode, revealCards]);
 
   useEffect(() => {
     let stopped = false;
@@ -165,6 +168,7 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
       connectionLabel={connection === "live" ? (mode === "spectator" ? "Spectating" : "Live") : connection}
       connectionTone={connection === "syncing" ? "reconnecting" : connection}
       embedded={embedded}
+      fullScreen={fullScreen}
       error={issue && issue.status !== 409 ? issue.message : null}
       exitHref={exitHref}
       notice={notice}

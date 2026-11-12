@@ -56,6 +56,7 @@ export interface PlayerSeat {
   eliminated: boolean;
   away?: boolean;
   hole_cards: string[];
+  win_probability?: number | null;
 }
 
 export interface PlayerAction {

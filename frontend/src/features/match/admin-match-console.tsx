@@ -15,7 +15,7 @@ import {
 import styles from "../account/account.module.css";
 import { MATCH_STATUS_LABELS, type AdminEntry, type AdminMatch } from "../account/types";
 import { useAccount } from "../account/use-account";
-import { PokerTable } from "../table/poker-table";
+import { SpectatorView } from "../table/spectator-view";
 import { formatChips, formatConfig, formatDuration, relativeTime } from "./format";
 
 function entryHealth(entry: AdminEntry, now: number): { tone: "ok" | "warn" | "muted"; text: string } {
@@ -251,8 +251,7 @@ export function AdminMatchConsole({ matchId }: { matchId: string }) {
 
         {match.status !== "lobby" && match.status !== "cancelled" && (
           <section className={styles.spectator} aria-label="Spectator view">
-            <p className={styles.sectionLabel}>Spectator view · hole cards hidden</p>
-            <PokerTable embedded exitHref="/admin" matchId={matchId} mode="spectator" />
+            <SpectatorView matchId={matchId} />
           </section>
         )}
       </div>

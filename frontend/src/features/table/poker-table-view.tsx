@@ -399,6 +399,7 @@ function SeatView({
         {showBacks && <><PlayingCard hidden /><PlayingCard hidden /></>}
       </div>
       <div className={styles.seatPanel}>
+        {seat.win_probability != null && <span className={styles.winOdds} aria-label={`${seat.display_name} estimated win odds ${seat.win_probability.toFixed(1)} percent`}>~{seat.win_probability.toFixed(1)}% win</span>}
         <div className={styles.seatNameRow}>
           <span className={`${styles.playerKind} ${seat.kind === "bot" ? styles.botBadge : styles.humanBadge}`}>
             <i aria-hidden="true">{seat.kind === "bot" ? "<>" : "●"}</i>
