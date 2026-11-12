@@ -32,6 +32,7 @@ import {
 } from "./types";
 import { useAccount } from "./use-account";
 import { LookingForMatchCard } from "./match-interest";
+import { InvitationInbox } from "./invitation-inbox";
 
 function TokenField({ botId, initialToken }: { botId: string; initialToken: string | null }) {
   const [token, setToken] = useState(initialToken);
@@ -407,7 +408,10 @@ export function ParticipantDashboard() {
         <div className={styles.workspace}>
           <aside className={styles.sidebar}>
             <section className={styles.sidebarCard}>
-              <h2>Join a match</h2>
+              <div className={styles.joinHeading}>
+                <h2>Join a match</h2>
+                <InvitationInbox account={account} />
+              </div>
               <p>Codes look like K7Q-4PM.</p>
               <CodeEntry compact />
             </section>

@@ -1,5 +1,6 @@
 import type {
   Account,
+  MatchInvitation,
   AdminAccount,
   AdminMatch,
   LeaderboardEntry,
@@ -86,6 +87,11 @@ export const registerAccount = (email: string, password: string, participantKind
   post<Account>("/auth/register", { email, password, participant_kind: participantKind });
 export const loginAccount = (email: string, password: string) =>
   post<Account>("/auth/login", { email, password });
+export const cancelLookingForMatch = () => apiRequest<Account>("/auth/looking-for-match", { method: "DELETE" });
+export const listInvitations = () => apiRequest<MatchInvitation[]>("/me/invitations");
+export const acceptInvitation = (matchId: string, displayName?: string) => post<MatchView>(`/matches/${encodeURIComponent(matchId)}/invitation/accept`, displayName ? { display_name: displayName } : {});
+export const declineInvitation = (matchId: string) => post<void>(`/matches/${encodeURIComponent(matchId)}/invitation/decline`);
+export const invitePlayer = (matchId: string, accountId: string) => post<AdminMatch>(`/admin/matches/${encodeURIComponent(matchId)}/invitations`, { account_id: accountId });
 export const signalLookingForMatch = () => post<Account>("/auth/looking-for-match");
 export const logoutAccount = () => post<void>("/auth/logout");
 export const changePassword = (currentPassword: string, newPassword: string) =>

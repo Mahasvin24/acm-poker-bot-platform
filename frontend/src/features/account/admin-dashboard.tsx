@@ -259,7 +259,7 @@ export function AdminDashboard() {
           </aside>
 
           <div className={styles.stack}>
-            <PlayersPanel />
+            <PlayersPanel matches={matches} />
           <section className={styles.panel}>
             <div className={styles.panelHead}>
               <div>

@@ -170,6 +170,15 @@ export interface AdminMatchSummary {
   created_at: string;
 }
 
+export interface MatchInvitation {
+  match_id: string;
+  match_name: string;
+  account_id: string;
+  status: "pending" | "accepted" | "declined";
+  created_at: string;
+  responded_at: string | null;
+}
+
 export interface AdminMatch {
   match_id: string;
   name: string;
@@ -177,6 +186,7 @@ export interface AdminMatch {
   join_code: string | null;
   config: MatchConfig;
   entries: AdminEntry[];
+  invitations?: MatchInvitation[];
   standings: Standing[];
   hand_number: number;
   match_remaining_seconds?: number | null;

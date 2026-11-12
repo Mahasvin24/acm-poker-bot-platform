@@ -1116,6 +1116,38 @@
   margin-top: 18px;
 }
 
+.interestButtons { display: flex; align-items: center; gap: 12px; }
+.interestButtons .primaryButton { flex: 1; width: auto; min-width: 0; }
+.interestButtons .textButton { flex: none; }
+
+.joinHeading,
+.invitationHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.joinHeading h2 { min-width: 0; }
+.inviteInboxButton { flex: none; padding: 0 10px; min-height: 32px; }
+.invitationDialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100svh - 48px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #9f998b;
+  background: var(--portal-paper);
+  color: var(--portal-ink);
+}
+.invitationDialog::backdrop { background: rgb(23 35 30 / 45%); }
+.invitationDialog h2 { margin: 0 0 16px; font: 400 28px/1.1 Georgia, serif; }
+.invitationDialog h3 { margin: 0; font: 400 24px/1.1 Georgia, serif; }
+.invitationItem { display: grid; gap: 16px; margin-top: 24px; padding-top: 20px; border-top: 1px solid rgb(23 35 30 / 22%); }
+.invitationDialog > .formError { margin-top: 16px; }
+.invitationDialog input { min-height: 40px; }
+.invitationDialog .panelActions > button { width: auto; }
+.sidebarCard .inviteInboxButton { width: auto; min-height: 32px; }
+
 .interestStatus,
 .playerIdentity strong {
   display: flex;

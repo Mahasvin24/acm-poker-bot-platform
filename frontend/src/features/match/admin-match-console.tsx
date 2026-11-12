@@ -15,6 +15,7 @@ import {
 import styles from "../account/account.module.css";
 import { MATCH_STATUS_LABELS, type AdminEntry, type AdminMatch } from "../account/types";
 import { useAccount } from "../account/use-account";
+import { PlayersPanel } from "../account/match-interest";
 import { SpectatorView } from "../table/spectator-view";
 import { formatChips, formatConfig, formatDuration, relativeTime } from "./format";
 
@@ -177,6 +178,8 @@ export function AdminMatchConsole({ matchId }: { matchId: string }) {
           {error && <span className={styles.formError} role="alert">{error}</span>}
         </section>
         )}
+
+        {match.status === "lobby" && <PlayersPanel matchId={matchId} />}
 
         <div className={styles.consoleGrid}>
           <section className={styles.panel}>
