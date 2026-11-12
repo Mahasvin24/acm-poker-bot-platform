@@ -727,7 +727,7 @@ export function PokerTableView({
   }, [table.decision]);
 
   return (
-    <div className={`${styles.shell} ${embedded ? styles.embeddedShell : ""} ${fullScreen ? styles.fullScreenShell : ""}`}>
+    <div className={`${styles.shell} ${embedded ? styles.embeddedShell : ""} ${fullScreen ? styles.fullScreenShell : ""} ${table.seats.some((seat) => seat.win_probability != null) ? styles.spectatorReveal : ""}`}>
       {!embedded && (
         <header className={styles.tableHeader}>
           <Link className={styles.wordmark} href="/">ACM / POKER</Link>
