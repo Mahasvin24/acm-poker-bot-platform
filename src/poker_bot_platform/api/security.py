@@ -35,12 +35,14 @@ class SameOriginGuard:
     """Reject browser cookie mutations that did not originate from this application."""
 
     def __init__(self, allowed_origin: str) -> None:
-        parsed = urlsplit(allowed_origin)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("allowed_origin must be an absolute HTTP(S) origin")
-        if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
-            raise ValueError("allowed_origin cannot contain a path, query, or fragment")
-        self.allowed_origin = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+        self.allowed_origins: set[str] = set()
+        for origin in allowed_origin.split(","):
+            parsed = urlsplit(origin.strip())
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                raise ValueError("allowed_origin must contain absolute HTTP(S) origins")
+            if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+                raise ValueError("allowed_origin cannot contain a path, query, or fragment")
+            self.allowed_origins.add(f"{parsed.scheme.lower()}://{parsed.netloc.lower()}")
 
     async def __call__(self, request: Request) -> None:
         if request.method in {"GET", "HEAD", "OPTIONS"}:
@@ -56,7 +58,7 @@ class SameOriginGuard:
         if (
             parsed.scheme not in {"http", "https"}
             or not parsed.netloc
-            or candidate != self.allowed_origin
+            or candidate not in self.allowed_origins
             or parsed.path not in {"", "/"}
             or parsed.query
             or parsed.fragment
