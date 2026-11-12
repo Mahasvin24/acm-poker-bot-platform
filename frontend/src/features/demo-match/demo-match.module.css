@@ -145,3 +145,10 @@
 .liveControls summary, .liveControls button { font: 600 12px/1.4 Arial, sans-serif; letter-spacing: normal; text-transform: none; }
 .liveControls > div { grid-template-columns: 1fr 1fr; }
 .empty button { font: 600 14px/1.4 Arial, sans-serif; letter-spacing: normal; text-transform: none; }
+
+/* Practice utilities get their own row, clear of the table's details button. */
+.livePage { --spectator-controls-height: 40px; }
+.liveControls { position: relative; inset: auto; width: 100%; margin: 0; border: 0; border-bottom: 1px solid #cfc9ba; box-shadow: none; }
+.liveControls summary { min-height: 39px; padding: 10px 20px; text-align: left; }
+.liveControls[open] { width: 100%; }
+.liveControls > div { max-width: 320px; }

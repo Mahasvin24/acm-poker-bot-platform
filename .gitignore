@@ -11,3 +11,6 @@ htmlcov/
 dist/
 build/
 
+
+# Local UI audit screenshots and browser artifacts
+output/playwright/

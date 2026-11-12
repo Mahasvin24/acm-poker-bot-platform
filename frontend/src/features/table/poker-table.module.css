@@ -462,43 +462,7 @@
   font-size: 11px;
 }
 
-.seatChips {
-  display: grid;
-  width: 100%;
-  padding: 4px 10px 6px;
-  background: #faf6ee;
-  border: 1px solid #b9c0b6;
-  border-top: 0;
-  border-radius: 0 0 4px 4px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.seatChips small {
-  font-size: 11px;
-  color: #526158;
-  font-weight: 400;
-}
-
-.streetBet {
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 5px);
-  transform: translateX(-50%);
-  padding: 2px 8px;
-  border-radius: 3px;
-  background: #fffaf1;
-  color: #17231e;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.seatPosition0 .streetBet {
-  top: auto;
-  bottom: calc(100% + 5px);
-}
-
-.viewerSeat .seatPanel, .viewerSeat .seatChips {
+.viewerSeat .seatPanel {
   border-color: var(--table-green);
 }
 
@@ -523,7 +487,7 @@
   display: none;
 }
 
-.foldedSeat .seatPanel, .foldedSeat .seatChips, .eliminatedSeat .seatPanel, .eliminatedSeat .seatChips {
+.foldedSeat .seatPanel, .eliminatedSeat .seatPanel {
   background: #e6e2d8;
 }
 
@@ -1168,21 +1132,11 @@
   .playerKind {
     font-size: 11px;
   }
-  .seatChips {
-    padding: 4px 6px;
-    font-size: 13px;
-  }
-  .seatChips small {
-    display: none;
-  }
   .seatPosition2, .seatPosition4 {
     top: 18%;
   }
   .seatPosition1, .seatPosition5 {
     bottom: 15%;
-  }
-  .streetBet {
-    font-size: 11px;
   }
   .card, .emptyCard {
     width: 32px;
@@ -1547,3 +1501,5 @@
     top: 12px;
   }
 }
+
+.turnCopy > strong, .turnBannerCopy h1 { overflow-wrap: anywhere; }

@@ -51,7 +51,7 @@ export function MatchRoom({ matchId }: { matchId: string }) {
   }, [account, match, matchId]);
 
   if (match && match.status !== "lobby") {
-    return <PokerTable matchId={matchId} />;
+    return <PokerTable key={matchId} matchId={matchId} />;
   }
 
   const leave = async (entryId: string) => {
@@ -97,7 +97,7 @@ export function MatchRoom({ matchId }: { matchId: string }) {
             <div className={styles.panelHead}>
               <div>
                 <p className={styles.sectionLabel}>{MATCH_STATUS_LABELS[match.status]}</p>
-                <h2>{match.name}</h2>
+                <h1 className={styles.subheading}>{match.name}</h1>
                 <p className={styles.panelIntro}>{formatConfig(match.config)}</p>
               </div>
               <span className={styles.statusPill} data-status="lobby">

@@ -238,12 +238,10 @@ function SeatView({
   anchorSeat,
   actingSeat,
   buttonSeat,
-  revealedCount,
   result,
   latestAction,
   playerCount,
   winner,
-  showdownIndex,
   bigBlind,
   maxStack,
   maxCommitted,
@@ -253,12 +251,10 @@ function SeatView({
   anchorSeat: number;
   actingSeat: number | null;
   buttonSeat: number;
-  revealedCount: number;
   result: HandResult | null;
   latestAction?: string;
   playerCount: number;
   winner: boolean;
-  showdownIndex: number;
   bigBlind: number;
   maxStack: number;
   maxCommitted: number;
@@ -281,11 +277,9 @@ function SeatView({
         seat.folded ? styles.foldedSeat : "",
         seat.eliminated ? styles.eliminatedSeat : "",
         winner ? styles.winnerSeat : "",
-        resultHand ? styles.showdownSeat : "",
         playerCount === 2 && seat.seat !== anchorSeat ? styles.headsUpOpponent : "",
         playerCount === 4 ? styles[`fourSeatPosition${relativePosition}`] : "",
       ].join(" ")}
-      style={resultHand ? ({ "--showdown-delay": `${Math.max(0, showdownIndex) * 650}ms` } as CSSProperties) : undefined}
     >
       {seat.seat === actingSeat && (
         <span
@@ -298,10 +292,9 @@ function SeatView({
         </span>
       )}
       <div className={styles.seatCards} aria-label={`${seat.display_name}'s cards`}>
-        {cards.slice(0, revealedCount).map((card) => (
+        {cards.slice(0, 2).map((card) => (
           <PlayingCard card={card} highlighted={best.has(card)} key={card} />
         ))}
-        {cards.slice(revealedCount).map((_, index) => <PlayingCard hidden key={index} />)}
         {showBacks && <><PlayingCard hidden /><PlayingCard hidden /></>}
       </div>
       <div className={styles.seatPanel}>
@@ -717,25 +710,27 @@ export function PokerTableView({
                 ))}
               </div>
             </div>
-            {table.seats.map((seat) => (
-              <SeatView
+            {table.seats.map((seat) => {
+              const action = recentActions.find((item) => item.seat === seat.seat && (!item.street || item.street === table.street));
+              const latestAction = action
+                ? `${actionLabel(action, table.action_history)}${action.amount_to !== null ? ` ${formatChips(action.amount_to)}` : ""}`
+                : undefined;
+              return <SeatView
                 seat={seat}
                 viewerSeat={table.viewer_seat}
                 anchorSeat={anchorSeat}
                 actingSeat={turn?.seat ?? null}
                 buttonSeat={table.button_seat}
-                revealedCount={2}
                 result={result}
-                latestAction={(() => { const action = recentActions.find((item) => item.seat === seat.seat && (!item.street || item.street === table.street)); return action ? `${actionLabel(action, table.action_history)}${action.amount_to !== null ? ` ${formatChips(action.amount_to)}` : ""}` : undefined; })()}
+                latestAction={latestAction}
                 playerCount={table.seats.length}
                 winner={winnerSeats.has(seat.seat)}
-                showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
                 bigBlind={table.big_blind}
                 maxStack={maxStack}
                 maxCommitted={maxCommitted}
                 key={seat.seat}
-              />
-            ))}
+              />;
+            })}
             <FinishOverlay exitHref={exitHref} table={table} />
           </div>
 

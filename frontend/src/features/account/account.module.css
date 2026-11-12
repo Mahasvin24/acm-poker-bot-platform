@@ -109,9 +109,9 @@
 .stat span,
 .statusPill,
 .tokenLabel {
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 600 12px/1.4 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .eyebrow {
@@ -1580,3 +1580,6 @@
 @media (min-width: 901px) {
   .dashboardIntro h1 { margin-top: 0; font-size: 36px; line-height: 1.1; }
 }
+
+/* Expanded account tools should grow the page instead of clipping the workspace. */
+.humanDashboard:has(.sidebar details[open]) { height: auto; min-height: 100svh; }

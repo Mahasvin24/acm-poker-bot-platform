@@ -30,7 +30,8 @@ export function CodeEntry({ initialCode = "", compact = false }: { initialCode?:
     event.preventDefault();
     const normalized = normalizeCode(code);
     if (!CODE_PATTERN.test(normalized)) {
-      setError("Codes are six letters and digits, like K7Q-4PM. They never use 0, 1, I, L, O, or U.");
+      setError("Enter the six-character code from the organizer, like K7Q-4PM.");
+      event.currentTarget.querySelector("input")?.focus();
       return;
     }
     setError(null);
@@ -147,7 +148,7 @@ export function JoinMatch({ code }: { code: string }) {
             <div className={styles.panelHead}>
               <div>
                 <p className={styles.sectionLabel}>Code {formatCode(normalized)}</p>
-                <h2>{preview.name}</h2>
+                <h1 className={styles.subheading}>{preview.name}</h1>
                 <p className={styles.panelIntro}>{formatConfig(preview.config)}</p>
               </div>
               <span className={styles.statusPill} data-status={preview.joinable ? "lobby" : "closed"}>
@@ -174,7 +175,7 @@ export function JoinMatch({ code }: { code: string }) {
                     <label className={styles.kindChoice}>
                       <input checked={kind === "bot"} name="kind" onChange={() => setKind("bot")} type="radio" value="bot" />
                       <strong>My bot</strong>
-                      <span>{readyBots.length ? "Seat one of your verified bots." : "Verify a bot under My Bots first."}</span>
+                      <span>{readyBots.length ? "Join with your verified bot." : "Test your bot connection on the dashboard first."}</span>
                     </label>
                   </div>
                 </fieldset>}

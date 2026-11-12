@@ -17,6 +17,10 @@
 
 ## Constraints and invariants
 
+- **Gameplay visual cues are intentional** — Preserve physical chip stacks, forest felt, green human/rust bot seat accents, patterned card backs and warm turn/action highlights. The user rejected a flatter iteration that removed these cues. Reduce repeated copy and tutorial chrome while keeping the betting controls visible at 1280×720. Evidence: `frontend/src/features/table/poker-table-view.tsx`, `poker-table.module.css`, `docs/ux-audit.md`. Last verified: 2026-11-12.
+- **Client presentation must not delay a live decision** — Reveal board streets only inside an available server presentation window with a polling margin; render current cards immediately on reconnect or a human decision. Snapshot ordering is shared by polling, conflict recovery and the demo. Evidence: `frontend/src/features/table/presentation.ts`, `frontend/tests/table-presentation.test.mjs`.
+
+
 - **Event environment** — Participants share the event Wi-Fi; bots run on their owners' laptops at registered numeric LAN addresses inside `POKER_PARTICIPANT_SUBNET`. Real-router reachability is still unproven. Evidence: `docs/event-runbook.md`. Last verified: 2026-10-18.
 - **Single process** — PostgreSQL is the durable authority and exactly one FastAPI worker is supported; rate limits, bot diagnostics, away state, and pacing are in-process memory and reset on restart. Evidence: `config.py::single_worker_only`, `api/rate_limit.py`. Last verified: 2026-10-18.
 - **Scheduler is the only table driver** — `MatchRuntime.drive` runs only from `GameplayScheduler`, one background task per match; read endpoints must never drive tables or wait on bot I/O. Commands apply under the table coordinator lock and then call `wake()`. Evidence: `integration/scheduler.py`, `test_player_reads_do_not_wait_for_a_slow_bot`. Last verified: 2026-10-18.

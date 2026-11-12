@@ -1,5 +1,7 @@
 import { BotDiagnosticsWindow } from "@/features/account/bot-diagnostics-window";
 
+export const metadata = { title: "Bot diagnostics | ACM Poker" };
+
 export default async function DiagnosticsPage({
   params,
 }: {

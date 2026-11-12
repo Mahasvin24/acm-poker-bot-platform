@@ -138,7 +138,7 @@ function BotCard({ bot, initialToken, onChange, matchStatus }: { bot: BotProfile
       </div>
       <div className={styles.connectionStatus} aria-live="polite" aria-busy={testing} data-state={testing ? "pending" : testPassed ? "success" : testFailure ? "error" : "pending"}>
         <strong>{testing ? "Checking health and token…" : testPassed ? "Connection test passed" : testFailure ? "Connection test failed" : "Finish setup, then test your bot"}</strong>
-        <p>{testing ? "Contacting your bot from the event server." : testPassed ? "Your bot is responding and the token works. You’re ready to join a match!" : testFailure ?? "Fill in your bot’s details, copy the token into your starter, and fire it up. Then give it a test."}</p>
+        <p>{testing ? "Contacting your bot from the event server." : testPassed ? "Connection verified. You can join a match." : testFailure ?? "Save your bot’s address, add its token to your starter, then start the bot and test the connection."}</p>
         {testPassed && bot.verified_at && !testing && <p>Last passed: <time dateTime={bot.verified_at}>{new Date(bot.verified_at).toLocaleString()}</time>.</p>}
       </div>
       <form className={styles.form} id={`bot-settings-${bot.id}`} onSubmit={saveEndpoint}>
@@ -203,6 +203,7 @@ function ProfileCard({
   account: import("./types").Account;
   onChange: () => Promise<void>;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const saveName = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -232,13 +233,13 @@ function ProfileCard({
     if (!window.confirm("Delete your account permanently? This cannot be undone.")) return;
     try {
       await deleteAccount(password);
-      window.location.href = "/account";
+      router.replace("/account");
     } catch (reason) {
       setMessage({ ok: false, text: reason instanceof Error ? reason.message : "Delete failed." });
     }
   };
   return (
-    <details className={styles.sidebarCard} open={account.participant_kind !== "bot"}>
+    <details className={styles.sidebarCard}>
       <summary className={styles.summaryToggle}>Your account</summary>
       <div className={styles.form}>
         <p className={styles.fieldHint}>
@@ -412,7 +413,6 @@ export function ParticipantDashboard() {
                 <h2>Join a match</h2>
                 <InvitationInbox account={account} />
               </div>
-              
               <CodeEntry compact />
             </section>
             <LookingForMatchCard account={account} />
@@ -423,7 +423,6 @@ export function ParticipantDashboard() {
                 <Link className={styles.textButton} href="/demo">Open the demo ↗</Link>
               </div>
             </section>}
-            {account.participant_kind === null && <>
             <ProfileCard
               account={account}
               onChange={async () => {
@@ -432,7 +431,6 @@ export function ParticipantDashboard() {
               }}
             />
             <PasswordCard />
-            </>}
             {account.participant_kind !== "human" && leaderboard && leaderboard.length > 0 && (
               <section className={styles.sidebarCard}>
                 <h2>Event leaderboard</h2>

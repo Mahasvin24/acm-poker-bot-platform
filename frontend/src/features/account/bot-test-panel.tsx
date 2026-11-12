@@ -40,12 +40,10 @@ export function BotTestPanel({ bot, matchStatus }: { bot: BotProfile; matchStatu
           <li key={step.label}><strong>{step.label}</strong><p>{step.detail}</p></li>
         ))}
       </ul>
-      <p className={styles.panelIntro}>This checklist is guidance; tests do not change match eligibility. Test results are from this page only and are cleared when you leave or replace your endpoint.</p>
+      <p className={styles.panelIntro}>Results clear when you leave this page or change the endpoint. A passing connection test is still required to join.</p>
       <h3 id={`bot-testing-${bot.id}`}>Test My Bot</h3>
       <p className={styles.panelIntro}>
-        Run six connection and poker-decision checks before your bot enters a live match. Allow up to 35 seconds.
-        Tests use synthetic decisions and do not mark your bot verified or enter it into a game.
-        Any advertised legal action passes; choosing a raise is optional.
+        Run six connection and decision checks (up to 35 seconds). These checks do not join a match or verify your connection for entry.
       </p>
       <button className={styles.secondaryButton} disabled={!bot.ip || !bot.port || busy || (matchStatus !== null && !["lobby", "completed", "cancelled"].includes(matchStatus))} onClick={() => void run()} type="button">
         {busy ? "Testing Bot…" : "Test My Bot"}

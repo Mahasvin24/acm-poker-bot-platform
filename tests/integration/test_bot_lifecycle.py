@@ -45,7 +45,12 @@ async def test_hooks_bracket_play_and_reach_every_bot(admin_end: bool) -> None:
         assert all(event["status"] == "completed" for event in ends)
         assert all(len(event["standings"]) == 2 for event in ends)
         assert all("hole_cards" not in str(event) for event in stack.network.game_requests)
-        assert stack.network.action_requests
+        # Ending before the first scheduler drive deliberately skips the deal.
+        # Both lifecycle hooks still reach every bot, without requesting a move.
+        if admin_end:
+            assert not stack.network.action_requests
+        else:
+            assert stack.network.action_requests
         # Additional scheduler polls cannot resend hooks.
         await stack.drive(match_id)
         assert len(stack.network.game_requests) == 4

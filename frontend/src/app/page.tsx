@@ -20,9 +20,9 @@ const timeline = [
   },
   {
     number: "02",
-    title: "Run the check",
+    title: "Test your bot",
     copy: "Bot builders save their connection settings and test their bot on the dashboard.",
-    timing: "Before event",
+    timing: "Bots only",
   },
   {
     number: "03",
@@ -32,7 +32,7 @@ const timeline = [
   },
   {
     number: "04",
-    title: "Play it down",
+    title: "Play the match",
     copy: "Play until the time or hand limit, or until one player remains. Remaining stacks determine the standings.",
     timing: "Live",
     live: true,
@@ -154,7 +154,6 @@ export default function Home() {
         <section className="page-section format" id="format">
           <div className="container format-inner">
             <div className="format-head reveal">
-              <p className="chapter">02 · Choose your seat</p>
               <h2>
                 Same table.
                 <br />
@@ -213,7 +212,6 @@ export default function Home() {
         <section className="page-section timeline" id="timeline">
           <div className="container timeline-inner">
             <div className="timeline-title reveal">
-              <p className="chapter">03 · From signup to showdown</p>
               <h2>
                 How to join
               </h2>
@@ -242,7 +240,6 @@ export default function Home() {
           </div>
           <div className="container faq-inner">
             <div className="faq-intro reveal">
-              <p className="chapter">04 · Before you ask</p>
               <h2>
                 Questions
               </h2>

@@ -1,5 +1,7 @@
 import { AuthPage } from "@/features/account/auth-page";
 
+export const metadata = { title: "Account | ACM Poker" };
+
 export default async function AccountPage({
   searchParams,
 }: {

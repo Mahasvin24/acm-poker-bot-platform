@@ -62,6 +62,7 @@ export function AuthPage({ next }: AuthPageProps) {
     const confirmation = String(form.get("confirmation") ?? "");
     if (mode === "register" && password !== confirmation) {
       setError("Passwords do not match. Re-enter the confirmation.");
+      event.currentTarget.querySelector<HTMLInputElement>("#account-confirmation")?.focus();
       return;
     }
     setPending(true);

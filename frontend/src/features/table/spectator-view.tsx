@@ -63,7 +63,7 @@ export function SpectatorView({ matchId, standalone = false }: { matchId: string
         {reveal && <p className={styles.spectatorNote}>Estimated win odds if everyone still in the hand reaches showdown. Ties split the percentage.</p>}
         {error && <p className={styles.formError} role="alert">{error}</p>}
       </div>
-      <PokerTable key={reveal ? "revealed" : "hidden"} embedded fullScreen={standalone || fullscreen} exitHref="/admin" matchId={matchId} mode="spectator" revealCards={reveal} />
+      <PokerTable key={`${matchId}-${reveal ? "revealed" : "hidden"}`} embedded fullScreen={standalone || fullscreen} exitHref="/admin" matchId={matchId} mode="spectator" revealCards={reveal} />
     </section>
   );
 }
