@@ -19,6 +19,7 @@ from poker_bot_platform.domain import (
 from poker_bot_platform.match.models import (
     AuditEntry,
     MatchEntry,
+    MatchInvitation,
     MatchPlayer,
     MatchState,
     MatchTable,
@@ -105,10 +106,24 @@ class MatchCoordinator:
     def state(self) -> MatchState:
         return self._state
 
-    async def join(self, entry: MatchEntry, *, actor_id: str) -> MatchState:
+    async def join(
+        self, entry: MatchEntry, *, actor_id: str, accept_invitation: bool = False
+    ) -> MatchState:
         async with self._lock:
             self._require_status(MatchStatus.LOBBY, "the match has already started")
             state = self._state
+            invitation = next(
+                (item for item in state.invitations if item.account_id == actor_id), None
+            )
+            if accept_invitation:
+                if invitation is None or entry.account_id != actor_id:
+                    raise MatchError("invitation not found")
+                if invitation.status == "accepted" and any(
+                    item.account_id == actor_id for item in state.entries
+                ):
+                    return state
+                if invitation.status != "pending":
+                    raise MatchError("this invitation is no longer pending")
             if len(state.entries) >= state.config.max_seats:
                 raise MatchError("the match is full")
             if entry.kind is EntryKind.HUMAN and any(
@@ -125,8 +140,66 @@ class MatchCoordinator:
                 for item in state.entries
             ):
                 raise MatchError("that display name is already taken in this match")
-            candidate = state.model_copy(update={"entries": (*state.entries, entry)})
-            return await self._save(candidate, actor_id, "join_match")
+            invitations = tuple(
+                item.model_copy(update={"status": "accepted", "responded_at": entry.joined_at})
+                if item.account_id == actor_id and item.status == "pending"
+                else item
+                for item in state.invitations
+            )
+            candidate = state.model_copy(
+                update={"entries": (*state.entries, entry), "invitations": invitations}
+            )
+            return await self._save(
+                candidate, actor_id, "accept_invitation" if accept_invitation else "join_match"
+            )
+
+    async def invite(self, account_id: str, *, actor_id: str, at: datetime) -> MatchState:
+        async with self._lock:
+            self._require_status(MatchStatus.LOBBY, "only lobby matches accept invitations")
+            state = self._state
+            if any(entry.account_id == account_id for entry in state.entries):
+                raise MatchError("this player has already joined the match")
+            if len(state.entries) >= state.config.max_seats:
+                raise MatchError("the match is full")
+            current = next(
+                (item for item in state.invitations if item.account_id == account_id), None
+            )
+            if current is not None and current.status == "pending":
+                return state
+            invitation = MatchInvitation(account_id=account_id, invited_by=actor_id, created_at=at)
+            candidate = state.model_copy(
+                update={
+                    "invitations": (
+                        *(item for item in state.invitations if item.account_id != account_id),
+                        invitation,
+                    )
+                }
+            )
+            return await self._save(candidate, actor_id, "invite_player")
+
+    async def decline_invitation(self, account_id: str, *, at: datetime) -> MatchState:
+        async with self._lock:
+            state = self._state
+            invitation = next(
+                (item for item in state.invitations if item.account_id == account_id), None
+            )
+            if invitation is None:
+                raise MatchError("invitation not found")
+            if invitation.status == "declined":
+                return state
+            if invitation.status != "pending":
+                raise MatchError("this invitation is no longer pending")
+            candidate = state.model_copy(
+                update={
+                    "invitations": tuple(
+                        item.model_copy(update={"status": "declined", "responded_at": at})
+                        if item.account_id == account_id
+                        else item
+                        for item in state.invitations
+                    )
+                }
+            )
+            return await self._save(candidate, account_id, "decline_invitation")
 
     async def remove_entry(self, entry_id: str, *, actor_id: str) -> MatchState:
         async with self._lock:

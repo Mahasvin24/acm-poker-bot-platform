@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
 
 from poker_bot_platform.api.models import (
+    AcceptInvitationRequest,
     AccountResponse,
     AdminAccountResponse,
     AdminMatchResponse,
@@ -18,10 +19,12 @@ from poker_bot_platform.api.models import (
     ChangePasswordRequest,
     DeleteAccountRequest,
     ForgotPasswordRequest,
+    InvitePlayerRequest,
     JoinMatchRequest,
     LeaderboardEntryResponse,
     LoginRequest,
     MatchCreateRequest,
+    MatchInvitationResponse,
     MatchPreviewResponse,
     MatchViewResponse,
     MyMatchResponse,
@@ -216,6 +219,12 @@ def create_api_router(
     )
     async def looking_for_match(account: CurrentAccount) -> AccountResponse:
         return await account_response(await _translate(auth.mark_looking_for_match(account)))
+
+    @router.delete(
+        "/auth/looking-for-match", response_model=AccountResponse, dependencies=mutation_guard,
+    )
+    async def cancel_looking_for_match(account: CurrentAccount) -> AccountResponse:
+        return await account_response(await _translate(auth.cancel_looking_for_match(account)))
 
     @router.get("/auth/me", response_model=AccountResponse)
     async def me(account: CurrentAccount) -> AccountResponse:
@@ -522,6 +531,26 @@ def create_api_router(
             matches.join(account, body.code, body.kind, body.display_name, body.bot_profile_id),
         )
 
+    @router.get("/me/invitations", response_model=tuple[MatchInvitationResponse, ...])
+    async def invitations(account: CurrentAccount) -> tuple[MatchInvitationResponse, ...]:
+        return await _translate(matches.invitations(account))
+
+    @router.post(
+        "/matches/{match_id}/invitation/accept", response_model=MatchViewResponse,
+        dependencies=mutation_guard,
+    )
+    async def accept_invitation(
+        match_id: str, body: AcceptInvitationRequest, account: CurrentAccount,
+    ) -> MatchViewResponse:
+        return await _translate(matches.accept_invitation(account, match_id, body.display_name))
+
+    @router.post(
+        "/matches/{match_id}/invitation/decline", status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=mutation_guard,
+    )
+    async def decline_invitation(match_id: str, account: CurrentAccount) -> None:
+        await _translate(matches.decline_invitation(account, match_id))
+
     @router.get("/me/matches", response_model=tuple[MyMatchResponse, ...])
     async def my_matches(account: CurrentAccount) -> tuple[MyMatchResponse, ...]:
         return await matches.my_matches(account)
@@ -568,6 +597,15 @@ def create_api_router(
     @router.get("/admin/matches", response_model=tuple[AdminMatchSummaryResponse, ...])
     async def list_matches(_admin: CurrentAdmin) -> tuple[AdminMatchSummaryResponse, ...]:
         return await matches.admin_list()
+
+    @router.post(
+        "/admin/matches/{match_id}/invitations", response_model=AdminMatchResponse,
+        dependencies=mutation_guard,
+    )
+    async def invite_player(
+        match_id: str, body: InvitePlayerRequest, admin: CurrentAdmin,
+    ) -> AdminMatchResponse:
+        return await _translate(matches.invite(admin, match_id, body.account_id))
 
     @router.get("/admin/matches/{match_id}", response_model=AdminMatchResponse)
     async def admin_match(match_id: str, _admin: CurrentAdmin) -> AdminMatchResponse:

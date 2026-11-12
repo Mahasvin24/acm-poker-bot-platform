@@ -205,6 +205,23 @@ class MatchCreateRequest(ApiModel):
     config: MatchConfig = Field(default_factory=MatchConfig)
 
 
+class InvitePlayerRequest(ApiModel):
+    account_id: Annotated[StrictStr, StringConstraints(min_length=1, max_length=128)]
+
+
+class AcceptInvitationRequest(ApiModel):
+    display_name: NameInput | None = None
+
+
+class MatchInvitationResponse(ApiModel):
+    match_id: str
+    match_name: str
+    account_id: str
+    status: Literal["pending", "accepted", "declined"]
+    created_at: datetime
+    responded_at: datetime | None = None
+
+
 class JoinMatchRequest(ApiModel):
     code: Annotated[StrictStr, StringConstraints(min_length=1, max_length=16)]
     kind: EntryKind
@@ -324,6 +341,7 @@ class AdminMatchResponse(ApiModel):
     join_code: str | None
     config: MatchConfig
     entries: tuple[AdminEntryResponse, ...]
+    invitations: tuple[MatchInvitationResponse, ...] = ()
     standings: tuple[StandingResponse, ...]
     hand_number: int
     level_number: int

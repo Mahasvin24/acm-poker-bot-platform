@@ -160,6 +160,9 @@ class AuthService:
     async def mark_looking_for_match(self, account: Account) -> Account:
         return await self.repository.mark_looking_for_match(account.id, self._now())
 
+    async def cancel_looking_for_match(self, account: Account) -> Account:
+        return await self.repository.mark_looking_for_match(account.id, None)
+
     async def reset_password(self, account_id: str) -> str:
         """Set a temporary password, sign the account out everywhere, and return it once."""
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -90,6 +91,14 @@ class AuditEntry(ContractModel):
     detail: str | None = None
 
 
+class MatchInvitation(ContractModel):
+    account_id: str
+    invited_by: str
+    created_at: datetime
+    status: Literal["pending", "accepted", "declined"] = "pending"
+    responded_at: datetime | None = None
+
+
 class MatchState(ContractModel):
     match_id: str = Field(min_length=1, max_length=128)
     name: str = Field(min_length=1, max_length=80)
@@ -100,6 +109,7 @@ class MatchState(ContractModel):
     created_by: str
     created_at: datetime
     entries: tuple[MatchEntry, ...] = ()
+    invitations: tuple[MatchInvitation, ...] = ()
     table: MatchTable | None = None
     standings: tuple[Standing, ...] = ()
     level_number: int = Field(default=1, ge=1)
@@ -110,6 +120,9 @@ class MatchState(ContractModel):
 
     @model_validator(mode="after")
     def validate_match(self) -> MatchState:
+        invitees = [item.account_id for item in self.invitations]
+        if len(invitees) != len(set(invitees)):
+            raise ValueError("a match can only have one invitation per account")
         entry_ids = [entry.entry_id for entry in self.entries]
         if len(entry_ids) != len(set(entry_ids)):
             raise ValueError("entry identifiers must be unique")

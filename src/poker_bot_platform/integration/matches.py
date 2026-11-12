@@ -12,6 +12,7 @@ from poker_bot_platform.api.models import (
     AdminMatchResponse,
     AdminMatchSummaryResponse,
     LobbyEntryResponse,
+    MatchInvitationResponse,
     MatchPreviewResponse,
     MatchViewResponse,
     MyMatchEntryResponse,
@@ -21,7 +22,7 @@ from poker_bot_platform.auth.models import Account, BotProfile, MatchResultSumma
 from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.auth.service import BotProfileService
 from poker_bot_platform.bots import BotEndpoint, BotGateway
-from poker_bot_platform.domain import EntryKind, MatchConfig, MatchStatus
+from poker_bot_platform.domain import EntryKind, MatchConfig, MatchStatus, Role
 from poker_bot_platform.integration.endpoint_usage import EndpointUsage
 from poker_bot_platform.integration.runtime import MatchRuntime, standing_responses
 from poker_bot_platform.match import (
@@ -205,18 +206,33 @@ class MatchService:
         display_name: str | None,
         bot_profile_id: str | None,
     ) -> MatchViewResponse:
+        coordinator = await self._by_code(code)
+        return await self._join(account, coordinator, kind, display_name, bot_profile_id)
+
+    async def _join(
+        self,
+        account: Account,
+        coordinator: MatchCoordinator,
+        kind: EntryKind,
+        display_name: str | None,
+        bot_profile_id: str | None,
+        *,
+        accept_invitation: bool = False,
+    ) -> MatchViewResponse:
         if account.participant_kind is not None and kind is not account.participant_kind:
             raise MatchCommandError(
                 f"this account joins matches as {account.participant_kind.value}"
             )
-        coordinator = await self._by_code(code)
         profile: BotProfile | None = None
         if kind is EntryKind.BOT:
-            assert bot_profile_id is not None
+            if bot_profile_id is None:
+                raise MatchCommandError("set up and test your bot before accepting")
             profile = await self._accounts.get_bot_profile(bot_profile_id)
             if profile is None or profile.account_id != account.id:
                 raise MatchCommandError("choose one of your own bots")
             if profile.verified_at is None:
+                if accept_invitation:
+                    raise MatchCommandError("test your bot on your profile before accepting")
                 raise MatchCommandError(
                     "verify this bot from My Bots before joining; the platform must reach it first"
                 )
@@ -231,8 +247,76 @@ class MatchService:
             bot_profile_id=profile.id if profile else None,
             joined_at=self._clock(),
         )
-        await self._run(coordinator.join(entry, actor_id=account.id))
+        await self._run(
+            coordinator.join(entry, actor_id=account.id, accept_invitation=accept_invitation)
+        )
         return await self.view(account, coordinator.state.match_id)
+
+    async def invite(self, admin: Account, match_id: str, account_id: str) -> AdminMatchResponse:
+        target = await self._accounts.get_account(account_id)
+        if target is None or target.deleted_at is not None or target.role is not Role.USER:
+            raise MatchNotFound("player not found")
+        coordinator = await self._get(match_id)
+        await self._run(coordinator.invite(account_id, actor_id=admin.id, at=self._clock()))
+        return await self._admin_view(coordinator.state)
+
+    async def invitations(self, account: Account) -> tuple[MatchInvitationResponse, ...]:
+        rows = [
+            MatchInvitationResponse(
+                match_id=state.match_id,
+                match_name=state.name,
+                account_id=item.account_id,
+                status=item.status,
+                created_at=item.created_at,
+                responded_at=item.responded_at,
+            )
+            for state in await self._registry.list_states()
+            if state.status is MatchStatus.LOBBY
+            for item in state.invitations
+            if item.account_id == account.id and item.status == "pending"
+            if not any(entry.account_id == account.id for entry in state.entries)
+        ]
+        return tuple(sorted(rows, key=lambda item: item.created_at, reverse=True))
+
+    async def accept_invitation(
+        self,
+        account: Account,
+        match_id: str,
+        display_name: str | None = None,
+    ) -> MatchViewResponse:
+        coordinator = await self._get(match_id)
+        invitation = next(
+            (item for item in coordinator.state.invitations if item.account_id == account.id), None
+        )
+        if invitation is None:
+            raise MatchNotFound("invitation not found")
+        if invitation.status == "accepted" and any(
+            entry.account_id == account.id for entry in coordinator.state.entries
+        ):
+            return await self.view(account, match_id)
+        if invitation.status != "pending":
+            raise MatchCommandError("this invitation is no longer pending")
+        kind = account.participant_kind or EntryKind.HUMAN
+        profiles = (
+            await self._accounts.list_bot_profiles(account.id) if kind is EntryKind.BOT else ()
+        )
+        name = display_name
+        if kind is EntryKind.HUMAN and not name:
+            name = account.display_name or account.email.split("@")[0]
+        return await self._join(
+            account,
+            coordinator,
+            kind,
+            name,
+            profiles[0].id if profiles else None,
+            accept_invitation=True,
+        )
+
+    async def decline_invitation(self, account: Account, match_id: str) -> None:
+        coordinator = await self._get(match_id)
+        if not any(item.account_id == account.id for item in coordinator.state.invitations):
+            raise MatchNotFound("invitation not found")
+        await self._run(coordinator.decline_invitation(account.id, at=self._clock()))
 
     async def leave(self, account: Account, match_id: str, entry_id: str) -> None:
         coordinator = await self._get(match_id)
@@ -469,6 +553,17 @@ class MatchService:
             join_code=format_join_code(state.join_code) if state.join_code else None,
             config=state.config,
             entries=tuple(entries),
+            invitations=tuple(
+                MatchInvitationResponse(
+                    match_id=state.match_id,
+                    match_name=state.name,
+                    account_id=item.account_id,
+                    status=item.status,
+                    created_at=item.created_at,
+                    responded_at=item.responded_at,
+                )
+                for item in state.invitations
+            ),
             standings=standing_responses(state),
             hand_number=state.table.hand_number if state.table else 0,
             level_number=state.level_number,

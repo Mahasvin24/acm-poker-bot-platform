@@ -249,7 +249,7 @@ class SqlAlchemyAuthRepository:
             row = await self._locked_profile(session, profile_id)
             await session.delete(row)
 
-    async def mark_looking_for_match(self, account_id: str, at: datetime) -> Account:
+    async def mark_looking_for_match(self, account_id: str, at: datetime | None) -> Account:
         identifier = _uuid_or_none(account_id)
         async with self._transaction() as session:
             row = await session.get(AccountRow, identifier) if identifier else None
