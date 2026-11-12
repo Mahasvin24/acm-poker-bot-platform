@@ -2,6 +2,8 @@
 
 ## Decisions
 
+- **Invitations supplement join codes** — Invitations live in durable match JSON (`MatchState.invitations`), not a separate delivery service. Admins invite accounts to lobby matches; accepting joins and marks the invitation accepted in one coordinator save, without relying on a join code. Normal capacity, name, and bot-readiness checks still apply. Pending invitations reserve no seats and disappear from the inbox after the match starts. Match-interest cancellation clears `looking_for_match_at` to null. Evidence: `match/coordinator.py`, `integration/matches.py`, `tests/api/test_invitations.py`.
+
 - **Match length** — One round means one completed poker hand. New admin-created matches choose a time limit (default 5 minutes) or a hand count. The durable match clock pauses while administratively paused; expiration finishes the current dealt hand, never deals another, then ranks remaining stacks. Older unlimited matches remain compatible. Evidence: `domain/match.py::MatchConfig`, `match/coordinator.py::tick`, `tests/match/test_match_coordinator.py`.
 
 - **Signup chooses human or bot** — New API registrations require `participant_kind`; joining enforces it and human accounts cannot create bot profiles. Admin role remains separate. Migration `0006_participant_kind` leaves older accounts nullable for compatibility, but the signup UI always sends a choice. Bot name/IP/port remain editable server-persisted settings; endpoint edits keep the token and invalidate verification. Evidence: `api/models.py::RegisterRequest`, `integration/matches.py::join`, `tests/api/test_router.py::test_bot_settings_survive_edit_and_new_session_without_changing_token`. Last verified: 2026-10-31.

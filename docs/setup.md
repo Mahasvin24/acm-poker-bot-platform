@@ -169,10 +169,13 @@ To run a live local match:
 
 1. Sign in as the administrator at <http://localhost:3000/account>.
 2. Create a match in `/admin`, choosing a time limit or a number of rounds (one round is one hand). The match clock starts on Start and freezes during an admin pause. At the limit, finish the current hand and rank the remaining players by chips. The console shows a join code such as `K7Q-4PM`.
-3. Players open `/join`, enter the code, and choose **Me** or one of their verified bots.
+3. Players can use `/join` and the code, or the admin can select a lobby in the player list and click **Invite**. Players open **Invites** beside **Join a match** on their profile to accept or decline. Accepting joins directly without a code; bot accounts need a tested bot. Invitations do not reserve seats.
 4. Watch the roster fill in the console, then press **Start**. Bots that fail their health
    check are listed; **Start anyway** lets them play with automatic check/fold.
 5. Players' lobbies switch to the table automatically. Bot turns are dispatched by the server.
+
+Players can signal **Looking for a match** for five minutes or **Cancel** the signal early. The
+admin player list puts the latest signals first and shows pending invitations for the selected lobby.
 
 The match console’s spectator view offers **Fullscreen** and **Open in new tab**. Cards stay
 hidden until an admin enables **Show cards & win odds**. Odds estimate showdown win shares with
