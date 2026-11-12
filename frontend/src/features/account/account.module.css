@@ -1571,3 +1571,12 @@
   .authIntro h1 { font-size: 36px; }
   .authPanel { padding-top: 28px; }
 }
+
+/* Keep the small event's table overview above player invitations. */
+.consoleTitle { font-size: clamp(32px,4vw,52px); line-height: 1.1; }
+.consoleHead { gap: 24px; padding-bottom: 24px; }
+.commandBar { padding-block: 16px; }
+.rosterTable th { font: 600 12px/1.4 Arial,sans-serif; }
+@media (min-width: 901px) {
+  .dashboardIntro h1 { margin-top: 0; font-size: 36px; line-height: 1.1; }
+}

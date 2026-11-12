@@ -154,7 +154,7 @@ export function AdminDashboard() {
     <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link className={styles.wordmark} href="/">ACM / POKER</Link>
-        <span className={styles.headerTitle}>Match Director</span>
+        <span className={styles.headerTitle}>Organizer</span>
         <div className={styles.headerAccount}>
           <span>{account.email}</span>
           <button className={styles.textButton} onClick={() => void logoutAccount().finally(() => router.replace("/account"))} type="button">
@@ -166,8 +166,7 @@ export function AdminDashboard() {
       <div className={styles.dashboard}>
         <section className={styles.dashboardIntro}>
           <div>
-            <p className={styles.eyebrow}>Admin console</p>
-            <h1>Deal a<br /><em>match.</em></h1>
+            <h1>Matches</h1>
           </div>
           <p>
             Create a match, share its code, and start when everyone is seated. Humans join in the
@@ -219,15 +218,15 @@ export function AdminDashboard() {
                     <label htmlFor="match-length-mode">Play for</label>
                     <select id="match-length-mode" onChange={(event) => setLengthMode(event.target.value as "time" | "rounds")} value={lengthMode}>
                       <option value="time">Time limit</option>
-                      <option value="rounds">Number of rounds</option>
+                      <option value="rounds">Number of hands</option>
                     </select>
                   </div>
                   <div className={styles.field}>
-                    <label htmlFor="match-length">{lengthMode === "time" ? "Minutes" : "Rounds (hands)"}</label>
+                    <label htmlFor="match-length">{lengthMode === "time" ? "Minutes" : "Hands"}</label>
                     <input key={lengthMode} defaultValue={lengthMode === "time" ? 5 : 10} id="match-length" max={lengthMode === "time" ? 1440 : 10000} min={1} name="matchLength" required type="number" />
                   </div>
                 </div>
-                <p className={styles.fieldHint}>{lengthMode === "time" ? "The clock starts when the match starts and pauses during an admin pause. When time runs out, finish the current hand." : "One round is one poker hand. Finish after this many hands."} Remaining players are ranked by chips.</p>
+                <p className={styles.fieldHint}>{lengthMode === "time" ? "The clock starts when the match starts and pauses during an admin pause. When time runs out, finish the current hand." : "Finish after this many hands."} Remaining players are ranked by chips.</p>
                 <label className={styles.checkRow}>
                   <input checked={escalate} onChange={(event) => setEscalate(event.target.checked)} type="checkbox" />
                   Blinds rise over time
@@ -259,13 +258,10 @@ export function AdminDashboard() {
           </aside>
 
           <div className={styles.stack}>
-            <PlayersPanel matches={matches} />
           <section className={styles.panel}>
             <div className={styles.panelHead}>
               <div>
-                <p className={styles.sectionLabel}>All matches</p>
-                <h2>Matches</h2>
-                <p className={styles.panelIntro}>Updates every few seconds.</p>
+                <h2>Tables</h2>
               </div>
             </div>
             {matches === null ? (
@@ -274,7 +270,7 @@ export function AdminDashboard() {
               <p className={styles.panelIntro}>No matches yet. Create one to get a join code.</p>
             ) : (
               <ul className={styles.matchList}>
-                {matches.map((item) => (
+                {[...matches].sort((a,b) => Number(["completed","cancelled"].includes(a.status)) - Number(["completed","cancelled"].includes(b.status))).map((item) => (
                   <li key={item.match_id}>
                     <div>
                       <strong>{item.name}</strong>
@@ -290,6 +286,7 @@ export function AdminDashboard() {
               </ul>
             )}
           </section>
+            <PlayersPanel matches={matches} />
           </div>
         </div>
       </div>
