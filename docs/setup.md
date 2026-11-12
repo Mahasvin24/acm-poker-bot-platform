@@ -129,6 +129,12 @@ Create an administrator account. The command prompts for its password:
 poker-platform bootstrap-admin --email organizer@example.com
 ```
 
+Password entry is hidden. Use the resulting email/password at `/account`, then open `/admin`.
+An existing admin keeps its current password; an existing player email cannot be promoted by
+this command. If the CLI cannot be found or reports a bad interpreter or missing module,
+follow the [environment recovery steps](../README.md#backend), particularly after moving the
+checkout.
+
 Start the API for local development:
 
 ```bash

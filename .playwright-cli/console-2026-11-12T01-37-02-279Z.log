@@ -1,0 +1,260 @@
+[     299ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[     344ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[     404ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3000/api/v1/auth/me:1
+[     405ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3000/api/v1/auth/me:1
+[     439ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[     447ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3000/api/v1/auth/me:1
+[     448ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:3000/api/v1/auth/me:1
+[    6815ms] [LOG] [Fast Refresh] done in 969ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[    8875ms] [LOG] [Fast Refresh] done in 958ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[    9904ms] [LOG] [Fast Refresh] done in 1994ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   10943ms] [LOG] [Fast Refresh] done in 3030ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   11983ms] [LOG] [Fast Refresh] done in 4068ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   12994ms] [LOG] [Fast Refresh] done in 5083ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   14031ms] [LOG] [Fast Refresh] done in 6116ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   15075ms] [LOG] [Fast Refresh] done in 7154ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   16099ms] [LOG] [Fast Refresh] done in 8189ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   17158ms] [LOG] [Fast Refresh] done in 9227ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   18161ms] [LOG] [Fast Refresh] done in 10261ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   18509ms] [LOG] [Fast Refresh] done in 10261ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   19226ms] [LOG] [Fast Refresh] done in 11293ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   20236ms] [LOG] [Fast Refresh] done in 12328ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   21349ms] [LOG] [Fast Refresh] done in 13367ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   22338ms] [LOG] [Fast Refresh] done in 14411ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   23359ms] [LOG] [Fast Refresh] done in 15442ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   24365ms] [LOG] [Fast Refresh] done in 16456ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   25402ms] [LOG] [Fast Refresh] done in 17492ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   26432ms] [LOG] [Fast Refresh] done in 18520ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   27457ms] [LOG] [Fast Refresh] done in 19551ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   27509ms] [LOG] [Fast Refresh] done in 19551ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   28486ms] [LOG] [Fast Refresh] done in 20577ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   29517ms] [LOG] [Fast Refresh] done in 21598ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   30546ms] [LOG] [Fast Refresh] done in 22633ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   31563ms] [LOG] [Fast Refresh] done in 23651ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   32605ms] [LOG] [Fast Refresh] done in 24687ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   33643ms] [LOG] [Fast Refresh] done in 25723ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   34679ms] [LOG] [Fast Refresh] done in 26767ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   35706ms] [LOG] [Fast Refresh] done in 27791ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   36747ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   36754ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   51249ms] [LOG] [Fast Refresh] done in 1021ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   51898ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   51928ms] [LOG] [Fast Refresh] done in 2ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   52300ms] [LOG] [Fast Refresh] done in 343ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   52334ms] [LOG] [Fast Refresh] done in 343ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   53300ms] [LOG] [Fast Refresh] done in 1363ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   54349ms] [LOG] [Fast Refresh] done in 2391ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   55379ms] [LOG] [Fast Refresh] done in 3420ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   55534ms] [LOG] [Fast Refresh] done in 3420ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   55685ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   55699ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   56877ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   56883ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   57420ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   57492ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2509:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2868:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   58601ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   58607ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   58639ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   59573ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   59581ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   59602ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   60608ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   60613ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   60633ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   61626ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   61632ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   61652ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   62644ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   62650ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   62676ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   63724ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   63730ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   63750ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   64662ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   64669ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   64690ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   65836ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   65842ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[   65876ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[   67529ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   68531ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   69533ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   70537ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   71541ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   76544ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   81547ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[   86550ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:3000/_next/hmr?id=xfiMAZmei1JnPC44Gsez2' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_client_0_90u2t._.js:16349
+[  118544ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  118574ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  119762ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  119767ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  120160ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  120181ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2509:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2868:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[  149812ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  149813ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  149868ms] [LOG] [Fast Refresh] done in 2ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  149925ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  149931ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  149957ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1619:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/_1637z7d._.js:1978:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)
+[  152753ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  152758ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  153958ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  153962ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  154052ms] [WARNING] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_1e8vcs8._.js:777
+[  154064ms] TypeError: Cannot read properties of undefined (reading 'small_blind')
+    at formatConfig (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2509:42)
+    at JoinMatch (http://127.0.0.1:3000/_next/static/chunks/src_features_069l2sd._.js:2868:209)
+    at Object.react_stack_bottom_frame (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:14894:24)
+    at renderWithHooks (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:4425:24)
+    at updateFunctionComponent (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:5892:21)
+    at beginWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6518:24)
+    at runWithFiberInDEV (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:761:74)
+    at performUnitOfWork (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9385:97)
+    at workLoopSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9279:40)
+    at renderRootSync (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9263:13)
+    at performWorkOnRoot (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8928:47)
+    at performWorkOnRootViaSchedulerTask (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10085:9)
+    at MessagePort.performWorkUntilDeadline (http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64)

@@ -69,6 +69,21 @@ uvicorn poker_bot_platform.app:app --host 0.0.0.0 --port 8000 --reload
 The API runs at <http://localhost:8000>. Version 1 uses exactly one application worker; do not
 combine Uvicorn's `--reload` and `--workers` options.
 
+The admin command prompts for a password; typing is hidden. Sign in with that email and password
+at `/account`, then open `/admin`. Running it again for an existing admin leaves its password
+unchanged; an email already registered as a player cannot be bootstrapped as an admin.
+
+If `poker-platform` reports `command not found`, `bad interpreter`, or a missing
+`poker_bot_platform` module, refresh the environment from the repository root. This is also
+needed after moving the checkout, because virtual environments contain absolute paths:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m poker_bot_platform.cli bootstrap-admin --email organizer@example.com
+```
+
 ### How to run a sample bot's API endpoint
 
 Start either example on port `8001`, add it under **My Bots** with this machine's LAN IP (not
