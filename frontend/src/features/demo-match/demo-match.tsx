@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { newerTable } from "../table/presentation";
 import { PokerTableView } from "../table/poker-table-view";
 import type { ActionType } from "../table/types";
 import {
@@ -23,6 +24,7 @@ const idleMatch: DemoMatchState = {
 };
 
 export function DemoMatch() {
+  const operationLock = useRef(false);
   const [match, setMatch] = useState<DemoMatchState>(idleMatch);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -39,6 +41,7 @@ export function DemoMatch() {
       ) {
         return current;
       }
+      if (!replaceMatch && current.table && next.table && newerTable(current.table, next.table) === current.table) return current;
       return next;
     });
   }, []);
@@ -59,6 +62,7 @@ export function DemoMatch() {
   useEffect(() => {
     if (match.status !== "active") return;
     let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
         const next = await getDemoMatch();
@@ -70,12 +74,14 @@ export function DemoMatch() {
         if (!stopped) {
           setError(reason instanceof Error ? reason.message : "The demo connection was interrupted.");
         }
+      } finally {
+        if (!stopped) timer = setTimeout(() => void poll(), 500);
       }
     };
-    const timer = window.setInterval(() => void poll(), 500);
+    void poll();
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, [match.status, update]);
 
@@ -84,6 +90,8 @@ export function DemoMatch() {
     success: string,
     replaceMatch = false,
   ) => {
+    if (operationLock.current) return;
+    operationLock.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -93,6 +101,7 @@ export function DemoMatch() {
     } catch (reason) {
       setError(reason instanceof DemoApiError ? reason.message : "The demo server could not be reached.");
     } finally {
+      operationLock.current = false;
       setBusy(false);
     }
   };
@@ -123,7 +132,6 @@ export function DemoMatch() {
           </div>
         </details>
         <PokerTableView
-          animateInitialDeal
           connectionLabel="Four-player demo"
           connectionTone={error ? "reconnecting" : "demo"}
           embedded

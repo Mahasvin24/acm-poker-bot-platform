@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getSpectatorState, getTableState, submitTableAction, TableApiError } from "./api";
 import styles from "./poker-table.module.css";
+import { newerTable } from "./presentation";
 import { PokerTableView } from "./poker-table-view";
 import type { ActionSubmission, ActionType, PlayerTableState } from "./types";
 
@@ -45,13 +46,6 @@ function issueFromError(error: unknown): AccessIssue {
   return { retry: true, title: "Connection interrupted", message: "The table could not be reached. Your chips and cards are safe on the server." };
 }
 
-function newer(current: PlayerTableState | null, next: PlayerTableState): PlayerTableState {
-  if (!current || next.hand_id !== current.hand_id) {
-    return !current || next.hand_number >= current.hand_number ? next : current;
-  }
-  return next.table_version >= current.table_version ? next : current;
-}
-
 function pollDelay(table: PlayerTableState): number {
   if (table.match_status === "completed" || table.match_status === "cancelled") return 5_000;
   if (table.decision || table.turn || table.next_action_at) return 400;
@@ -66,6 +60,7 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const interrupted = useRef(false);
+  const submissionLock = useRef(false);
   const fetchState = useCallback((id: string, signal?: AbortSignal) =>
     mode === "spectator" ? getSpectatorState(id, signal, revealCards) : getTableState(id, signal), [mode, revealCards]);
 
@@ -80,7 +75,7 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
         const next = await fetchState(matchId, controller.signal);
         if (stopped) return;
         failures = 0;
-        setTable((current) => newer(current, next));
+        setTable((current) => newerTable(current, next));
         if (interrupted.current) {
           setNotice("Connection restored.");
           interrupted.current = false;
@@ -98,8 +93,19 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
         if (nextIssue.retry) timer = setTimeout(poll, Math.min(5_000, 800 * failures));
       }
     };
+    const resume = () => {
+      if (document.visibilityState === "hidden") return;
+      setConnection("syncing");
+      setRefreshToken((value) => value + 1);
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
     void poll();
     return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+      window.removeEventListener("focus", resume);
       stopped = true;
       controller?.abort();
       if (timer) clearTimeout(timer);
@@ -107,7 +113,8 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
   }, [fetchState, matchId, refreshToken]);
 
   const submit = useCallback(async (action: ActionType, amountTo?: number) => {
-    if (!table?.decision || submitting) return;
+    if (!table?.decision || submissionLock.current || connection !== "live") return;
+    submissionLock.current = true;
     const submission: ActionSubmission = {
       decision_id: table.decision.decision_id,
       table_version: table.decision.table_version,
@@ -118,23 +125,27 @@ export function PokerTable({ matchId, mode = "player", embedded = false, exitHre
     setNotice(`Sending ${action}…`);
     try {
       const next = await submitTableAction(matchId, submission);
-      setTable((current) => newer(current, next));
+      setTable((current) => newerTable(current, next));
       setNotice(null);
     } catch (error) {
       if (error instanceof TableApiError && error.status === 409) {
         setNotice("The table moved on before that arrived. Showing the latest state.");
         try {
-          setTable(await getTableState(matchId));
+          const next = await getTableState(matchId);
+          setTable((current) => newerTable(current, next));
         } catch (syncError) {
           setIssue(issueFromError(syncError));
+          setConnection("reconnecting");
         }
       } else {
         setIssue(issueFromError(error));
+        setConnection("reconnecting");
       }
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
-  }, [matchId, submitting, table]);
+  }, [matchId, connection, table]);
 
   if (!table) {
     return (

@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./poker-table.module.css";
+import { boardRevealSteps, raisePresets } from "./presentation";
 import { resultTransitionDelay } from "./result-transition";
 import type {
   ActionType,
@@ -36,7 +37,6 @@ interface PokerTableViewProps {
   embedded?: boolean;
   fullScreen?: boolean;
   showSidePots?: boolean;
-  animateInitialDeal?: boolean;
   exitHref?: string;
   onSubmit: (action: ActionType, amountTo?: number) => void;
 }
@@ -161,115 +161,35 @@ function currentHandStage(phase: PresentationPhase, table: PlayerTableState): Ha
   return "preflop";
 }
 
-function useTablePresentation(table: PlayerTableState, animateInitialDeal: boolean) {
+function useTablePresentation(table: PlayerTableState) {
   const reducedMotion = useReducedMotion();
-  const settledPhase = targetPhase(table);
-  const seatSignature = table.seats.map((seat) => seat.seat).join(",");
-  const dealSeatNumbers = useMemo(
-    () => seatSignature.split(",").filter(Boolean).map(Number),
-    [seatSignature],
-  );
-  const [phase, setPhase] = useState<PresentationPhase>(() =>
-    animateInitialDeal && !table.completed ? "dealing-private" : targetPhase(table),
-  );
-  const [revealedBySeat, setRevealedBySeat] = useState<Record<number, number>>(() =>
-    animateInitialDeal ? {} : Object.fromEntries(table.seats.map((seat) => [seat.seat, 2])),
-  );
-  const [boardCount, setBoardCount] = useState(() =>
-    animateInitialDeal ? 0 : table.community_cards.length,
-  );
-  const handRef = useRef(table.hand_id);
-  const initialDealAnimatedRef = useRef(false);
-  const boardRef = useRef(boardCount);
+  const target = table.community_cards.length;
+  const handId = table.hand_id;
+  const hasDecision = Boolean(table.decision);
+  const nextActionAt = table.next_action_at;
+  const [shown, setShown] = useState({ handId, count: target });
+  const previous = useRef({ handId, count: target });
 
   useEffect(() => {
-    const newHand = handRef.current !== table.hand_id;
-    handRef.current = table.hand_id;
-    const shouldAnimate = newHand || (animateInitialDeal && !initialDealAnimatedRef.current);
-    if (!shouldAnimate) return;
-    if (table.completed || reducedMotion) {
-      const timer = window.setTimeout(
-        () => {
-          initialDealAnimatedRef.current = true;
-          setRevealedBySeat(Object.fromEntries(dealSeatNumbers.map((seat) => [seat, 2])));
-        },
-        0,
-      );
-      return () => window.clearTimeout(timer);
-    }
-
-    const ordered = [...dealSeatNumbers].sort(
-      (left, right) =>
-        ((left - table.button_seat + 6) % 6 || 6) -
-        ((right - table.button_seat + 6) % 6 || 6),
-    );
-    const interval = Math.round(Math.min(300, 2000 / Math.max(1, ordered.length * 2)));
-    const timers: number[] = [];
-    timers.push(window.setTimeout(() => {
-      initialDealAnimatedRef.current = true;
-      setPhase("dealing-private");
-      setRevealedBySeat({});
-    }, 0));
-    ordered.forEach((seat, seatIndex) => {
-      for (let round = 0; round < 2; round += 1) {
-        timers.push(
-          window.setTimeout(() => {
-            setRevealedBySeat((current) => ({ ...current, [seat]: round + 1 }));
-          }, (round * ordered.length + seatIndex + 1) * interval),
-        );
-      }
-    });
-    timers.push(
-      window.setTimeout(
-        () => setPhase(settledPhase),
-        ordered.length * 2 * interval + 100,
-      ),
-    );
+    const before = previous.current;
+    previous.current = { handId, count: target };
+    const steps = before.handId === handId && !reducedMotion
+      ? boardRevealSteps(before.count, target, nextActionAt ? Date.parse(nextActionAt) - Date.now() : 0, hasDecision)
+      : [];
+    const timers = steps.length
+      ? steps.map(({ count, delay }) => window.setTimeout(() => setShown({ handId, count }), delay))
+      : [window.setTimeout(() => setShown({ handId, count: target }), 0)];
     return () => timers.forEach(window.clearTimeout);
-  }, [animateInitialDeal, dealSeatNumbers, reducedMotion, settledPhase, table.button_seat, table.completed, table.hand_id]);
+  }, [handId, target, reducedMotion, hasDecision, nextActionAt]);
 
-  useEffect(() => {
-    const target = table.community_cards.length;
-    const previous = boardRef.current;
-    if (target <= previous || reducedMotion) {
-      boardRef.current = target;
-      const timer = window.setTimeout(() => setBoardCount(target), 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    const timers: number[] = [];
-    const reveal = (count: number, label: PresentationPhase, delay: number) => {
-      timers.push(
-        window.setTimeout(() => {
-          setPhase(label);
-          setBoardCount(count);
-          boardRef.current = count;
-        }, delay),
-      );
-    };
-    let delay = 180;
-    if (previous < 3 && target >= 3) {
-      reveal(1, "revealing-flop", delay);
-      reveal(2, "revealing-flop", delay + 140);
-      reveal(3, "revealing-flop", delay + 280);
-      delay += 560;
-    }
-    if (previous < 4 && target >= 4) {
-      reveal(4, "revealing-turn", delay);
-      delay += 420;
-    }
-    if (previous < 5 && target >= 5) {
-      reveal(5, "revealing-river", delay);
-      delay += 420;
-    }
-    timers.push(window.setTimeout(() => setPhase(settledPhase), delay));
-    return () => timers.forEach(window.clearTimeout);
-  }, [reducedMotion, settledPhase, table.community_cards.length]);
-
-  const activePhase = phase === "dealing-private" || phase.startsWith("revealing-")
-    ? phase
-    : settledPhase;
-  return { phase: activePhase, revealedBySeat, boardCount };
+  // A new hand, a live decision, and reduced motion always show authoritative cards now.
+  const boardCount = shown.handId !== handId || hasDecision || reducedMotion ? target : Math.min(shown.count, target);
+  const phase: PresentationPhase = boardCount < target
+    ? boardCount < 3 ? "revealing-flop" : boardCount < 4 ? "revealing-turn" : "revealing-river"
+    : nextActionAt && !table.completed && table.action_history.length === 0
+      ? "dealing-private"
+      : targetPhase(table);
+  return { phase, boardCount };
 }
 
 function PlayingCard({
@@ -490,6 +410,7 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
   const observedLive = useRef(!terminal);
   const terminalUntil = useRef(0);
   const [ready, setReady] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (!terminal) {
       observedLive.current = true;
@@ -504,6 +425,13 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
     const timer = setTimeout(() => setReady(true), delay);
     return () => clearTimeout(timer);
   }, [terminal, table.completed, table.hand_id]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!terminal || !ready || hidden || !dialog) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    if (!dialog.open) dialog.showModal();
+    return () => { dialog.close(); previousFocus?.focus(); };
+  }, [terminal, ready, hidden]);
   if (!terminal || !ready) return null;
   if (hidden) {
     return (
@@ -520,7 +448,7 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
         ? "Match cancelled"
         : "Match finished";
   return (
-    <div className={styles.finishOverlay} role="dialog" aria-label="Match result">
+    <dialog ref={dialogRef} className={styles.finishOverlay} aria-label="Match result" onCancel={() => setHidden(true)}>
       <div>
         <span>{finished ? "Final standings" : "You are out"}</span>
         <h2>{headline}</h2>
@@ -543,7 +471,7 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -572,11 +500,10 @@ export function PokerTableView({
   embedded = false,
   fullScreen = false,
   showSidePots = true,
-  animateInitialDeal = false,
   exitHref = "/dashboard",
   onSubmit,
 }: PokerTableViewProps) {
-  const { phase, revealedBySeat, boardCount } = useTablePresentation(table, animateInitialDeal);
+  const { phase, boardCount } = useTablePresentation(table);
   const [now, setNow] = useState(() => Date.now());
   const [railOpen, setRailOpen] = useState(false);
   const [shortcuts, setShortcuts] = useShortcutPreference();
@@ -606,7 +533,7 @@ export function PokerTableView({
   const secondsLeft = turn ? Math.max(0, (Date.parse(turn.deadline_at) - now) / 1000) : 0;
   const timerPercent = turn ? Math.min(100, (secondsLeft * 1000 * 100) / turn.duration_ms) : 0;
   const resolving = Boolean(turn && secondsLeft <= 0);
-  const decisionReady = Boolean(table.decision && phase === "awaiting-human" && !resolving);
+  const decisionReady = Boolean(table.decision && !resolving && connectionTone !== "reconnecting");
   const waitSeconds = table.next_action_at
     ? Math.max(0, (Date.parse(table.next_action_at) - now) / 1000)
     : null;
@@ -629,7 +556,7 @@ export function PokerTableView({
   const turnLabel = resolving ? "Resolving action…" : statusLabel(phase, table, names, waitSeconds);
   const latestNarrative = actionNarrative(latest, table.action_history, names);
   const banner = statusBanner(table);
-  const spectating = table.viewer_seat === null || table.viewer?.status !== "seated";
+  const spectating = table.viewer_seat === null || Boolean(table.viewer && table.viewer.status !== "seated");
   const tableUpdate = phase === "dealing-private"
     ? "Dealing cards…"
     : phase === "revealing-flop"
@@ -644,7 +571,7 @@ export function PokerTableView({
     if (!shortcuts || !decisionReady || submitting) return;
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (event.repeat || target?.closest("input, textarea, select, button, a, summary, dialog, [contenteditable]")) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const key = event.key.toLowerCase();
       if (key === "c") {
@@ -770,9 +697,9 @@ export function PokerTableView({
                 anchorSeat={anchorSeat}
                 actingSeat={turn?.seat ?? null}
                 buttonSeat={table.button_seat}
-                revealedCount={revealedBySeat[seat.seat] ?? 0}
+                revealedCount={2}
                 result={result}
-                latestAction={(() => { const action = recentActions.find((item) => item.seat === seat.seat); return action ? `${actionLabel(action, table.action_history)}${action.amount_to !== null ? ` ${formatChips(action.amount_to)}` : ""}` : undefined; })()}
+                latestAction={(() => { const action = recentActions.find((item) => item.seat === seat.seat && (!item.street || item.street === table.street)); return action ? `${actionLabel(action, table.action_history)}${action.amount_to !== null ? ` ${formatChips(action.amount_to)}` : ""}` : undefined; })()}
                 playerCount={table.seats.length}
                 winner={winnerSeats.has(seat.seat)}
                 showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
@@ -920,7 +847,6 @@ function RaiseControl({
 }) {
   const min = action.min_amount_to ?? 0;
   const max = action.max_amount_to ?? min;
-  const clamp = (value: number) => Math.max(min, Math.min(max, Math.round(value)));
   const [amountText, setAmountText] = useState(String(min));
   const parsed = Number(amountText);
   const amount = Number.isInteger(parsed) && amountText !== "" && parsed >= min && parsed <= max
@@ -929,13 +855,13 @@ function RaiseControl({
   const additional = amount === null ? 0 : Math.max(0, amount - committed);
   const verb = betting ? "Bet" : "Raise";
   const allIn = amount !== null && amount === max;
-  const potAfterCall = pot + callAmount;
+  const values = raisePresets(pot, callAmount, committed, min, max);
   const presets = [
-    [betting ? "Min bet" : "Min raise", min],
-    ["½ pot", committed + callAmount + potAfterCall / 2],
-    ["¾ pot", committed + callAmount + potAfterCall * 0.75],
-    ["Pot", committed + callAmount + potAfterCall],
-    ["All in", max],
+    [betting ? "Min bet" : "Min raise", values[0]],
+    ["½ pot", values[1]],
+    ["¾ pot", values[2]],
+    ["Pot", values[3]],
+    ["All in", values[4]],
   ] as const;
   const amountHint = amountText === ""
     ? `Enter ${formatChips(min)}–${formatChips(max)}`
@@ -985,7 +911,7 @@ function RaiseControl({
       <div className={styles.raiseBottom}>
         <div className={styles.presets}>
           {presets.map(([label, value]) => (
-            <button disabled={disabled} key={label} onClick={() => setAmountText(String(clamp(value)))} type="button">{label}</button>
+            <button disabled={disabled} key={label} onClick={() => setAmountText(String(value))} type="button">{label}</button>
           ))}
         </div>
         <button className={styles.raiseButton} disabled={disabled || amount === null} type="submit">
