@@ -79,6 +79,8 @@ export interface MatchConfig {
   big_blind_ante: boolean;
   human_action_timeout_ms: number;
   blind_increase_minutes: number | null;
+  time_limit_minutes?: number | null;
+  hand_limit?: number | null;
 }
 
 export interface MatchPreview {
@@ -177,6 +179,7 @@ export interface AdminMatch {
   entries: AdminEntry[];
   standings: Standing[];
   hand_number: number;
+  match_remaining_seconds?: number | null;
   level_number: number;
   level_remaining_seconds: number | null;
   end_requested: boolean;

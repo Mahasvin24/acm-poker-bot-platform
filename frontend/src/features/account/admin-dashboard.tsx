@@ -89,6 +89,7 @@ export function AdminDashboard() {
   const { account, error: accountError } = useAccount("/admin");
   const [matches, setMatches] = useState<AdminMatchSummary[] | null>(null);
   const [escalate, setEscalate] = useState(false);
+  const [lengthMode, setLengthMode] = useState<"time" | "rounds">("time");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
@@ -127,6 +128,8 @@ export function AdminDashboard() {
       big_blind_ante: data.get("ante") === "on",
       human_action_timeout_ms: Number(data.get("clock")) * 1000,
       blind_increase_minutes: escalate ? Number(data.get("levelMinutes")) : null,
+      time_limit_minutes: lengthMode === "time" ? Number(data.get("matchLength")) : null,
+      hand_limit: lengthMode === "rounds" ? Number(data.get("matchLength")) : null,
     };
     setBusy(true);
     setError(null);
@@ -211,6 +214,20 @@ export function AdminDashboard() {
                     </div>
                   )}
                 </div>
+                <div className={styles.inlineFields}>
+                  <div className={styles.field}>
+                    <label htmlFor="match-length-mode">Play for</label>
+                    <select id="match-length-mode" onChange={(event) => setLengthMode(event.target.value as "time" | "rounds")} value={lengthMode}>
+                      <option value="time">Time limit</option>
+                      <option value="rounds">Number of rounds</option>
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="match-length">{lengthMode === "time" ? "Minutes" : "Rounds (hands)"}</label>
+                    <input key={lengthMode} defaultValue={lengthMode === "time" ? 5 : 10} id="match-length" max={lengthMode === "time" ? 1440 : 10000} min={1} name="matchLength" required type="number" />
+                  </div>
+                </div>
+                <p className={styles.fieldHint}>{lengthMode === "time" ? "The clock starts when the match starts and pauses during an admin pause. When time runs out, finish the current hand." : "One round is one poker hand. Finish after this many hands."} Remaining players are ranked by chips.</p>
                 <label className={styles.checkRow}>
                   <input checked={escalate} onChange={(event) => setEscalate(event.target.checked)} type="checkbox" />
                   Blinds rise over time

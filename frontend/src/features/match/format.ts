@@ -18,7 +18,8 @@ export function formatConfig(config: MatchConfig): string {
     ? `rising every ${config.blind_increase_minutes} min`
     : "fixed";
   const ante = config.big_blind_ante ? " + big-blind ante" : "";
-  return `${config.max_seats} seats · ${formatChips(config.starting_stack)} chips · ${blinds}${ante} (${escalation}) · ${Math.round(config.human_action_timeout_ms / 1000)}s per decision`;
+  const length = config.time_limit_minutes ? ` · ${config.time_limit_minutes} min match` : config.hand_limit ? ` · ${config.hand_limit} rounds` : "";
+  return `${config.max_seats} seats · ${formatChips(config.starting_stack)} chips · ${blinds}${ante} (${escalation}) · ${Math.round(config.human_action_timeout_ms / 1000)}s per decision${length}`;
 }
 
 export function formatDuration(seconds: number): string {

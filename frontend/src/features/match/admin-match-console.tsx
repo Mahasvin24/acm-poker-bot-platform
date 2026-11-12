@@ -187,7 +187,7 @@ export function AdminMatchConsole({ matchId }: { matchId: string }) {
               </div>
               {playing && (
                 <span className={styles.statusPill} data-status={match.status}>
-                  Hand {match.hand_number}{match.level_remaining_seconds !== null ? ` · level ${match.level_number} · ${formatDuration(match.level_remaining_seconds)}` : ""}
+                  Hand {match.hand_number}{match.config.hand_limit ? ` of ${match.config.hand_limit}` : ""}{match.match_remaining_seconds != null ? ` · ${formatDuration(match.match_remaining_seconds)} match time left` : ""}{match.level_remaining_seconds !== null ? ` · level ${match.level_number} · ${formatDuration(match.level_remaining_seconds)}` : ""}
                 </span>
               )}
             </div>
