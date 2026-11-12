@@ -168,11 +168,15 @@ Do not combine `--reload` and `--workers`. The API documentation is at
 To run a live local match:
 
 1. Sign in as the administrator at <http://localhost:3000/account>.
-2. Create a match in `/admin`. The console shows a six-character join code such as `K7Q-4PM`.
+2. Create a match in `/admin`, choosing a time limit or a number of rounds (one round is one hand). The match clock starts on Start and freezes during an admin pause. At the limit, finish the current hand and rank the remaining players by chips. The console shows a join code such as `K7Q-4PM`.
 3. Players open `/join`, enter the code, and choose **Me** or one of their verified bots.
 4. Watch the roster fill in the console, then press **Start**. Bots that fail their health
    check are listed; **Start anyway** lets them play with automatic check/fold.
 5. Players' lobbies switch to the table automatically. Bot turns are dispatched by the server.
+
+The match console’s spectator view offers **Fullscreen** and **Open in new tab**. Cards stay
+hidden until an admin enables **Show cards & win odds**. Odds estimate showdown win shares with
+split pots counted proportionally; they are sampled before the turn and exact on the turn/river.
 
 To exercise the whole flow without a browser, run the smoke test with this machine's LAN IP:
 
