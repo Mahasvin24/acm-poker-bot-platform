@@ -21,9 +21,12 @@ import {
   verifyBot,
 } from "./api";
 import styles from "./account.module.css";
+import { BotTestPanel } from "./bot-test-panel";
+import { botSetupError } from "./bot-readiness";
 import {
   MATCH_STATUS_LABELS,
   type BotProfile,
+  type MatchStatus,
   type LeaderboardEntry,
   type MyMatch,
 } from "./types";
@@ -78,7 +81,7 @@ function TokenField({ botId, initialToken }: { botId: string; initialToken: stri
   );
 }
 
-function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToken: string | null; onChange: () => Promise<void> }) {
+function BotCard({ bot, initialToken, onChange, matchStatus }: { bot: BotProfile; initialToken: string | null; onChange: () => Promise<void>; matchStatus: MatchStatus | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -98,7 +101,7 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
       await onChange();
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "That did not work.";
-      if (label === "verify") setTestError(message);
+      if (label === "verify") setTestError(botSetupError(message));
       else setError(message);
       await onChange().catch(() => undefined);
     } finally {
@@ -169,7 +172,7 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
           onClick={() => void run("verify", async () => { await verifyBot(bot.id); })}
           type="button"
         >
-          {testing ? "Testing…" : "Test"}
+          {testing ? "Testing…" : "Test connection"}
         </button>
         <a
           className={styles.secondaryButton}
@@ -184,7 +187,10 @@ function BotCard({ bot, initialToken, onChange }: { bot: BotProfile; initialToke
         </a>
       </div>
       {error && <p className={styles.formError} role="alert">{error}</p>}
-
+      <details className={styles.protocolSection}>
+        <summary className={styles.summaryToggle}>Decision checks and setup checklist</summary>
+        <BotTestPanel key={`${bot.id}:${bot.ip}:${bot.port}:${bot.verified_at ?? ""}`} bot={bot} matchStatus={matchStatus} />
+      </details>
     </article>
   );
 }
@@ -475,7 +481,7 @@ export function ParticipantDashboard() {
               {error && <p className={styles.formError} role="alert">{error}</p>}
               <div className={styles.botList}>
                 {bots.map((bot) => <div key={bot.id}>
-                  <BotCard bot={bot} initialToken={newToken?.botId === bot.id ? newToken.value : null} onChange={refresh} />
+                  <BotCard bot={bot} initialToken={newToken?.botId === bot.id ? newToken.value : null} onChange={refresh} matchStatus={live.find((match) => match.status !== "lobby" && match.my_entries.some((entry) => entry.kind === "bot"))?.status ?? live.find((match) => match.my_entries.some((entry) => entry.kind === "bot"))?.status ?? null} />
                 </div>)}
               </div>
               </>}

@@ -84,3 +84,16 @@ def test_bot_previous_hand_summary_excludes_mucked_cards() -> None:
     assert "7c" not in previous.model_dump_json()
     assert sum(item.stack for item in previous.final_stacks) == 10_000
     assert [award.seat for award in previous.awards] == [2]
+
+
+def test_mucked_hand_is_visible_only_to_its_owner() -> None:
+    board = ("3c", "Kd", "Qs", "9h", "4c", "4s", "5c", "Jc")
+    snapshot = check_down(("As", "7c", "Ah", "2d", *board), button_seat=1)
+    public = natural_hand_result(snapshot)
+    private = natural_hand_result(snapshot, viewer_entrant_id="a")
+    other = natural_hand_result(snapshot, viewer_entrant_id="b")
+    assert public is not None and private is not None and other is not None
+    assert {hand.seat for hand in private.revealed_hands} == {1, 2}
+    assert {hand.seat for hand in public.revealed_hands} == {2}
+    assert {hand.seat for hand in other.revealed_hands} == {2}
+    assert private.winner_seats == public.winner_seats == other.winner_seats == (2,)

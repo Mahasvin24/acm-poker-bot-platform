@@ -203,3 +203,18 @@ export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   completed: "Finished",
   cancelled: "Cancelled",
 };
+
+export interface BotTestCheck {
+  name: string;
+  description: string;
+  passed: boolean;
+  elapsed_ms: number;
+  message: string;
+  action: string | null;
+  amount_to: number | null;
+}
+
+export interface BotTestReport {
+  passed: boolean;
+  checks: BotTestCheck[];
+}

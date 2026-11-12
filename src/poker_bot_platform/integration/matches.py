@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -19,8 +20,9 @@ from poker_bot_platform.api.models import (
 from poker_bot_platform.auth.models import Account, BotProfile, MatchResultSummary
 from poker_bot_platform.auth.repository import AuthRepository
 from poker_bot_platform.auth.service import BotProfileService
-from poker_bot_platform.bots import BotGateway
+from poker_bot_platform.bots import BotEndpoint, BotGateway
 from poker_bot_platform.domain import EntryKind, MatchConfig, MatchStatus
+from poker_bot_platform.integration.endpoint_usage import EndpointUsage
 from poker_bot_platform.integration.runtime import MatchRuntime, standing_responses
 from poker_bot_platform.match import (
     MatchCoordinator,
@@ -57,6 +59,7 @@ class MatchService:
         *,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
+        self.endpoints = EndpointUsage()
         self._registry = registry
         self._accounts = accounts
         self._bots = bots
@@ -83,14 +86,31 @@ class MatchService:
         state = coordinator.state
         if state.status is not MatchStatus.LOBBY:
             raise MatchCommandError("the match has already started")
-        problems = await self._bot_readiness_problems(state, check_health=not force)
-        if problems:
-            raise MatchCommandError(
-                "Some bots are not ready: "
-                + "; ".join(problems)
-                + ". Fix them or start anyway; unresponsive bots check or fold automatically."
-            )
-        await self._run(coordinator.start(actor_id=admin.id))
+        profiles = [
+            profile
+            for entry in state.entries
+            if entry.bot_profile_id is not None
+            and (profile := await self._accounts.get_bot_profile(entry.bot_profile_id)) is not None
+        ]
+        keys = [(profile.bot_ip, profile.bot_port) for profile in profiles]
+        async with self.endpoints.reserve(keys):
+            for profile in profiles:
+                current = await self._accounts.get_bot_profile(profile.id)
+                if current is None or (current.bot_ip, current.bot_port) != (
+                    profile.bot_ip,
+                    profile.bot_port,
+                ):
+                    raise MatchCommandError("bot settings changed; try starting again")
+            for key in keys:
+                await self._require_endpoint_idle(key, exclude_match_id=match_id)
+            problems = await self._bot_readiness_problems(state, check_health=not force)
+            if problems:
+                raise MatchCommandError(
+                    "Some bots are not ready: "
+                    + "; ".join(problems)
+                    + ". Fix them or start anyway; unresponsive bots check or fold automatically."
+                )
+            await self._run(coordinator.start(actor_id=admin.id, expected_revision=state.revision))
         self._runtime.wake()
         return await self._admin_view(coordinator.state)
 
@@ -290,6 +310,42 @@ class MatchService:
                 )
             )
         return tuple(responses)
+
+    # Bot setup and admission use the same endpoint locks. The state commit must
+    # happen before releasing them so a queued test observes a newly live match.
+
+    def bot_endpoint(self, profile: BotProfile) -> BotEndpoint:
+        return self._bots.endpoint_for(profile)
+
+    def bot_token(self, profile: BotProfile) -> str:
+        return self._bots.token_store.decrypt(profile.bot_token_ciphertext)
+
+    @asynccontextmanager
+    async def bot_setup(self, account_id: str, bot_id: str) -> AsyncIterator[BotProfile]:
+        profile = await self._bots.get(account_id, bot_id)
+        async with self.endpoints.reserve([(profile.bot_ip, profile.bot_port)]):
+            current = await self._bots.get(account_id, bot_id)
+            if (current.bot_ip, current.bot_port) != (profile.bot_ip, profile.bot_port):
+                raise MatchCommandError("bot settings changed; try again")
+            await self._require_endpoint_idle((current.bot_ip, current.bot_port))
+            yield current
+
+    async def _require_endpoint_idle(
+        self, key: tuple[str, int], *, exclude_match_id: str | None = None
+    ) -> None:
+        for state in await self._registry.list_states():
+            if state.match_id == exclude_match_id or state.status in {
+                MatchStatus.LOBBY,
+                MatchStatus.COMPLETED,
+                MatchStatus.CANCELLED,
+            }:
+                continue
+            for entry in state.entries:
+                if entry.bot_profile_id is None:
+                    continue
+                profile = await self._accounts.get_bot_profile(entry.bot_profile_id)
+                if profile is not None and (profile.bot_ip, profile.bot_port) == key:
+                    raise MatchCommandError("endpoint is assigned to a live match")
 
     # Helpers
 

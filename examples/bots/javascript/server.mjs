@@ -1,5 +1,6 @@
 // Minimal dependency-free Node.js participant bot. Run with: BOT_TOKEN=... node server.mjs
 import { createServer } from "node:http";
+import { chooseAction } from "./strategy.mjs";
 
 const token = process.env.BOT_TOKEN ?? "replace-me";
 const games = new Map(); // State is isolated by match_id.
@@ -62,8 +63,7 @@ createServer(async (request, response) => {
     if (request.method === "POST" && request.url === "/v1/action") {
       // Recover when the bot restarts or misses the start notification.
       if (!games.has(body.match_id)) games.set(body.match_id, {});
-      const allowed = new Set(body.legal_actions.map((item) => item.action));
-      const action = allowed.has("check") ? "check" : allowed.has("call") ? "call" : "fold";
+      const { action, amount_to } = chooseAction(body);
       send(response, 200, {
         protocol: "poker-bot.v2",
         match_id: body.match_id,
@@ -72,7 +72,7 @@ createServer(async (request, response) => {
         decision_id: body.decision_id,
         table_version: body.table_version,
         action,
-        amount_to: null,
+        amount_to,
       });
       return;
     }

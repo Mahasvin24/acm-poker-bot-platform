@@ -7,6 +7,7 @@ import type {
   BotDiagnostics,
   BotProfile,
   BotToken,
+  BotTestReport,
   EntrantKind,
   MatchConfig,
   MatchPreview,
@@ -120,6 +121,9 @@ export const verifyBot = (botId: string) => post<BotProfile>(`${botPath(botId)}/
 export const deleteBot = (botId: string) => apiRequest<void>(botPath(botId), { method: "DELETE" });
 export const getBotDiagnostics = (botId: string) =>
   apiRequest<BotDiagnostics>(`${botPath(botId)}/diagnostics`);
+
+export const testBot = (botId: string, signal?: AbortSignal) =>
+  apiRequest<BotTestReport>(`${botPath(botId)}/test`, { method: "POST", signal });
 
 // Matches
 

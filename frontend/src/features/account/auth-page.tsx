@@ -43,7 +43,7 @@ export function AuthPage({ next }: AuthPageProps) {
       })
       .catch((requestError: unknown) => {
         if (active && !(requestError instanceof AccountApiError && requestError.status === 401)) {
-          setError("The account service is unavailable. Check that the API is running.");
+          setError("The competition website is unavailable. Try again shortly; if it continues, contact the organizer.");
         }
       })
       .finally(() => {

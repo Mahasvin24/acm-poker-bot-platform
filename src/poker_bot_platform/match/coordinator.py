@@ -147,10 +147,12 @@ class MatchCoordinator:
             command = "revoke_join_code" if join_code is None else "set_join_code"
             return await self._save(candidate, actor_id, command)
 
-    async def start(self, *, actor_id: str) -> MatchState:
+    async def start(self, *, actor_id: str, expected_revision: int | None = None) -> MatchState:
         async with self._lock:
             self._require_status(MatchStatus.LOBBY, "the match has already started")
             state = self._state
+            if expected_revision is not None and state.revision != expected_revision:
+                raise MatchError("the lobby changed during readiness checks; try starting again")
             if len(state.entries) < 2:
                 raise MatchError("at least two players must join before the match starts")
             rng = deterministic_rng(state.seed_hex, "seating")

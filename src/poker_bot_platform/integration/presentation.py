@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pokerkit import Hand, StandardHighHand
+from pokerkit import StandardHighHand
 
 from poker_bot_platform.api.models import (
     HandAwardResponse,
@@ -10,7 +10,9 @@ from poker_bot_platform.api.models import (
 from poker_bot_platform.domain import HandSnapshot, StartHandRequest
 
 
-def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
+def natural_hand_result(
+    snapshot: HandSnapshot, *, viewer_entrant_id: str | None = None
+) -> HandResultResponse | None:
     """Build the public, presentation-oriented result from authoritative engine state."""
 
     if not snapshot.completed:
@@ -29,11 +31,11 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
             continue
         seat_number = raw_award.get("seat")
         amount = raw_award.get("amount")
-        if not isinstance(seat_number, int) or not isinstance(amount, int) or amount <= 0:
+        if not isinstance(seat_number, int):
             continue
         seat = seats_by_number.get(seat_number)
         starting = starting_stacks.get(seat_number)
-        if seat is None or starting is None:
+        if seat is None or starting is None or not isinstance(amount, int) or amount <= 0:
             continue
         awards.append(
             HandAwardResponse(
@@ -46,24 +48,24 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
     live_hands = [seat for seat in snapshot.seats if seat.hole_cards and not seat.folded]
     folded = len(live_hands) <= 1
     revealed: list[RevealedHandResponse] = []
-    ranked_hands: list[tuple[int, Hand]] = []
     if not folded:
-        # Only hands PokerKit actually showed are public; mucked losing hands stay private.
         for seat in live_hands:
-            if not seat.public_hole_cards:
+            cards = (
+                seat.hole_cards if seat.entrant_id == viewer_entrant_id else seat.public_hole_cards
+            )
+            if not cards:
                 continue
             try:
                 hand = StandardHighHand.from_game(
-                    "".join(seat.public_hole_cards),
+                    "".join(cards),
                     "".join(snapshot.community_cards),
                 )
             except ValueError:
                 continue
-            ranked_hands.append((seat.seat, hand))
             revealed.append(
                 RevealedHandResponse(
                     seat=seat.seat,
-                    hole_cards=seat.public_hole_cards,
+                    hole_cards=cards,
                     label=hand.entry.label.value,
                     best_five=tuple(repr(card) for card in hand.cards),
                 )
@@ -71,12 +73,9 @@ def natural_hand_result(snapshot: HandSnapshot) -> HandResultResponse | None:
 
     if folded:
         winner_seats = tuple(seat.seat for seat in live_hands)
-    elif ranked_hands and not snapshot.side_pots:
-        best_hand = max(hand for _, hand in ranked_hands)
-        winner_seats = tuple(seat_number for seat_number, hand in ranked_hands if hand == best_hand)
     else:
-        # A side-pot winner can hold a weaker hand than the main-pot winner.
-        # In that case, PokerKit's pot awards remain the authoritative source.
+        # PokerKit pot awards establish winners without inspecting mucked cards
+        # or confusing side-pot winners with the best main-pot hand.
         winner_seats = tuple(award.seat for award in awards)
 
     return HandResultResponse(

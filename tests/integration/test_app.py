@@ -40,9 +40,9 @@ def test_application_factory_mounts_match_api_without_connecting_to_database() -
 
 async def test_scheduler_discovers_and_drives_running_matches() -> None:
     stack = await build_stack()
-    owner = await stack.user("owner@example.com")
     match_id, code = await stack.create_match()
     for index in range(2):
+        owner = await stack.user(f"owner-{index}@example.com")
         profile = await stack.verified_bot(owner, f"Bot {index}", f"10.20.0.{30 + index}")
         await stack.join_bot(owner, code, profile)
     await stack.matches.start(stack.admin, match_id)

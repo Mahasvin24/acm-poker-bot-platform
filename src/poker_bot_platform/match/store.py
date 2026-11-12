@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from poker_bot_platform.auth.repository import AuthRepository
 
+from poker_bot_platform.domain import MatchStatus
 from poker_bot_platform.match.models import (
     ACTIVE_MATCH_STATUSES,
     OPEN_MATCH_STATUSES,
     AuditEntry,
     MatchState,
-    MatchStatus,
 )
+
 
 class MatchStoreError(RuntimeError):
     pass

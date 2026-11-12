@@ -14,6 +14,7 @@ from poker_bot_platform.bots import BotGateway
 from poker_bot_platform.bots.tokens import EncryptedTokenStore
 from poker_bot_platform.config import Settings
 from poker_bot_platform.integration import GameplayScheduler, MatchRuntime, MatchService
+from poker_bot_platform.integration.bot_testing import BotTestingService
 from poker_bot_platform.integration.demo_match import DemoMatchSessions
 from poker_bot_platform.match import MatchRegistry, SqlAlchemyMatchStore
 from poker_bot_platform.persistence import create_database_components
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             bots=bots,
             matches=matches,
             runtime=runtime,
+            bot_testing=BotTestingService(matches, bot_gateway),
             allowed_origin=settings.allowed_origin,
             cookie_secure=settings.cookie_secure,
         )

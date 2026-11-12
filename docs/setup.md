@@ -251,3 +251,11 @@ for the complete wire contract.
 Malformed JSON, duplicate keys, schema mismatches, stale identifiers, illegal actions, wrong
 content types, non-success responses, oversized responses, connection failures, and timeouts all
 produce one deterministic automatic check-or-fold.
+
+### Browser bot checks
+
+The dashboard separates **Test connection** (saved health/token verification) from
+**Test My Bot** under **Decision checks and setup checklist** (six synthetic protocol
+checks, up to 35 seconds). Run both before starting a match. A saved verification or a
+past passing test is not evidence that the bot is still running. See the
+[participant guide](../examples/bots/README.md#testing-your-bot-in-the-browser).

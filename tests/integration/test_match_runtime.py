@@ -27,10 +27,10 @@ async def human_vs_bots(
     force: bool = False,
 ) -> tuple[str, str]:
     ava = await stack.user("ava@example.com")
-    owner = await stack.user("owner@example.com")
     match_id, code = await stack.create_match(config)
     await stack.join_human(ava, code, "Ava")
     for index in range(bots):
+        owner = await stack.user(f"bot-owner-{index}@example.com")
         profile = await stack.verified_bot(owner, f"Bot {index + 1}", f"10.20.0.{11 + index}")
         await stack.join_bot(owner, code, profile)
     await stack.matches.start(stack.admin, match_id, force=force)
@@ -144,9 +144,10 @@ async def test_failing_bot_trips_breaker_and_is_probed_instead_of_waited_on() ->
     match_id, code = await stack.create_match()
     await stack.join_human(ava, code, "Ava")
     good = await stack.verified_bot(owner, "Good", "10.20.0.11")
-    broken = await stack.verified_bot(owner, "Broken", "10.20.0.12")
+    broken_owner = await stack.user("broken@example.com")
+    broken = await stack.verified_bot(broken_owner, "Broken", "10.20.0.12")
     await stack.join_bot(owner, code, good)
-    await stack.join_bot(owner, code, broken)
+    await stack.join_bot(broken_owner, code, broken)
     stack.network.broken.add("10.20.0.12")
 
     with pytest.raises(MatchCommandError, match="Broken did not answer"):
@@ -226,9 +227,9 @@ async def test_table_recovers_after_a_database_failure() -> None:
 
 async def test_bot_only_tables_run_without_presentation_pauses() -> None:
     stack = await build_stack()
-    owner = await stack.user("owner@example.com")
     match_id, code = await stack.create_match()
     for index in range(2):
+        owner = await stack.user(f"bot-owner-{index}@example.com")
         profile = await stack.verified_bot(owner, f"Bot {index}", f"10.20.0.{20 + index}")
         await stack.join_bot(owner, code, profile)
     await stack.matches.start(stack.admin, match_id)

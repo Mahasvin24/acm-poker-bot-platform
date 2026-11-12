@@ -8,7 +8,22 @@ bot builders register reusable bots once and seat them with the same code. The F
 runs every hand through PokerKit, persists each action to PostgreSQL before advancing, paces play
 so humans can follow, and resolves any bot or human failure with a recorded check or fold.
 
+## Participant quickstart
+
+Participants only need to run their bot, not the platform backend or database.
+
+1. Open the organizer's website, create a bot account, and save your bot's LAN IP
+   and port `8001` in **Bot configuration** on the dashboard.
+2. Copy the token into your starter as `BOT_TOKEN`, then run the bot on the event network.
+3. Select **Test connection**, then expand **Decision checks and setup checklist**
+   and run **Test My Bot**. Keep the bot running and join using the organizer's match code.
+
+See the [bot guide](examples/bots/README.md) for Windows commands, networking,
+protocol testing, and editable strategy functions.
+
 ## Setup
+
+The following setup is for organizers and developers running the full platform locally.
 
 ### Environment
 

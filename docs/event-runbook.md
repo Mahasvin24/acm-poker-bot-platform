@@ -67,3 +67,10 @@ machine names, and drill results in a separate event worksheet; do not commit se
   addresses and verify again, then resume.
 - Engine invariant failure: the table stops and the console shows it; end the match to record
   standings and preserve logs and the database for review.
+
+### Bot rehearsal checks
+
+Have each builder save their LAN endpoint and token, pass **Test connection**, then run
+**Test My Bot** under **Decision checks and setup checklist** before the organizer starts
+a match. Keep terminals open and laptops awake. Synthetic tests never join a match or
+save verification; an endpoint in a running or paused match cannot be edited or tested.

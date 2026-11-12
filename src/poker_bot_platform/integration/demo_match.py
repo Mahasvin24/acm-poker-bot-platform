@@ -391,7 +391,7 @@ class EphemeralDemoMatch:
             completed=completed,
             decision=decision,
             turn=turn,
-            hand_result=natural_hand_result(snapshot),
+            hand_result=natural_hand_result(snapshot, viewer_entrant_id=_HUMAN_ENTRANT_ID),
         )
 
     @staticmethod

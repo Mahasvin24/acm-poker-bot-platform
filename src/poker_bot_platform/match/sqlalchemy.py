@@ -6,16 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from poker_bot_platform.domain import MatchStatus
 from poker_bot_platform.match.models import (
     ACTIVE_MATCH_STATUSES,
     OPEN_MATCH_STATUSES,
     AuditEntry,
     MatchState,
-    MatchStatus,
 )
 
 if TYPE_CHECKING:
-    from poker_bot_platform.auth.repository import AuthRepository
+    from poker_bot_platform.auth.sqlalchemy import SqlAlchemyAuthRepository
 from poker_bot_platform.match.store import (
     JoinCodeConflict,
     MatchNotFoundError,
@@ -31,7 +31,7 @@ class SqlAlchemyMatchStore:
     def __init__(
         self,
         sessions: async_sessionmaker[AsyncSession],
-        career: AuthRepository | None = None,
+        career: SqlAlchemyAuthRepository | None = None,
     ) -> None:
         self._sessions = sessions
         self._career = career

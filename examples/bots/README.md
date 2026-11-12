@@ -50,6 +50,124 @@ python -m poker_bot_platform.bots.conformance \
   --participant-subnet 192.168.0.0/16
 ```
 
+## JavaScript starter
+
+Install Node.js 20.9+ and check it with `node --version`. No extra packages are needed.
+From the repository folder, replace `token-from-my-bots` with your copied token:
+
+**macOS / Linux:**
+
+```bash
+cd examples/bots/javascript
+BOT_TOKEN='token-from-my-bots' PORT=8001 node server.mjs
+```
+
+**Windows PowerShell:**
+
+```powershell
+cd examples/bots/javascript
+$env:BOT_TOKEN='token-from-my-bots'
+$env:PORT='8001'
+node server.mjs
+```
+
+Leave the terminal open. Open <http://localhost:8001/v1/health> on your laptop; it should show
+`{"protocol":"poker-bot.v2","status":"ready"}`. This local address is only for this check.
+
+### Change your JavaScript strategy
+
+Edit **`chooseAction(state)` in `examples/bots/javascript/strategy.mjs`**. Leave `server.mjs`
+alone: it handles the connection and response format. For example, this checks for free and
+folds instead of paying to call:
+
+```javascript
+export function chooseAction(state) {
+  const canCheck = state.legal_actions.some((item) => item.action === "check");
+  return { action: canCheck ? "check" : "fold", amount_to: null };
+}
+```
+
+Press **Ctrl+C** to stop the bot, rerun its start command, then run **Test My Bot** again.
+
+## Python starter
+
+
+Use Python 3.12+. You only need to run your bot, not the platform's database or backend.
+From the repository folder, choose the commands for your terminal and replace the token.
+
+**macOS / Linux:**
+
+```shell
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+cd examples/bots/python
+BOT_TOKEN=replace-with-my-bots-token uvicorn app:app --host 0.0.0.0 --port 8001
+```
+
+**Windows PowerShell:**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e .
+cd examples/bots/python
+$env:BOT_TOKEN='replace-with-my-bots-token'
+uvicorn app:app --host 0.0.0.0 --port 8001
+```
+
+Edit **`choose_action(state)` in `examples/bots/python/strategy.py`**. It returns
+`(action, raise_to)`; use `None` for `raise_to` unless raising. For example, change the
+function body to check for free and otherwise fold:
+
+```python
+allowed = {item.action for item in state.legal_actions}
+return (ActionType.CHECK if ActionType.CHECK in allowed else ActionType.FOLD), None
+```
+
+Leave `app.py` alone: it handles authentication and response IDs. Press Ctrl+C and rerun the
+last command to restart your bot after editing.
+
+## Networking checklist
+
+- Connect to the network named by the organizer while registering, verifying, testing, and
+  playing. Testing from home requires an organizer-provided test network/server that can
+  reach your laptop; opening the website alone is not enough.
+- Find your **LAN IP** (your laptop's address on this network):
+  **Windows:** Settings → Network & internet → Wi-Fi → your connected network → IPv4 address.
+  **macOS:** System Settings → Wi-Fi → Details → TCP/IP → IP address.
+  **Linux:** open the connected network's settings and look under IPv4/Details.
+- Save that numeric address, such as `192.168.1.42`, and port `8001` on the dashboard.
+  Do not save `localhost`, `127.0.0.1`, or the competition website address.
+- Allow the bot's port through your firewall when prompted. Do not disable the firewall.
+  If local health works but verification fails, recheck the saved IP and network; the
+  organizer's server must be able to reach your laptop. Wi-Fi changes can change your IP.
+
+## Testing your bot in the browser
+
+In **Bot configuration**, select **Test connection** to save verification of your
+bot's health and token. Then expand **Decision checks and setup checklist** and
+select **Test My Bot**. Allow up to 35 seconds for six checks: health, authentication,
+check/raise, facing a bet, a short-stack call, and a short all-in raise.
+
+Each check reports PASS/FAIL, response time, and an explanation. Any advertised legal
+action passes; choosing a raise is optional. Tests use synthetic protocol v2 decisions,
+never live game state, and do not save verification, change chips, or join a match.
+The report belongs to the current page and clears when the saved endpoint changes.
+
+Test before starting a match. Testing, endpoint edits, token rotation, and bot deletion
+are blocked while the endpoint belongs to a live match, including paused matches.
+An endpoint cannot be admitted into another live match while a test is running.
+If testing is busy, wait and try again. Keep your bot running on the event Wi-Fi.
+
+| Problem | What to check |
+| --- | --- |
+| Cannot connect | Keep the terminal open, check your saved numeric LAN IP and port, and allow the port through your firewall. |
+| IP rejected | Use your laptop's address on the participant network, not localhost or a website URL. |
+| Authentication fails | Show your existing token in the dashboard, copy it into BOT_TOKEN, restart, and test the connection again. |
+| Invalid or late action | Choose from legal_actions, use the supplied raise bounds, echo the current identifiers, and respond within five seconds. |
+| Endpoint in use | Finish the live match before changing or testing its endpoint. |
+
 ## Game lifecycle and state
 
 A **game means the whole match**, across all of its hands. The platform attempts

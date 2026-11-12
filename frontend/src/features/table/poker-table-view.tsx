@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./poker-table.module.css";
+import { resultTransitionDelay } from "./result-transition";
 import type {
   ActionType,
   HandResult,
@@ -530,7 +531,25 @@ function FinishOverlay({ table, exitHref }: { table: PlayerTableState; exitHref:
   const viewer = table.viewer;
   const standings = table.match?.standings ?? [];
   const finished = table.match_status === "completed" || table.match_status === "cancelled";
-  if (!finished && viewer?.status !== "eliminated") return null;
+  const terminal = finished || viewer?.status === "eliminated";
+  const observedLive = useRef(!terminal);
+  const terminalUntil = useRef(0);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!terminal) {
+      observedLive.current = true;
+      terminalUntil.current = 0;
+      return;
+    }
+    const now = Date.now();
+    if (table.completed && terminalUntil.current === 0) terminalUntil.current = now + 4000;
+    const delay = observedLive.current
+      ? resultTransitionDelay({ completed: table.completed }, terminalUntil.current, now)
+      : 0;
+    const timer = setTimeout(() => setReady(true), delay);
+    return () => clearTimeout(timer);
+  }, [terminal, table.completed, table.hand_id]);
+  if (!terminal || !ready) return null;
   if (hidden) {
     return (
       <button className={styles.finishReopen} onClick={() => setHidden(false)} type="button">

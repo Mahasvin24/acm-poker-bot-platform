@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from poker_bot_platform.auth.models import MatchResultSummary
-from poker_bot_platform.domain import EntryKind
-from poker_bot_platform.match.models import MatchState, MatchStatus
+from poker_bot_platform.domain import EntryKind, MatchStatus
+from poker_bot_platform.match.models import MatchState
 
 
 def match_result_rows(state: MatchState) -> tuple[MatchResultSummary, ...]:

@@ -161,6 +161,19 @@ export default function BotGuidePage() {
               </section>
               <section className={styles.protocolSection}>
                 <div>
+                  <h3>Edit and test your strategy</h3>
+                  <p className={styles.panelIntro}>
+                    Edit <code>choose_action</code> in the Python starter&apos;s <code>strategy.py</code>
+                    or <code>chooseAction</code> in JavaScript&apos;s <code>strategy.mjs</code>, then restart your bot.
+                    In Bot configuration, run <strong>Test connection</strong> to save verification.
+                    Expand <strong>Decision checks and setup checklist</strong> and select <strong>Test My Bot</strong>
+                    for six synthetic checks. Allow up to 35 seconds. Tests do not change verification
+                    or match eligibility; run them before entering a live match.
+                  </p>
+                </div>
+              </section>
+              <section className={styles.protocolSection}>
+                <div>
                   <h3>A complete request</h3>
                   <p className={styles.panelIntro}>
                     Your own hole cards, the public table, every action this hand with its street,

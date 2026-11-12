@@ -802,7 +802,9 @@ class MatchRuntime:
             completed=snapshot.completed,
             decision=decision,
             turn=turn,
-            hand_result=natural_hand_result(snapshot),
+            hand_result=natural_hand_result(
+                snapshot, viewer_entrant_id=entry.entry_id if entry else None
+            ),
             next_action_at=next_action_at,
             match=_match_context(state),
             last_hand=(

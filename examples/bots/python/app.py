@@ -17,7 +17,7 @@ from poker_bot_platform.bots.models import (
     VerifyRequest,
     VerifyResponse,
 )
-from poker_bot_platform.bots.reference import deterministic_reference_action
+from strategy import choose_action
 
 app = FastAPI()
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "replace-me")
@@ -78,4 +78,14 @@ async def action(
     authorize(authorization)
     # Recover if this bot restarted or missed the start notification.
     games.setdefault(request.match_id, {})
-    return deterministic_reference_action(request)
+    selected, amount_to = choose_action(request)
+    return BotActionResponse(
+        protocol=request.protocol,
+        match_id=request.match_id,
+        table_id=request.table_id,
+        hand_id=request.hand_id,
+        decision_id=request.decision_id,
+        table_version=request.table_version,
+        action=selected,
+        amount_to=amount_to,
+    )

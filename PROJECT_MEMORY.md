@@ -19,6 +19,8 @@
 - **Showdown privacy** — Hand results, table views, spectator views, and bot `previous_hand` use `public_hole_cards` (what PokerKit showed), never `hole_cards`, for anyone but the viewer. Evidence: `integration/presentation.py`, `bots/factory.py::previous_hand_from_snapshot`, `tests/integration/test_presentation.py`. Last verified: 2026-10-18.
 - **Shared table presentation** — Player, spectator, demo, and preview tables all render through `PokerTableView`; containers own transport only. Evidence: `frontend/src/features/table/`. Last verified: 2026-10-18.
 
+- **Browser bot tests use v2 profiles** — `POST /api/v1/bots/{id}/test` runs six synthetic checks without saving verification. `MatchService` shares endpoint reservations across test suites, setup mutations, and match admission; tests must never send synthetic decisions to a live match endpoint. The incoming tournament-specific testing service was superseded during the match-architecture merge. Evidence: `integration/bot_testing.py`, `integration/matches.py::bot_setup`, `tests/integration/test_bot_testing.py`.
+
 ## Discoveries and gotchas
 
 - **`TableCoordinator.restore()` marks "not found" as a database outage** — `TableNotFoundError` is a `PersistenceError`, so `restore()` sets `database_paused` before raising. Callers must build a fresh coordinator for a table that has not dealt its first hand. Evidence: `MatchRuntime._coordinator`. Last verified: 2026-10-18.

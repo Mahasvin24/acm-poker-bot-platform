@@ -1,4 +1,5 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
@@ -32,7 +33,7 @@ from poker_bot_platform.api.models import (
 )
 from poker_bot_platform.api.rate_limit import RateLimitExceeded, SlidingWindowLimiter
 from poker_bot_platform.api.security import SameOriginGuard, client_key, too_many_attempts
-from poker_bot_platform.auth.models import Account
+from poker_bot_platform.auth.models import Account, BotProfile
 from poker_bot_platform.auth.repository import AuthConflictError, AuthNotFoundError
 from poker_bot_platform.auth.service import (
     AuthService,
@@ -41,7 +42,9 @@ from poker_bot_platform.auth.service import (
     InvalidCredentialsError,
     InvalidSessionError,
 )
+from poker_bot_platform.bots.testing import BotTestReport
 from poker_bot_platform.domain import EntryKind, Role
+from poker_bot_platform.integration.bot_testing import BotTestBusyError, BotTestingService
 from poker_bot_platform.integration.matches import MatchCommandError, MatchNotFound, MatchService
 from poker_bot_platform.integration.runtime import (
     GameplayAccessError,
@@ -84,6 +87,7 @@ def create_api_router(
     matches: MatchService,
     runtime: MatchRuntime,
     allowed_origin: str,
+    bot_testing: BotTestingService | None = None,
     cookie_name: str = "poker_session",
     cookie_secure: bool = False,
 ) -> APIRouter:
@@ -239,7 +243,9 @@ def create_api_router(
         response_model=AccountResponse,
         dependencies=mutation_guard,
     )
-    async def update_profile(body: UpdateProfileRequest, account: CurrentAccount) -> AccountResponse:
+    async def update_profile(
+        body: UpdateProfileRequest, account: CurrentAccount
+    ) -> AccountResponse:
         try:
             updated = await auth.update_profile(account, body.display_name)
         except ValueError as exc:
@@ -296,7 +302,9 @@ def create_api_router(
         try:
             await auth.request_password_reset(body.email)
         except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            ) from exc
 
     @router.get("/leaderboard", response_model=tuple[LeaderboardEntryResponse, ...])
     async def leaderboard(_account: CurrentAccount) -> tuple[LeaderboardEntryResponse, ...]:
@@ -363,6 +371,15 @@ def create_api_router(
             temporary_password=temporary,
         )
 
+    @asynccontextmanager
+    async def bot_setup(account_id: str, bot_id: str) -> AsyncIterator[BotProfile]:
+        context = matches.bot_setup(account_id, bot_id)
+        profile = await _translate(context.__aenter__())
+        try:
+            yield profile
+        finally:
+            await context.__aexit__(None, None, None)
+
     # Bots
 
     @router.get("/bots", response_model=tuple[BotProfileResponse, ...])
@@ -401,10 +418,11 @@ def create_api_router(
         body: BotProfileUpdateRequest,
         account: CurrentAccount,
     ) -> BotProfileResponse:
-        profile = await _translate(
-            bots.update(account.id, bot_id, name=body.name, ip=body.ip, port=body.port)
-        )
-        return BotProfileResponse.from_profile(profile)
+        async with bot_setup(account.id, bot_id):
+            profile = await _translate(
+                bots.update(account.id, bot_id, name=body.name, ip=body.ip, port=body.port)
+            )
+            return BotProfileResponse.from_profile(profile)
 
     @router.post(
         "/bots/{bot_id}/token",
@@ -431,12 +449,13 @@ def create_api_router(
         response: Response,
         account: CurrentAccount,
     ) -> BotTokenResponse:
-        result = await _translate(bots.rotate_token(account.id, bot_id))
-        response.headers["Cache-Control"] = "no-store"
-        return BotTokenResponse(
-            bot=BotProfileResponse.from_profile(result.profile),
-            bearer_token=result.bearer_token,
-        )
+        async with bot_setup(account.id, bot_id):
+            result = await _translate(bots.rotate_token(account.id, bot_id))
+            response.headers["Cache-Control"] = "no-store"
+            return BotTokenResponse(
+                bot=BotProfileResponse.from_profile(result.profile),
+                bearer_token=result.bearer_token,
+            )
 
     @router.post(
         "/bots/{bot_id}/verify",
@@ -444,8 +463,9 @@ def create_api_router(
         dependencies=mutation_guard,
     )
     async def verify_bot(bot_id: str, account: CurrentAccount) -> BotProfileResponse:
-        profile = await _translate(bots.verify(account.id, bot_id))
-        return BotProfileResponse.from_profile(profile)
+        async with bot_setup(account.id, bot_id):
+            profile = await _translate(bots.verify(account.id, bot_id))
+            return BotProfileResponse.from_profile(profile)
 
     @router.delete(
         "/bots/{bot_id}",
@@ -453,7 +473,8 @@ def create_api_router(
         dependencies=mutation_guard,
     )
     async def delete_bot(bot_id: str, account: CurrentAccount) -> None:
-        await _translate(bots.delete(account.id, bot_id))
+        async with bot_setup(account.id, bot_id):
+            await _translate(bots.delete(account.id, bot_id))
 
     @router.get("/bots/{bot_id}/diagnostics", response_model=BotDiagnosticsResponse)
     async def bot_diagnostics(bot_id: str, account: CurrentAccount) -> BotDiagnosticsResponse:
@@ -466,6 +487,22 @@ def create_api_router(
             consecutive_failures=stats.consecutive_failures,
             recent=tuple(stats.recent),
         )
+
+    @router.post(
+        "/bots/{bot_id}/test",
+        response_model=BotTestReport,
+        dependencies=mutation_guard,
+    )
+    async def test_bot(bot_id: str, response: Response, account: CurrentAccount) -> BotTestReport:
+        if bot_testing is None:
+            raise HTTPException(status_code=503, detail="bot testing is unavailable")
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            return await _translate(bot_testing.run(account.id, bot_id))
+        except BotTestBusyError as exc:
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
+        except TimeoutError as exc:
+            raise HTTPException(status_code=504, detail="bot test suite timed out") from exc
 
     # Matches for players
 
