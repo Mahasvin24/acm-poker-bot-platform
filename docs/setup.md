@@ -24,9 +24,18 @@ The important backend variables are:
 | `POKER_SECRET_KEY` | None; required | Encrypts bot tokens. The server refuses placeholder or low-entropy values |
 | `POKER_PARTICIPANT_SUBNET` | `192.168.0.0/16` | LAN range allowed to host participant bots |
 | `POKER_BLOCKED_IPS` | Router/service addresses | LAN addresses bots must not target |
-| `POKER_ALLOWED_ORIGIN` | `http://localhost:3000` | Browser origin allowed by the API |
+| `POKER_ALLOWED_ORIGIN` | `http://localhost:3000` | Browser origins allowed by the API (comma-separated) |
 | `POKER_COOKIE_SECURE` | `false` | Set to `true` behind HTTPS |
 | `POKER_WORKER_COUNT` | `1` | Version 1 requires exactly one API worker |
+
+For access from both this computer and event Wi-Fi, set the frontend origins explicitly:
+
+```dotenv
+POKER_ALLOWED_ORIGIN=http://localhost:3000,http://127.0.0.1:3000,http://192.168.0.176:3000
+```
+
+Replace the LAN address with the computer hosting the frontend, and restart the API after changing
+this setting. Origins must include the scheme and port; unrelated origins remain blocked.
 
 When the backend uses an origin other than `http://127.0.0.1:8000`, also configure the frontend:
 
