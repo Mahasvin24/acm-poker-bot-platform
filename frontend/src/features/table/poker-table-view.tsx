@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./poker-table.module.css";
-import { boardRevealSteps, raisePresets } from "./presentation";
+import { boardRevealSteps, isOpeningBet as isBetAvailable, raisePresets } from "./presentation";
 import { resultTransitionDelay } from "./result-transition";
 import type {
   ActionType,
@@ -218,6 +218,20 @@ function PlayingCard({
   );
 }
 
+function ChipTower({ amount, maximum, tone }: {
+  amount: number;
+  maximum: number;
+  tone: "balance" | "committed" | "pot";
+}) {
+  const count = amount <= 0 ? 0 : Math.max(1, Math.min(6, Math.ceil(amount / Math.max(1, maximum) * 6)));
+  return (
+    <span aria-hidden="true" className={`${styles.chipTower} ${styles[tone]}`}>
+      {Array.from({ length: count }, (_, index) => <i key={index} style={{ "--chip-level": index } as CSSProperties} />)}
+      {count === 0 && <i className={styles.emptyChip} />}
+    </span>
+  );
+}
+
 function SeatView({
   seat,
   viewerSeat,
@@ -231,6 +245,8 @@ function SeatView({
   winner,
   showdownIndex,
   bigBlind,
+  maxStack,
+  maxCommitted,
 }: {
   seat: PlayerSeat;
   viewerSeat: number | null;
@@ -244,6 +260,8 @@ function SeatView({
   winner: boolean;
   showdownIndex: number;
   bigBlind: number;
+  maxStack: number;
+  maxCommitted: number;
 }) {
   const relativePosition = (seat.seat - anchorSeat + 6) % 6;
   const resultHand = result?.revealed_hands.find((hand) => hand.seat === seat.seat);
@@ -311,12 +329,23 @@ function SeatView({
                     : "In hand"}
         </span>
       </div>
-      <div className={styles.seatChips}>
-        <span aria-label={`${seat.display_name} has ${formatChips(seat.stack)} chips`}>
-          {formatChips(seat.stack)} <small>chips</small>
-          {isViewer && <small> · {blindDepth.format(seat.stack / bigBlind)} BB</small>}
+      <div className={styles.boardChipRack}>
+        <span className={styles.boardChipStack} title={`${formatChips(seat.stack)} chips remaining`}>
+          <ChipTower amount={seat.stack} maximum={maxStack} tone="balance" />
+          <span className={styles.boardChipCopy}>
+            <small>Stack</small>
+            <strong>{formatChips(seat.stack)}</strong>
+            {isViewer && <em>{blindDepth.format(seat.stack / bigBlind)} BB</em>}
+          </span>
         </span>
-        {seat.committed_this_street > 0 && <span className={styles.streetBet}>Bet {formatChips(seat.committed_this_street)}</span>}
+        {seat.committed_this_hand > 0 && <span className={styles.boardChipStack} title={`${formatChips(seat.committed_this_hand)} contributed this hand`}>
+          <ChipTower amount={seat.committed_this_hand} maximum={maxCommitted} tone="committed" />
+          <span className={styles.boardChipCopy}>
+            <small>In pot</small>
+            <strong>{formatChips(seat.committed_this_hand)}</strong>
+            {seat.committed_this_street > 0 && <em>{formatChips(seat.committed_this_street)} this street</em>}
+          </span>
+        </span>}
       </div>
       {latestAction && <span className={styles.actionBadge}>{latestAction}</span>}
     </article>
@@ -541,18 +570,20 @@ export function PokerTableView({
   const latest = recentActions[0];
   const result = table.hand_result ?? null;
   const winnerSeats = useMemo(() => new Set(result?.winner_seats ?? []), [result]);
-  const boardBest = new Set(result?.revealed_hands.flatMap((hand) => hand.best_five) ?? []);
+  const displayedPot = result ? result.awards.filter((award) => winnerSeats.has(award.seat)).reduce((total, award) => total + award.amount, 0) : table.pot;
+  const boardBest = new Set(result?.revealed_hands.filter((hand) => winnerSeats.has(hand.seat)).flatMap((hand) => hand.best_five) ?? []);
   const legal = table.decision?.legal_actions ?? [];
   const raise = legal.find((item) => item.action === "raise");
   const canCheck = legal.some((item) => item.action === "check");
   const callAction = legal.find((item) => item.action === "call");
-  const betting = canCheck;
+  const betting = isBetAvailable(table.street, canCheck);
   const viewer = table.seats.find((seat) => seat.seat === table.viewer_seat);
   const anchorSeat = table.viewer_seat ?? 1;
+  const maxStack = Math.max(1, ...table.seats.map((seat) => seat.stack));
+  const maxCommitted = Math.max(1, ...table.seats.map((seat) => seat.committed_this_hand));
   const callAmount = callAction?.amount ?? 0;
   const activeStage = currentHandStage(phase, table);
   const stageLabel = handStages.find((stage) => stage.key === activeStage)?.label ?? "Pre-flop";
-  const turnName = turn ? names.get(turn.seat) ?? `Seat ${turn.seat}` : null;
   const turnLabel = resolving ? "Resolving action…" : statusLabel(phase, table, names, waitSeconds);
   const latestNarrative = actionNarrative(latest, table.action_history, names);
   const banner = statusBanner(table);
@@ -613,11 +644,11 @@ export function PokerTableView({
           <div className={styles.handMeta}>
             <span>{table.match?.name ?? "Match"}</span>
             <b>Hand #{table.hand_number}</b>
-            <span>{table.match ? `${table.match.players_remaining} players left` : ""}</span>
+            <span>{table.match ? `${table.match.players_remaining} ${table.match.players_remaining === 1 ? "player" : "players"} left` : ""}</span>
           </div>
           <div className={styles.headerActions}>
             <span className={`${styles.connection} ${styles[connectionTone]}`}><i aria-hidden="true" /> {connectionLabel}</span>
-            <Link href={exitHref}>Leave table</Link>
+            <Link href={exitHref}>{exitHref === "/" ? "Home" : "Dashboard"}</Link>
           </div>
         </header>
       )}
@@ -626,14 +657,10 @@ export function PokerTableView({
         <section className={styles.tableColumn} aria-label="Poker table">
           <div className={`${styles.turnBanner} ${decisionReady ? styles.yourTurnBanner : ""}`}>
             <div className={styles.turnBannerCopy}>
-              <span>{stageLabel}</span>
+              {!table.completed && <span>{stageLabel}</span>}
               <h1 aria-live="polite">{turnLabel}</h1>
               <small>
-                {turnName && !resolving
-                  ? (turn?.seat === table.viewer_seat ? "" : `${turnName} is acting`)
-                  : waitSeconds !== null && !turn
-                    ? "Next action shortly"
-                    : tableUpdate}
+                {!turn && !table.completed && waitSeconds === null && tableUpdate}
               </small>
             </div>
             <div className={styles.topClock}>
@@ -674,8 +701,8 @@ export function PokerTableView({
             )}
             <div className={styles.felt}>
               <div className={styles.board}>
-                <span className={styles.potLabel}>Total Pot</span>
-                <strong>{formatChips(table.pot)}</strong>
+                <span className={styles.potLabel}>{result ? "Pot awarded" : "Pot"}</span>
+                <strong className={styles.potAmount}><ChipTower amount={displayedPot} maximum={displayedPot} tone="pot" />{formatChips(displayedPot)}</strong>
                 <div className={styles.communityCards}>
                   {Array.from({ length: 5 }, (_, index) =>
                     index < boardCount && table.community_cards[index] ? (
@@ -704,6 +731,8 @@ export function PokerTableView({
                 winner={winnerSeats.has(seat.seat)}
                 showdownIndex={result?.revealed_hands.findIndex((hand) => hand.seat === seat.seat) ?? -1}
                 bigBlind={table.big_blind}
+                maxStack={maxStack}
+                maxCommitted={maxCommitted}
                 key={seat.seat}
               />
             ))}
@@ -713,7 +742,8 @@ export function PokerTableView({
           <div className={`${styles.actionDock} ${decisionReady ? styles.yourTurn : ""}`}>
             <div className={styles.turnCopy}>
               <span>{decisionReady ? "Your action" : result ? "Hand result" : spectating ? "Spectating" : ""}</span>
-              <strong>{decisionReady ? (canCheck ? "Check or bet" : `Call ${formatChips(callAmount)} or raise`) : result ? result.winner_seats.map((seat) => names.get(seat)).join(" + ") + (result.winner_seats.length > 1 ? " split the pot" : " wins the pot") : tableUpdate}</strong>
+              <strong>{decisionReady ? (canCheck ? (betting ? "Check or bet" : "Check or raise") : `Call ${formatChips(callAmount)} or raise`) : result ? result.winner_seats.map((seat) => names.get(seat)).join(" + ") + (result.winner_seats.length > 1 ? " split the pot" : " wins the pot") : tableUpdate}</strong>
+              {result && <p className={styles.notice}>{result.revealed_hands.filter((hand) => winnerSeats.has(hand.seat)).map((hand) => hand.label).join(" · ") || "Everyone else folded"}</p>}
               {foldArmed && <p className={styles.notice} role="alert">Checking is free. Press F again to fold anyway, or C to check.</p>}
               {notice && !foldArmed && <p aria-live="polite" className={styles.notice}>{notice}</p>}
               {error && <p className={styles.errorNotice} role="alert">Connection interrupted · Retrying… {error}</p>}
@@ -770,7 +800,7 @@ export function PokerTableView({
             <div><span>Current hand</span><strong>#{table.hand_number}</strong></div>
           </div>
           <dl className={styles.summary}>
-            <div><dt>Total pot</dt><dd>{formatChips(table.pot)}</dd></div>
+            <div><dt>{result ? "Pot awarded" : "Total pot"}</dt><dd>{formatChips(displayedPot)}</dd></div>
             <div><dt>Players in hand</dt><dd>{table.seats.filter((seat) => !seat.folded && !seat.eliminated).length}</dd></div>
             {table.match && <div><dt>Players left</dt><dd>{table.match.players_remaining}</dd></div>}
             {table.match && <div><dt>Blind level</dt><dd>{table.match.level_number}</dd></div>}
@@ -800,7 +830,7 @@ export function PokerTableView({
           <details className={styles.historyDisclosure} open>
             <summary className={styles.historyHead}><span>Action history</span><span>Latest first</span></summary>
             <ol className={styles.history}>
-              {recentActions.map((action, index) => (
+              {[...table.action_history].reverse().map((action, index) => (
                 <li className={index === 0 ? styles.latestHistory : ""} key={action.sequence}>
                   <span>{String(action.sequence).padStart(2, "0")}</span>
                   <div>

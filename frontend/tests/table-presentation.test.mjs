@@ -46,3 +46,9 @@ test("raise presets include the call and prior street contribution, bounded by l
   assert.deepEqual(plain(raisePresets(10000,0,0,200,500)),[200,500,500,500,500]);
   assert.deepEqual(plain(raisePresets(100,0,0,200,2000)),[200,200,200,200,2000]);
 });
+
+test("checking the big blind still offers a raise, not an opening bet", () => {
+  assert.equal(exported.isOpeningBet("preflop", true), false);
+  assert.equal(exported.isOpeningBet("flop", true), true);
+  assert.equal(exported.isOpeningBet("river", false), false);
+});

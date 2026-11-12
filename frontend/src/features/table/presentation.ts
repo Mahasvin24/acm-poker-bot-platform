@@ -21,3 +21,8 @@ export function raisePresets(pot: number, call: number, committed: number, min: 
   const clamp = (amount: number) => Math.max(min, Math.min(max, Math.round(amount)));
   return [min, ...[0.5, 0.75, 1].map((fraction) => clamp(committed + call + (pot + call) * fraction)), max];
 }
+
+/** The big blind can check pre-flop, but increasing it is still a raise. */
+export function isOpeningBet(street: string, canCheck: boolean): boolean {
+  return canCheck && street !== "preflop";
+}
