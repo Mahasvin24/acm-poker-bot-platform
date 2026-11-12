@@ -28,16 +28,16 @@
 .wordmark {
   justify-self: start;
   color: inherit;
-  font: 700 11px/1 monospace;
-  letter-spacing: 0.14em;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
   text-decoration: none;
 }
 
 .headerTitle {
   color: var(--portal-muted);
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .headerAccount {
@@ -47,7 +47,7 @@
   justify-self: end;
   gap: 16px;
   color: var(--portal-muted);
-  font: 10px/1 monospace;
+  font: 12px/1 Arial, Helvetica, sans-serif;
 }
 
 .headerAccount span {
@@ -63,11 +63,11 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.08em;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .authLayout {
@@ -80,10 +80,11 @@
   position: relative;
   display: flex;
   overflow: hidden;
-  min-height: 650px;
+  min-height: 0;
   flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(48px, 8vw, 112px);
+  justify-content: center;
+  gap: 24px;
+  padding: clamp(32px, 5vw, 72px);
   background: var(--portal-green);
   color: #f8f1e5;
 }
@@ -123,7 +124,7 @@
   max-width: 820px;
   margin: 28px 0 0;
   font: 400 clamp(64px, 9vw, 132px) / 0.82 Georgia, serif;
-  letter-spacing: -0.07em;
+  letter-spacing: normal;
   text-wrap: balance;
 }
 
@@ -168,12 +169,12 @@
   background: transparent;
   color: var(--portal-muted);
   cursor: pointer;
-  font: 700 10px/1 monospace;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-.modeTabs button[aria-selected="true"] {
+.modeTabs button[aria-pressed="true"] {
   border-bottom-color: var(--portal-red);
   color: var(--portal-ink);
 }
@@ -183,7 +184,7 @@
 .emptyState h2 {
   margin: 0;
   font: 400 clamp(34px, 4vw, 52px) / 1 Georgia, serif;
-  letter-spacing: -0.04em;
+  letter-spacing: normal;
   text-wrap: balance;
 }
 
@@ -225,7 +226,7 @@
   border-radius: 0;
   background: #fffaf1;
   color: var(--portal-ink);
-  font: 14px/1 monospace;
+  font: 14px/1 Arial, Helvetica, sans-serif;
 }
 
 .field input:focus-visible,
@@ -268,9 +269,9 @@
   padding: 0 18px;
   border: 1px solid transparent;
   cursor: pointer;
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .primaryButton,
@@ -343,20 +344,20 @@
 .dashboard {
   width: min(1220px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 72px 0 100px;
+  padding: 28px 0 48px;
 }
 
 .dashboardIntro {
   display: grid;
   align-items: end;
   grid-template-columns: 1fr minmax(280px, 0.45fr);
-  gap: 64px;
-  padding-bottom: 64px;
+  gap: 32px;
+  padding-bottom: 24px;
   border-bottom: 1px solid rgb(23 35 30 / 22%);
 }
 
 .dashboardIntro h1 {
-  font-size: clamp(58px, 8vw, 112px);
+  font-size: 36px;
 }
 
 .dashboardIntro > p {
@@ -370,8 +371,8 @@
   display: grid;
   align-items: start;
   grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr);
-  gap: 56px;
-  padding-top: 56px;
+  gap: 24px;
+  padding-top: 24px;
 }
 
 .sidebar {
@@ -537,9 +538,9 @@
 .entrantSummary > span {
   align-self: center;
   color: var(--portal-muted);
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .botSetup {
@@ -578,7 +579,7 @@
   border: 1px solid #9f998b;
   background: #fffaf1;
   color: var(--portal-ink);
-  font: 12px/1 monospace;
+  font: 12px/1 Arial, Helvetica, sans-serif;
 }
 
 .inviteControls input:focus-visible {
@@ -664,7 +665,7 @@
   padding: 18px;
   background: var(--portal-ink);
   color: #f8f1e5;
-  font: 11px/1.6 monospace;
+  font: 12px/1.6 Arial, Helvetica, sans-serif;
 }
 
 .protocolList {
@@ -687,9 +688,9 @@
   min-height: calc(100svh - 74px);
   place-items: center;
   color: var(--portal-muted);
-  font: 700 10px/1 monospace;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .loading span::after {
@@ -783,9 +784,9 @@
 .openSeat span {
   grid-column: 1 / -1;
   color: var(--portal-muted);
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .kindTag {
@@ -793,9 +794,9 @@
   padding: 4px 6px;
   border: 1px solid currentcolor;
   color: var(--portal-green);
-  font: 700 8px/1 monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .kindTag[data-kind="bot"] {
@@ -880,7 +881,7 @@
 
 .botCardHead code {
   color: var(--portal-muted);
-  font: 12px/1 monospace;
+  font: 12px/1 Arial, Helvetica, sans-serif;
 }
 
 /* Connection feedback uses the same surfaces and rules as the account panels. */
@@ -895,9 +896,9 @@
 
 .connectionStatus strong {
   color: var(--portal-muted);
-  font: 700 11px/1.4 monospace;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 700 12px/1.4 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .connectionStatus p {
@@ -950,7 +951,7 @@
 
 :is(.botDashboard, .humanDashboard) .dashboardIntro h1 {
   margin: 0;
-  font-size: clamp(32px, 3.4vw, 46px);
+  font-size: 32px;
   line-height: 1.05;
 }
 
@@ -974,7 +975,7 @@
 }
 
 :is(.botDashboard, .humanDashboard) .panelHead h2 {
-  font-size: 30px;
+  font-size: 26px;
 }
 
 :is(.botDashboard, .humanDashboard) .sectionLabel {
@@ -1310,7 +1311,7 @@
 .consoleTitle {
   margin: 0;
   font: 400 clamp(46px, 6vw, 84px) / 0.9 Georgia, serif;
-  letter-spacing: -0.05em;
+  letter-spacing: normal;
 }
 
 .codeCard {
@@ -1369,10 +1370,10 @@
   padding: 10px 8px;
   border-bottom: 1px solid rgb(23 35 30 / 30%);
   color: var(--portal-muted);
-  font: 700 9px/1 monospace;
-  letter-spacing: 0.1em;
+  font: 700 12px/1 Arial, Helvetica, sans-serif;
+  letter-spacing: normal;
   text-align: left;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .rosterTable td {
@@ -1385,7 +1386,7 @@
   display: block;
   margin-top: 4px;
   color: var(--portal-muted);
-  font: 11px/1 monospace;
+  font: 12px/1 Arial, Helvetica, sans-serif;
 }
 
 .health {
@@ -1452,7 +1453,7 @@
 
 @media (max-width: 900px) {
   .authLayout { grid-template-columns: 1fr; }
-  .authIntro { min-height: 500px; }
+  .authIntro { min-height: 0; }
   .dashboardIntro,
   .workspace { grid-template-columns: 1fr; }
   .dashboardIntro { gap: 30px; }
@@ -1465,12 +1466,12 @@
   .headerTitle { display: none; }
   .headerAccount span { display: none; }
   .authLayout { min-height: calc(100svh - 64px); }
-  .authIntro { min-height: 420px; padding: 52px 18px; }
+  .authIntro { min-height: 0; padding: 52px 18px; }
   .authIntro h1 { font-size: clamp(58px, 19vw, 86px); }
   .authPanel { padding: 54px 18px; }
   .dashboard { width: calc(100% - 36px); padding-top: 48px; }
   .dashboardIntro { padding-bottom: 44px; }
-  .dashboardIntro h1 { font-size: clamp(54px, 18vw, 80px); }
+  .dashboardIntro h1 { font-size: 32px; }
   .sidebar { grid-template-columns: 1fr; }
   .panel,
   .emptyState { padding: 26px 18px; }
@@ -1505,19 +1506,19 @@
   margin-top: 0;
   font-size: clamp(48px, 6vw, 88px);
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: normal;
 }
 
 .authLayout .field label,
 .authLayout .kindLegend {
   font: 600 13px/1.4 Arial, sans-serif;
-  letter-spacing: 0;
+  letter-spacing: normal;
   text-transform: none;
 }
 
 .authLayout .modeTabs button {
   font: 600 12px/1.4 Arial, sans-serif;
-  letter-spacing: 0;
+  letter-spacing: normal;
   text-transform: none;
 }
 
@@ -1547,4 +1548,26 @@
 .botTestReport p {
   margin: 8px 0 0;
   line-height: 1.5;
+}
+
+/* Readable shared account controls and document flow at larger zoom. */
+.page { --portal-muted: #526158; font-family: Arial, Helvetica, sans-serif; }
+.page :is(button, input, select, summary) { touch-action: manipulation; }
+.page :is(a, button, summary, input, select):focus-visible { outline: 3px solid #164b39; outline-offset: 3px; }
+.textButton { min-height: 32px; display: inline-flex; align-items: center; }
+.fieldHint, .formError, .successMessage, .panelIntro { font-size: 13px; }
+.panelHead h2 { font-size: 28px; }
+.kindTag[data-kind="bot"] { color: #526158; }
+.authIntro::after { display: none; }
+.authIntro p { max-width: 36ch; }
+.authIntro h1 { font-size: clamp(36px, 5vw, 64px); }
+.page h1, .page h2, .matchList strong { overflow-wrap: anywhere; }
+.lookingDot::after, .pulse { animation: none; }
+@media (max-width: 620px) {
+  .field input, .field select { font-size: 16px; }
+  .humanDashboard { height: auto; min-height: 100svh; }
+  .humanDashboard .matchList { overflow: visible; }
+  .authIntro { padding: 28px 18px; }
+  .authIntro h1 { font-size: 36px; }
+  .authPanel { padding-top: 28px; }
 }

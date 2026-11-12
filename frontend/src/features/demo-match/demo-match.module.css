@@ -136,3 +136,12 @@
   .intro,
   .intro h1 { transition: none; }
 }
+
+/* Practice uses the same quiet, functional hierarchy as the platform. */
+.header { font: 600 12px/1.4 Arial, sans-serif; letter-spacing: normal; text-transform: none; }
+.intro h1 { font: 400 clamp(36px, 5vw, 64px)/1.05 Georgia, serif; letter-spacing: -0.03em; }
+.intro p:first-child, .footer { font: 13px/1.5 Arial, sans-serif; letter-spacing: normal; text-transform: none; }
+.liveControls { position: absolute; top: 12px; right: 20px; bottom: auto; left: auto; width: auto; }
+.liveControls summary, .liveControls button { font: 600 12px/1.4 Arial, sans-serif; letter-spacing: normal; text-transform: none; }
+.liveControls > div { grid-template-columns: 1fr 1fr; }
+.empty button { font: 600 14px/1.4 Arial, sans-serif; letter-spacing: normal; text-transform: none; }

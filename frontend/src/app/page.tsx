@@ -8,7 +8,7 @@ const tickerItems = [
   "No-limit Hold’em",
   "Six-player tables",
   "Play-money",
-  "One champion",
+  "Humans and bots",
 ];
 
 const timeline = [
@@ -21,7 +21,7 @@ const timeline = [
   {
     number: "02",
     title: "Run the check",
-    copy: "Bot builders verify their endpoint from My Bots.",
+    copy: "Bot builders save their connection settings and test their bot on the dashboard.",
     timing: "Before event",
   },
   {
@@ -33,7 +33,7 @@ const timeline = [
   {
     number: "04",
     title: "Play it down",
-    copy: "The table plays until one stack remains.",
+    copy: "Play until the time or hand limit, or until one player remains. Remaining stacks determine the standings.",
     timing: "Live",
     live: true,
   },
@@ -137,8 +137,7 @@ export default function Home() {
             </h1>
             <div className="hero-bottom reveal">
               <p>
-                Live poker where people play their instincts and student-built
-                bots play their code. Got a code from the organizer?
+                Play no-limit Hold’em against people and student-built bots. Enter the organizer’s code to join.
               </p>
               <Link className="round-link" href="/join">
                 <span>Join a match</span>
@@ -150,31 +149,6 @@ export default function Home() {
             Up to 6 per table
           </p>
           <p className="side-note side-note--right">Scroll to deal</p>
-        </section>
-
-        <section
-          className="page-section thesis"
-          aria-label="Introduction"
-        >
-          <div className="suit-field" aria-hidden="true">
-            <span>♣</span>
-            <span>♦</span>
-            <span>♠</span>
-            <span>♥</span>
-          </div>
-          <div className="container thesis-inner">
-            <p className="chapter reveal">01 · The idea</p>
-            <p className="statement reveal">
-              Poker has always been a game of incomplete information.
-            </p>
-            <p className="statement statement--shift reveal">
-              Now the player across from you might be <em>an API.</em>
-            </p>
-            <div className="thesis-foot reveal">
-              <span>Bring your poker face.</span>
-              <span>Or bring your code.</span>
-            </div>
-          </div>
         </section>
 
         <section className="page-section format" id="format">
@@ -196,10 +170,9 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="player-mark">H</p>
-                  <h3>Read the room.</h3>
+                  <h3>Play in your browser</h3>
                   <p>
-                    Play each hand through a focused browser interface. Your
-                    cards, legal moves, and clock—nothing more.
+                    See your cards, follow the action, and choose your next move.
                   </p>
                 </div>
                 <span className="player-tag">No code required</span>
@@ -214,7 +187,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="player-mark">B</p>
-                  <h3>Read the state.</h3>
+                  <h3>Enter your bot</h3>
                   <p>
                     Connect your own strategy over the event network. We send
                     the hand; your API returns the move.
@@ -242,9 +215,7 @@ export default function Home() {
             <div className="timeline-title reveal">
               <p className="chapter">03 · From signup to showdown</p>
               <h2>
-                Four moments.
-                <br />
-                <em>One night.</em>
+                How to join
               </h2>
             </div>
             <ol className="timeline-list">
@@ -273,9 +244,7 @@ export default function Home() {
             <div className="faq-intro reveal">
               <p className="chapter">04 · Before you ask</p>
               <h2>
-                The fine print,
-                <br />
-                <em>kept simple.</em>
+                Questions
               </h2>
               <p>
                 Build a bot with the{" "}

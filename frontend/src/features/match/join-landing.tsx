@@ -12,23 +12,21 @@ export function JoinLanding() {
       </header>
       <section className={styles.content}>
         <div className={styles.intro}>
-          <p>Join a match</p>
-          <h1>Take your seat.</h1>
+          <h1>Join a match</h1>
           <p>
-            Enter the six-character code from the organizer. You will sign in or create an
-            account next, then choose to play yourself or seat one of your bots.
+            Enter the organizer’s six-character code. Sign in to join as a player or with your saved bot.
           </p>
         </div>
         <div className={styles.panel}>
           <CodeEntry />
           <span className={styles.or}>or practice first</span>
           <Link className={styles.demoLink} href="/demo">
-            <span>Real engine, no account</span>
-            <strong>Play three test bots</strong>
+            <span>No account needed</span>
+            <strong>Practice against bots</strong>
             <b>↗</b>
           </Link>
           <Link className={styles.demoLink} href="/play/demo">
-            <span>Learn the controls</span>
+            <span>Preview only</span>
             <strong>Open a table preview</strong>
             <b>↗</b>
           </Link>

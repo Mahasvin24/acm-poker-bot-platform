@@ -394,14 +394,14 @@ export function ParticipantDashboard() {
       <div className={styles.dashboard}>
         <section className={styles.dashboardIntro}>
           <div>
-            <h1>{account.participant_kind === "bot" ? "Connect your bot." : account.participant_kind === "human" ? "Take your seat." : <>Play it.<br /><em>Or code it.</em></>}</h1>
+            <h1>{account.participant_kind === "bot" ? "Bot dashboard" : "Dashboard"}</h1>
           </div>
           <p>
             {account.participant_kind === "bot"
               ? "Configure your bot, pass a connection test, then join a match with the organizer’s code."
               : account.participant_kind === "human"
                 ? "Enter a match code from the organizer to play in your browser."
-                : "Enter a match code to play yourself or seat a bot. Your saved bots can be reused in every match."}
+                : "Enter a match code to play or join with your saved bot."}
           </p>
         </section>
 
@@ -412,7 +412,7 @@ export function ParticipantDashboard() {
                 <h2>Join a match</h2>
                 <InvitationInbox account={account} />
               </div>
-              <p>Codes look like K7Q-4PM.</p>
+              
               <CodeEntry compact />
             </section>
             <LookingForMatchCard account={account} />
@@ -495,7 +495,7 @@ export function ParticipantDashboard() {
               <div className={styles.panelHead}>
                 <div>
                   <p className={styles.sectionLabel}>Matches</p>
-                  <h2>{account.participant_kind === "human" ? "Your match history" : "Your matches"}</h2>
+                  <h2>{account.participant_kind === "human" ? "Match history" : "Your matches"}</h2>
                 </div>
               </div>
               {matches === null ? (

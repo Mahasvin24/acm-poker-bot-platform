@@ -84,7 +84,7 @@ export function AuthPage({ next }: AuthPageProps) {
   if (checking) {
     return (
       <main className={styles.page} id="main-content">
-        <div className={styles.loading}><span>Checking Session</span></div>
+        <div className={styles.loading}><span>Checking session…</span></div>
       </main>
     );
   }
@@ -99,41 +99,38 @@ export function AuthPage({ next }: AuthPageProps) {
       <div className={styles.authLayout}>
         <section className={styles.authIntro}>
           <div>
-            <h1>Human<br />or bot.</h1>
+            <h1>ACM Poker</h1>
           </div>
           <p>
-            Sign up as a human to play in the browser, or as a bot to connect your code.
-            Organizers share a short join code for each match.
+            Play in your browser or enter a bot. Join a match with the organizer’s code.
           </p>
         </section>
         <section className={styles.authPanel} aria-labelledby="account-heading">
           <div className={styles.authCard}>
-            <div className={styles.modeTabs} role="tablist" aria-label="Account action">
+            <div className={styles.modeTabs} role="group" aria-label="Account action">
               <button
-                aria-selected={mode === "login"}
+                aria-pressed={mode === "login"}
                 onClick={() => { setMode("login"); setError(null); }}
-                role="tab"
                 type="button"
               >
                 Sign In
               </button>
               <button
-                aria-selected={mode === "register"}
+                aria-pressed={mode === "register"}
                 onClick={() => { setMode("register"); setError(null); }}
-                role="tab"
                 type="button"
               >
                 Create Account
               </button>
             </div>
             <h2 id="account-heading">
-              {mode === "login" ? "Return to your seat." : "Start with an account."}
+              {mode === "login" ? "Sign in" : "Create an account"}
             </h2>
             <p>
               {mode === "login"
                 ? safeNext(next)?.startsWith("/join")
                   ? "Sign in to finish joining the match."
-                  : "Sign in to join a match, manage your bots, or return to a live table."
+                  : "Sign in to join a match or return to your table."
                 : "Choose how you will play. Bot accounts save their connection settings on the dashboard."}
             </p>
             <form className={styles.form} onSubmit={submit}>
@@ -180,7 +177,7 @@ export function AuthPage({ next }: AuthPageProps) {
               </div>
               {mode === "register" && (
                 <div className={styles.field}>
-                  <label htmlFor="account-confirmation">Confirm Password</label>
+                  <label htmlFor="account-confirmation">Confirm password</label>
                   <input
                     autoComplete="new-password"
                     id="account-confirmation"
@@ -194,7 +191,7 @@ export function AuthPage({ next }: AuthPageProps) {
               )}
               {error && <p aria-live="polite" className={styles.formError}>{error}</p>}
               <button className={styles.primaryButton} disabled={pending} type="submit">
-                {pending ? "Working…" : mode === "login" ? "Sign In" : "Create Account"}
+                {pending ? mode === "login" ? "Signing in…" : "Creating account…" : mode === "login" ? "Sign In" : "Create Account"}
               </button>
               {mode === "login" && (
                 <p className={styles.fieldHint}>

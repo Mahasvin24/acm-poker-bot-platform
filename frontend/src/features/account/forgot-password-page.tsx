@@ -20,7 +20,7 @@ export function ForgotPasswordPage() {
       await requestPasswordReset(email);
       setSubmitted(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "That did not work. Try again.");
+      setError(reason instanceof Error ? reason.message : "Could not request a password reset. Try again.");
     } finally {
       setPending(false);
     }
@@ -35,8 +35,7 @@ export function ForgotPasswordPage() {
       </header>
       <div className={styles.narrow}>
         <section className={styles.panel}>
-          <p className={styles.sectionLabel}>Password help</p>
-          <h2>Forgot your password?</h2>
+          <h1 className={styles.subheading}>Password help</h1>
           {submitted ? (
             <div className={styles.entrantBody}>
               <p className={styles.panelIntro}>
@@ -53,8 +52,7 @@ export function ForgotPasswordPage() {
           ) : (
             <form className={styles.form} onSubmit={(event) => void submit(event)}>
               <p className={styles.panelIntro}>
-                Enter the email you used to register. We do not send email from this platform;
-                your organizer can issue a new password from the admin dashboard.
+                Enter your account email to request a reset from the organizer. You’ll receive your temporary password from them at the event.
               </p>
               <div className={styles.field}>
                 <label htmlFor="forgot-email">Email</label>

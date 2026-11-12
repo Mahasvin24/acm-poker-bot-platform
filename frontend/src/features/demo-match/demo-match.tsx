@@ -116,10 +116,10 @@ export function DemoMatch() {
     return (
       <main className={styles.livePage} id="main-content">
         <details className={styles.liveControls}>
-          <summary>Test controls</summary>
+          <summary>Practice controls</summary>
           <div>
-            <button disabled={busy} onClick={() => void run(startDemoMatch, "A fresh match is live.", true)}>Restart</button>
-            <button disabled={busy} onClick={() => void run(endDemoMatch, "Match erased.", true)}>Exit game</button>
+            <button disabled={busy} onClick={() => void run(startDemoMatch, "Practice started.", true)}>Restart</button>
+            <button disabled={busy} onClick={() => void run(endDemoMatch, "Practice ended.", true)}>Exit game</button>
           </div>
         </details>
         <PokerTableView
@@ -144,23 +144,15 @@ export function DemoMatch() {
     <main className={styles.page} id="main-content">
       <header className={styles.header}>
         <Link href="/">ACM / POKER</Link>
-        <span>EPHEMERAL TEST TABLE</span>
+        <span>Practice table</span>
         <Link href="/join">Join a real match</Link>
       </header>
 
       <section className={styles.intro}>
-        <div><p>One human × three test bots</p><h1>One table.<br /><em>No trace.</em></h1></div>
+        <div><p>One human × three test bots</p><h1>Practice poker</h1></div>
         <p className={styles.explainer}>
-          A real four-player hand powered by the production poker engine. This single in-memory
-          match creates no account, match, entrant, event, or action records.
+          Play a hand against three bots. No account needed, and results do not affect your match history.
         </p>
-      </section>
-
-      <section aria-label="Demo match controls" className={styles.controlBar}>
-        <button disabled={busy} onClick={() => void run(startDemoMatch, "A fresh match is live.", true)}>
-          {match.status === "idle" ? "Start game" : "Restart game"}
-        </button>
-        <button disabled={busy || match.status === "idle"} onClick={() => void run(endDemoMatch, "Match erased.", true)}>End game</button>
       </section>
 
       {loading ? (
@@ -168,14 +160,14 @@ export function DemoMatch() {
       ) : match.status === "idle" ? (
         <section className={styles.empty}>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <span>01 / READY</span><h2>The table is empty.</h2>
-          <p>Start a game to take your seat against three deliberately paced test bots.</p>
-          <button disabled={busy} onClick={() => void run(startDemoMatch, "A fresh match is live.", true)}>Deal the hand →</button>
+          <h2>Ready to play?</h2>
+          <p>You’ll have 30 seconds for each decision.</p>
+          <button disabled={busy} onClick={() => void run(startDemoMatch, "Practice started.", true)}>Deal the hand →</button>
         </section>
       ) : null}
 
       <footer className={styles.footer}>
-        <span>IN-MEMORY ONLY</span><span>PRIVATE TO THIS BROWSER</span><span>30 SECOND HUMAN CLOCK</span><span>3 × 4 SECOND TEST BOTS</span>
+        <span>Play money</span><span>Private to this browser</span>
       </footer>
     </main>
   );

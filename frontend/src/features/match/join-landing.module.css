@@ -16,9 +16,9 @@
   gap: 24px;
   margin: 0 auto;
   border-bottom: 1px solid rgb(23 35 30 / 22%);
-  font: 700 10px/1 monospace;
+  font: 700 12px/1 Arial, sans-serif;
   letter-spacing: 0.11em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .header a {
@@ -38,21 +38,21 @@
   grid-template-columns: 0.9fr 1.1fr;
   gap: 10vw;
   margin: 0 auto;
-  padding: 80px 0;
+  padding: 40px 0;
 }
 
 .intro > p:first-child {
   margin: 0 0 26px;
   color: #bd493b;
-  font: 700 10px/1 monospace;
+  font: 700 12px/1 Arial, sans-serif;
   letter-spacing: 0.13em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .intro h1 {
   margin: 0;
-  font: 400 clamp(64px, 9vw, 120px) / 0.82 Georgia, serif;
-  letter-spacing: -0.07em;
+  font: 400 clamp(40px, 5vw, 64px) / 1.05 Georgia, serif;
+  letter-spacing: -0.03em;
 }
 
 .intro > p:last-child {
@@ -80,10 +80,10 @@
   display: block;
   margin: 30px 0;
   color: #7b817b;
-  font: 9px/1 monospace;
+  font: 12px/1 Arial, sans-serif;
   letter-spacing: 0.1em;
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .demoLink {
@@ -101,9 +101,9 @@
 
 .demoLink span {
   color: #bd493b;
-  font: 700 9px/1 monospace;
+  font: 700 12px/1 Arial, sans-serif;
   letter-spacing: 0.09em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .demoLink strong {
@@ -147,3 +147,6 @@
 @media (max-width: 500px) {
   .header span { display: none; }
 }
+
+.intro > p:last-child { margin-top: 24px; }
+.header a:focus-visible, .demoLink:focus-visible { outline: 3px solid #164b39; outline-offset: 4px; }
