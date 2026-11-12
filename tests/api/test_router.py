@@ -259,6 +259,21 @@ async def test_admin_creates_match_and_players_join_by_code(
     assert spectate.status_code == 200
     assert spectate.json()["viewer_seat"] is None
     assert all(seat["hole_cards"] == [] for seat in spectate.json()["seats"])
+    revealed = await admin.get(f"/api/v1/admin/matches/{match['match_id']}/table?reveal_cards=true")
+    assert revealed.status_code == 200
+    assert all(len(seat["hole_cards"]) == 2 for seat in revealed.json()["seats"])
+    assert all(seat["win_probability"] is not None for seat in revealed.json()["seats"])
+    async with signed_in(app, "not-admin@example.com") as visitor:
+        forbidden = await visitor.get(
+            f"/api/v1/admin/matches/{match['match_id']}/table?reveal_cards=true"
+        )
+        assert forbidden.status_code == 403
+    hidden_again = await admin.get(f"/api/v1/admin/matches/{match['match_id']}/table")
+    assert all(
+        seat["hole_cards"] == [] and seat["win_probability"] is None
+        for seat in hidden_again.json()["seats"]
+    )
+
 
     async with signed_in(app, "late@example.com") as late:
         rejected = await late.post(

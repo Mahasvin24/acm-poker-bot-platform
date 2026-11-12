@@ -401,6 +401,7 @@ class PublicPlayerSeatResponse(ApiModel):
     eliminated: bool
     away: bool = False
     hole_cards: tuple[str, ...] = ()
+    win_probability: float | None = Field(default=None, ge=0, le=100)
 
 
 class PublicPlayerActionResponse(ApiModel):

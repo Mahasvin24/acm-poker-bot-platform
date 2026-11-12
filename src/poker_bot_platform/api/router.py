@@ -574,8 +574,10 @@ def create_api_router(
         return await _translate(matches.admin_detail(match_id))
 
     @router.get("/admin/matches/{match_id}/table", response_model=PlayerTableStateResponse)
-    async def spectate_match(match_id: str, _admin: CurrentAdmin) -> PlayerTableStateResponse:
-        return await _translate(runtime.spectator_state(match_id))
+    async def spectate_match(
+        match_id: str, _admin: CurrentAdmin, reveal_cards: bool = False
+    ) -> PlayerTableStateResponse:
+        return await _translate(runtime.spectator_state(match_id, reveal_cards=reveal_cards))
 
     @router.post(
         "/admin/matches/{match_id}/start",

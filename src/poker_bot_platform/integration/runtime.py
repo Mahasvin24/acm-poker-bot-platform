@@ -57,6 +57,7 @@ from poker_bot_platform.domain import (
 )
 from poker_bot_platform.engine import PokerEngine, PokerKitEngine
 from poker_bot_platform.integration.actors import BotActor
+from poker_bot_platform.integration.equity import showdown_equities
 from poker_bot_platform.integration.presentation import natural_hand_result
 from poker_bot_platform.match import (
     MatchCoordinator,
@@ -202,9 +203,11 @@ class MatchRuntime:
             self._last_seen[entry.entry_id] = self._now()
         return await self._table_view(state, entry)
 
-    async def spectator_state(self, match_id: str) -> PlayerTableStateResponse:
+    async def spectator_state(
+        self, match_id: str, *, reveal_cards: bool = False
+    ) -> PlayerTableStateResponse:
         match = await self._match(match_id)
-        return await self._table_view(match.state, None)
+        return await self._table_view(match.state, None, reveal_cards=reveal_cards)
 
     def entry_activity(self, entry_id: str) -> EntryActivity:
         return EntryActivity(
@@ -530,6 +533,8 @@ class MatchRuntime:
         self,
         state: MatchState,
         entry: MatchEntry | None,
+        *,
+        reveal_cards: bool = False,
     ) -> PlayerTableStateResponse:
         if state.status is MatchStatus.LOBBY or state.table is None:
             raise GameplayConflictError("the match has not started yet")
@@ -539,7 +544,24 @@ class MatchRuntime:
             raise GameplayUnavailableError("the table is reconnecting to the database") from exc
         if coordinator.state.snapshot is None:
             raise GameplayConflictError("the first hand is being dealt")
-        return self._project(state, coordinator, entry)
+        view = self._project(state, coordinator, entry)
+        if reveal_cards:
+            snapshot = coordinator.state.snapshot
+            # Capture one immutable snapshot before moving calculation off the event loop.
+            assert snapshot is not None
+            seats = tuple(
+                (seat.seat, seat.hole_cards, seat.folded or seat.eliminated)
+                for seat in snapshot.seats
+            )
+            equities = await asyncio.to_thread(showdown_equities, snapshot.community_cards, seats)
+            holes = {seat.seat: seat.hole_cards for seat in snapshot.seats}
+            view = view.model_copy(update={"seats": tuple(
+                seat.model_copy(update={
+                    "hole_cards": holes[seat.seat],
+                    "win_probability": equities.get(seat.seat),
+                }) for seat in view.seats
+            )})
+        return view
 
     async def _coordinator(self, table_id: str) -> TableCoordinator:
         existing = self._coordinators.get(table_id)
